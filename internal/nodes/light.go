@@ -7,6 +7,38 @@ import (
 	"texxer/internal/img"
 )
 
+var lightDef = Def{
+	Eval:     lightNode,
+	Category: "light",
+	Inputs:   []string{"height"},
+	Params: []Param{
+		num("strength", 3, 0, 32),
+		num("gain", 1, 0, 4),
+		num("azimuth", 135, 0, 360),
+		num("elevation", 45, 1, 90),
+	},
+}
+
+var slopeDef = Def{
+	Eval:     slopeNode,
+	Category: "light",
+	Inputs:   []string{"height"},
+	Params: []Param{
+		num("strength", 3, 0, 32),
+		num("azimuth", 90, 0, 360),
+	},
+}
+
+var curvatureDef = Def{
+	Eval:     curvatureNode,
+	Category: "light",
+	Inputs:   []string{"height"},
+	Params: []Param{
+		px("radius", 1, 1, 16),
+		num("gain", 4, 0, 32),
+	},
+}
+
 // lightNode bakes directional lighting from a height map. Flat areas are 0.5,
 // so the result works with an overlay blend.
 func lightNode(e *graph.Env) (*img.Buffer, error) {

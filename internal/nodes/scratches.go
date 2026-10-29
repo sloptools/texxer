@@ -8,7 +8,20 @@ import (
 	"texxer/internal/noise"
 )
 
-func scratches(e *graph.Env) *img.Buffer {
+var scratchesDef = Def{
+	Eval:     scratchesNode,
+	Category: "grunge",
+	Params: []Param{
+		integer("count", 150, 1, 2000),
+		px("length", 30, 1, 256),
+		px("width", 1, 0.25, 8),
+		num("angle", 30, -180, 180),
+		num("spread", 40, 0, 360),
+		seedParam,
+	},
+}
+
+func scratchesNode(e *graph.Env) (*img.Buffer, error) {
 	p := e.Params
 	count := p.Int("count", 150)
 	length := e.Px("length", 30)
@@ -30,7 +43,7 @@ func scratches(e *graph.Env) *img.Buffer {
 
 		drawLine(b, x0, y0, x1, y1, width, float32(0.4+0.6*r(4)))
 	}
-	return b
+	return b, nil
 }
 
 // drawLine draws an anti-aliased segment, wrapping around tiled edges.

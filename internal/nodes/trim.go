@@ -3,6 +3,7 @@ package nodes
 import (
 	"errors"
 	"math"
+	"slices"
 
 	"texxer/internal/graph"
 	"texxer/internal/img"
@@ -13,11 +14,25 @@ type strip struct {
 	Input  string  `json:"input"`
 }
 
+var defaultStrips = []strip{{Height: 64, Input: "s1"}, {Height: 0, Input: "s2"}}
+
+var trimDef = Def{
+	Eval:     trimNode,
+	Category: "shape",
+	Dynamic:  true,
+	Params: []Param{
+		data("strips", defaultStrips),
+		px("rail", 6, 0, 64),
+		px("rail_bevel", 2, 0.5, 32),
+		num("depth", 0.6, 0, 1),
+	},
+}
+
 // trimNode stacks horizontal strips into a trimsheet height map. Each strip
 // input is rendered at strip size with horizontal-only tiling. Raised rails
 // separate the strips; the last strip fills the remaining height.
 func trimNode(e *graph.Env) (*img.Buffer, error) {
-	var strips []strip
+	strips := slices.Clone(defaultStrips)
 	if err := e.Params.Decode("strips", &strips); err != nil {
 		return nil, err
 	}

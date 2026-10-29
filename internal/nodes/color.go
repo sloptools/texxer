@@ -18,6 +18,15 @@ type stop struct {
 	rgb   [3]float32
 }
 
+var defaultStops = []stop{{Pos: 0, Color: "#000000"}, {Pos: 1, Color: "#ffffff"}}
+
+var gradientDef = Def{
+	Eval:     gradientNode,
+	Category: "color",
+	Inputs:   []string{"in"},
+	Params:   []Param{data("stops", defaultStops)},
+}
+
 // gradientNode maps a gray input to colors.
 func gradientNode(e *graph.Env) (*img.Buffer, error) {
 	src, err := e.Required("in")
@@ -25,7 +34,7 @@ func gradientNode(e *graph.Env) (*img.Buffer, error) {
 		return nil, err
 	}
 
-	var stops []stop
+	stops := slices.Clone(defaultStops)
 	if err := e.Params.Decode("stops", &stops); err != nil {
 		return nil, err
 	}
@@ -70,6 +79,12 @@ func sample(stops []stop, t float64) [3]float32 {
 	return stops[len(stops)-1].rgb
 }
 
+var colorDef = Def{
+	Eval:     colorNode,
+	Category: "generator",
+	Params:   []Param{color("color", "#808080")},
+}
+
 func colorNode(e *graph.Env) (*img.Buffer, error) {
 	c, err := parseHex(e.Params.String("color", "#808080"))
 	if err != nil {
@@ -95,6 +110,20 @@ func parseHex(s string) ([3]float32, error) {
 		float32(v>>8&0xff) / 255,
 		float32(v&0xff) / 255,
 	}, nil
+}
+
+var levelsDef = Def{
+	Eval:     levelsNode,
+	Category: "filter",
+	Inputs:   []string{"in"},
+	Params: []Param{
+		num("in_low", 0, 0, 1),
+		num("in_high", 1, 0, 1),
+		num("gamma", 1, 0.1, 4),
+		num("out_low", 0, 0, 1),
+		num("out_high", 1, 0, 1),
+		flag("invert", false),
+	},
 }
 
 func levelsNode(e *graph.Env) (*img.Buffer, error) {

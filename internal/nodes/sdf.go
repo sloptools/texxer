@@ -18,6 +18,26 @@ var sdfOps = map[string]func(a, b, amount float64) float64{
 	"shell":     func(a, _, w float64) float64 { return math.Abs(a) - w/2 },
 }
 
+var sdfDef = Def{
+	Eval:     sdfNode,
+	Category: "shape",
+	Inputs:   []string{"a", "b"},
+	Params: []Param{
+		enum("op", "union", "union", "subtract", "intersect", "offset", "shell"),
+		px("amount", 2, -64, 64),
+	},
+}
+
+var profileDef = Def{
+	Eval:     profileNode,
+	Category: "shape",
+	Inputs:   []string{"in"},
+	Params: []Param{
+		px("bevel", 2, 0.5, 64),
+		enum("profile", "round", "round", "linear", "flat"),
+	},
+}
+
 // sdfNode combines or modifies distance fields. offset grows the shape by
 // amount px, shell turns it into an outline amount px wide.
 func sdfNode(e *graph.Env) (*img.Buffer, error) {

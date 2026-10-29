@@ -11,8 +11,16 @@ import (
 
 type Node struct {
 	Type   string            `json:"type"`
-	Params Params            `json:"params"`
-	Inputs map[string]string `json:"inputs"`
+	Params Params            `json:"params,omitempty"`
+	Inputs map[string]string `json:"inputs,omitempty"`
+
+	// UI holds the editor position and is ignored by the evaluator.
+	UI *UI `json:"ui,omitempty"`
+}
+
+type UI struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
 }
 
 type Graph struct {
@@ -22,8 +30,8 @@ type Graph struct {
 	Nodes  map[string]Node `json:"nodes"`
 
 	// Used when the graph is a subgraph.
-	Outputs map[string]string  `json:"outputs"`
-	Exposed map[string]Exposed `json:"params"`
+	Outputs map[string]string  `json:"outputs,omitempty"`
+	Exposed map[string]Exposed `json:"params,omitempty"`
 
 	Dir string `json:"-"`
 }
@@ -32,6 +40,8 @@ type Graph struct {
 type Exposed struct {
 	Default any      `json:"default"`
 	Targets []string `json:"targets"`
+	Min     float64  `json:"min,omitempty"`
+	Max     float64  `json:"max,omitempty"`
 }
 
 func Load(path string) (*Graph, error) {

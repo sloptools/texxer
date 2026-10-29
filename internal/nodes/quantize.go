@@ -10,6 +10,18 @@ import (
 
 var bayer4 = [16]float32{0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5}
 
+var quantizeDef = Def{
+	Eval:     quantizeNode,
+	Category: "output",
+	Inputs:   []string{"in"},
+	Params: []Param{
+		text("palette", ""),
+		integer("colors", 64, 2, 256),
+		enum("dither", "none", "none", "bayer"),
+		num("dither_strength", 0.04, 0, 0.5),
+	},
+}
+
 // quantizeNode reduces colors to a palette loaded from an image, or an
 // adaptive palette with the given number of colors.
 func quantizeNode(e *graph.Env) (*img.Buffer, error) {

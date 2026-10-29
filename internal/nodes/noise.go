@@ -6,6 +6,17 @@ import (
 	"texxer/internal/noise"
 )
 
+var noiseDef = Def{
+	Eval:     noiseNode,
+	Category: "generator",
+	Params: []Param{
+		num("scale", 4, 1, 256),
+		integer("octaves", 5, 1, 8),
+		num("persistence", 0.5, 0, 1),
+		seedParam,
+	},
+}
+
 func noiseNode(e *graph.Env) (*img.Buffer, error) {
 	p := e.Params
 	px, py := periods(e.Ctx, p.Float("scale", 4))

@@ -18,14 +18,14 @@
     "color":      { "type": "input", "params": { "name": "color" } },
     "height":     { "type": "input", "params": { "name": "height" } },
 
-    "grain":      { "type": "grunge", "params": { "kind": "grain", "size": 0.5, "seed": 1 } },
+    "grain":      { "type": "grain", "params": { "size": 0.5, "seed": 1 } },
     "grained":    { "type": "blend", "params": { "mode": "overlay" }, "inputs": { "a": "color", "b": "grain" } },
 
     "blurred":    { "type": "blur", "params": { "radius": 3 }, "inputs": { "in": "height" } },
     "cavity":     { "type": "blend", "params": { "mode": "subtract" }, "inputs": { "a": "blurred", "b": "height" } },
     "cavitymask": { "type": "levels", "params": { "in_high": 0.05 }, "inputs": { "in": "cavity" } },
-    "spots":      { "type": "grunge", "params": { "kind": "spots", "scale": 40, "size": 0.45, "seed": 2 } },
-    "rustdirt":   { "type": "grunge", "params": { "kind": "dirt", "scale": 6, "coverage": 0.7, "seed": 3 } },
+    "spots":      { "type": "spots", "params": { "scale": 40, "size": 0.45, "seed": 2 } },
+    "rustdirt":   { "type": "dirt", "params": { "scale": 6, "coverage": 0.7, "seed": 3 } },
     "rustzone":   { "type": "blend", "params": { "mode": "screen" }, "inputs": { "a": "cavitymask", "b": "spots" } },
     "rustmask":   { "type": "blend", "params": { "mode": "multiply" }, "inputs": { "a": "rustzone", "b": "rustdirt" } },
     "rusttone":   { "type": "noise", "params": { "scale": 8, "octaves": 6, "persistence": 0.55, "seed": 4 } },
@@ -33,12 +33,12 @@
     "rusted":     { "type": "blend", "inputs": { "a": "grained", "b": "rustcol", "mask": "rustmask" } },
 
     "dirtcol":    { "type": "color" },
-    "dirtmask":   { "type": "grunge", "params": { "kind": "dirt", "scale": 4, "coverage": 0.4, "softness": 0.25, "seed": 5 } },
+    "dirtmask":   { "type": "dirt", "params": { "scale": 4, "coverage": 0.4, "softness": 0.25, "seed": 5 } },
     "dirty":      { "type": "blend", "inputs": { "a": "rusted", "b": "dirtcol", "mask": "dirtmask" } },
-    "drips":      { "type": "grunge", "params": { "kind": "streaks", "scale": 4, "coverage": 0.35, "seed": 6 } },
+    "drips":      { "type": "streaks", "params": { "scale": 4, "coverage": 0.35, "seed": 6 } },
     "dripped":    { "type": "blend", "inputs": { "a": "dirty", "b": "dirtcol", "mask": "drips" } },
 
-    "scratches":  { "type": "grunge", "params": { "kind": "scratches", "count": 120, "length": 14, "seed": 7 } },
+    "scratches":  { "type": "scratches", "params": { "count": 120, "length": 14, "seed": 7 } },
     "scratched":  { "type": "blend", "params": { "mode": "screen" }, "inputs": { "a": "dripped", "b": "scratches" } },
     "curv":       { "type": "curvature", "params": { "radius": 1, "gain": 3 }, "inputs": { "height": "height" } },
     "wear":       { "type": "levels", "params": { "in_low": 0.55, "in_high": 0.85 }, "inputs": { "in": "curv" } },

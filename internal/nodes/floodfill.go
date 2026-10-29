@@ -13,6 +13,20 @@ type point struct {
 	i, x, y int
 }
 
+var floodFillDef = Def{
+	Eval:     floodFillNode,
+	Category: "filter",
+	Inputs:   []string{"in"},
+	Params: []Param{
+		enum("mode", "random", "random", "gradient"),
+		num("threshold", 0.5, 0, 1),
+		num("angle", 0, -180, 180),
+		num("spread", 360, 0, 360),
+		num("variation", 0, 0, 1),
+		seedParam,
+	},
+}
+
 // floodFillNode finds connected islands in a mask and fills each with a random
 // value or a random linear gradient. Islands continue across tiled edges.
 func floodFillNode(e *graph.Env) (*img.Buffer, error) {

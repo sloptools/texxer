@@ -6,6 +6,18 @@ import (
 	"texxer/internal/noise"
 )
 
+var warpDef = Def{
+	Eval:     warpNode,
+	Category: "filter",
+	Inputs:   []string{"in"},
+	Params: []Param{
+		px("amount", 4, 0, 64),
+		num("scale", 16, 1, 128),
+		integer("octaves", 3, 1, 8),
+		seedParam,
+	},
+}
+
 // warpNode displaces its input by noise, e.g. for chipped edges or wobbly cracks.
 func warpNode(e *graph.Env) (*img.Buffer, error) {
 	src, err := e.Required("in")

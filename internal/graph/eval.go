@@ -52,6 +52,14 @@ type Evaluator struct {
 	cache    map[outKey]*img.Buffer
 	busy     map[nodeKey]bool
 	children map[nodeKey]*Evaluator
+
+	shared *Cache
+	hashes map[string]hash
+}
+
+// UseCache shares results with other evaluations through c.
+func (ev *Evaluator) UseCache(c *Cache) {
+	ev.shared = c
 }
 
 func NewEvaluator(g *Graph, nodes map[string]EvalFunc, load Loader) *Evaluator {
@@ -62,6 +70,7 @@ func NewEvaluator(g *Graph, nodes map[string]EvalFunc, load Loader) *Evaluator {
 		cache:    map[outKey]*img.Buffer{},
 		busy:     map[nodeKey]bool{},
 		children: map[nodeKey]*Evaluator{},
+		hashes:   map[string]hash{},
 	}
 }
 
@@ -90,6 +99,20 @@ func (ev *Evaluator) Eval(ref string, ctx Ctx) (*img.Buffer, error) {
 		return nil, fmt.Errorf("cycle at node %q", id)
 	}
 
+	// Subgraphs depend on their parent's inputs, so only top-level results are shared.
+	var key hash
+	shared := ev.shared != nil && ev.parent == nil
+	if shared {
+		var err error
+		if key, err = ev.cacheKey(id, out, ctx); err != nil {
+			return nil, err
+		}
+		if b, ok := ev.shared.get(key); ok {
+			ev.cache[outKey{nk, out}] = b
+			return b, nil
+		}
+	}
+
 	ev.busy[nk] = true
 	defer delete(ev.busy, nk)
 
@@ -99,6 +122,9 @@ func (ev *Evaluator) Eval(ref string, ctx Ctx) (*img.Buffer, error) {
 	}
 
 	ev.cache[outKey{nk, out}] = b
+	if shared {
+		ev.shared.put(key, b)
+	}
 	return b, nil
 }
 

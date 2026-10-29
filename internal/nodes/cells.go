@@ -8,6 +8,17 @@ import (
 	"texxer/internal/noise"
 )
 
+var cellsDef = Def{
+	Eval:     cellsNode,
+	Category: "generator",
+	Params: []Param{
+		enum("mode", "distance", "distance", "edges"),
+		num("scale", 8, 1, 128),
+		num("width", 0.05, 0.005, 0.5),
+		seedParam,
+	},
+}
+
 // cellsNode is Worley noise. "distance" grows from each feature point,
 // "edges" is 1 on the borders between cells (cracks, aggregate outlines).
 func cellsNode(e *graph.Env) (*img.Buffer, error) {

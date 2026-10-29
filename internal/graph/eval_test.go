@@ -63,6 +63,39 @@ func TestOutputs(t *testing.T) {
 	}
 }
 
+func TestSharedCache(t *testing.T) {
+	calls := 0
+	nodes := map[string]EvalFunc{
+		"count": func(e *Env) (*img.Buffer, error) {
+			calls++
+			return constBuf(e, 1), nil
+		},
+		"add": testNodes["add"],
+	}
+
+	graphWith := func(v float64) *Graph {
+		return &Graph{Nodes: map[string]Node{
+			"src": {Type: "count"},
+			"k":   {Type: "count", Params: Params{"v": v}},
+			"sum": {Type: "add", Inputs: map[string]string{"a": "src", "b": "k"}},
+		}}
+	}
+
+	cache := NewCache(1 << 20)
+	for _, v := range []float64{1, 1, 2} {
+		ev := NewEvaluator(graphWith(v), nodes, nil)
+		ev.UseCache(cache)
+		if _, err := ev.Eval("sum", testCtx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// First run evaluates src and k, the repeat hits the cache, the change re-evaluates only k.
+	if calls != 3 {
+		t.Errorf("got %d evaluations, want 3", calls)
+	}
+}
+
 func TestSubgraph(t *testing.T) {
 	sub := &Graph{
 		Outputs: map[string]string{"out": "sum"},

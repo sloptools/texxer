@@ -8,6 +8,21 @@ import (
 	"texxer/internal/img"
 )
 
+var patternDef = Def{
+	Eval:     patternNode,
+	Category: "shape",
+	Params: []Param{
+		enum("shape", "box", "box", "diamond", "circle", "groove", "lines", "chamfer", "arch", "gothic"),
+		px("cell_w", 32, 2, 512),
+		px("cell_h", 0, 0, 512),
+		px("gap", 2, 0, 64),
+		px("radius", 0, 0, 64),
+		px("bevel", 3, 0.5, 64),
+		enum("profile", "round", "round", "linear", "flat"),
+		flag("stagger", false),
+	},
+}
+
 // patternNode repeats a shape as a height map. Cell sizes are rounded so the
 // repetition always fits the buffer exactly and stays seamless.
 func patternNode(e *graph.Env) (*img.Buffer, error) {
@@ -19,7 +34,10 @@ func patternNode(e *graph.Env) (*img.Buffer, error) {
 	}
 
 	cw := e.Px("cell_w", 32)
-	ch := e.Px("cell_h", p.Float("cell_w", 32))
+	ch := e.Px("cell_h", 0)
+	if ch <= 0 {
+		ch = cw
+	}
 	gap := e.Px("gap", 2)
 	radius := e.Px("radius", 0)
 	bevel := max(e.Px("bevel", 3), 0.5)

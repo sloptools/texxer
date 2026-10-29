@@ -1,3 +1,6 @@
 .DS_Store
 *.png
 /texxer
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep

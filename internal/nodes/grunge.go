@@ -1,7 +1,6 @@
 package nodes
 
 import (
-	"fmt"
 	"math"
 
 	"texxer/internal/graph"
@@ -11,24 +10,18 @@ import (
 
 // Built-in procedural grunge maps. 1 means "dirty".
 
-func grungeNode(e *graph.Env) (*img.Buffer, error) {
-	switch kind := e.Params.String("kind", "dirt"); kind {
-	case "dirt":
-		return dirt(e), nil
-	case "spots":
-		return spots(e), nil
-	case "streaks":
-		return streaks(e), nil
-	case "scratches":
-		return scratches(e), nil
-	case "grain":
-		return grain(e), nil
-	default:
-		return nil, fmt.Errorf("unknown grunge kind %q", kind)
-	}
+var dirtDef = Def{
+	Eval:     dirtNode,
+	Category: "grunge",
+	Params: []Param{
+		num("scale", 4, 1, 64),
+		num("coverage", 0.5, 0, 1),
+		num("softness", 0.15, 0.01, 0.5),
+		seedParam,
+	},
 }
 
-func dirt(e *graph.Env) *img.Buffer {
+func dirtNode(e *graph.Env) (*img.Buffer, error) {
 	p := e.Params
 	px, py := periods(e.Ctx, p.Float("scale", 4))
 	seed := e.Seed()
@@ -39,10 +32,20 @@ func dirt(e *graph.Env) *img.Buffer {
 		u, v := cell(e.Ctx, x, y, px, py)
 		n := noise.FBM(u, v, px, py, 6, 0.6, seed)*1.4 + 0.5
 		return float32(smoothstep(edge-soft, edge+soft, n))
-	})
+	}), nil
 }
 
-func spots(e *graph.Env) *img.Buffer {
+var spotsDef = Def{
+	Eval:     spotsNode,
+	Category: "grunge",
+	Params: []Param{
+		num("scale", 8, 1, 128),
+		num("size", 0.35, 0.01, 1),
+		seedParam,
+	},
+}
+
+func spotsNode(e *graph.Env) (*img.Buffer, error) {
 	p := e.Params
 	px, py := periods(e.Ctx, p.Float("scale", 8))
 	seed := e.Seed()
@@ -54,20 +57,36 @@ func spots(e *graph.Env) *img.Buffer {
 		r := size * (1 + warp)
 		d, _ := noise.Worley(u+warp*0.4, v-warp*0.4, px, py, seed)
 		return float32(1 - smoothstep(r*0.5, r, d))
-	})
+	}), nil
 }
 
-// grain is white noise in blocks of size px, the speckle that survives downsampling.
-func grain(e *graph.Env) *img.Buffer {
+var grainDef = Def{
+	Eval:     grainNode,
+	Category: "grunge",
+	Params:   []Param{px("size", 1, 0.25, 8), seedParam},
+}
+
+// grainNode is white noise in blocks of size px, the speckle that survives downsampling.
+func grainNode(e *graph.Env) (*img.Buffer, error) {
 	size := max(1, int(math.Round(e.Px("size", 1))))
 	seed := e.Seed()
 
 	return fill(e.Ctx, func(x, y int) float32 {
 		return float32(noise.Rand01(x/size, y/size, seed))
-	})
+	}), nil
 }
 
-func streaks(e *graph.Env) *img.Buffer {
+var streaksDef = Def{
+	Eval:     streaksNode,
+	Category: "grunge",
+	Params: []Param{
+		num("scale", 6, 1, 32),
+		num("coverage", 0.4, 0, 1),
+		seedParam,
+	},
+}
+
+func streaksNode(e *graph.Env) (*img.Buffer, error) {
 	p := e.Params
 	scale := p.Float("scale", 6)
 	seed := e.Seed()
@@ -85,5 +104,5 @@ func streaks(e *graph.Env) *img.Buffer {
 		fu, fv := cell(e.Ctx, x, y, fx, fy)
 		fade := noise.FBM(fu, fv, fx, fy, 3, 0.5, seed+3)*1.2 + 0.5
 		return float32(smoothstep(edge-0.2, edge+0.2, n) * clamp01(fade))
-	})
+	}), nil
 }

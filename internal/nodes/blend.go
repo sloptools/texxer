@@ -23,6 +23,16 @@ var blendModes = map[string]func(a, b float32) float32{
 	},
 }
 
+var blendDef = Def{
+	Eval:     blendNode,
+	Category: "filter",
+	Inputs:   []string{"a", "b", "mask"},
+	Params: []Param{
+		enum("mode", "normal", "normal", "multiply", "screen", "overlay", "add", "subtract", "darken", "lighten"),
+		num("opacity", 1, 0, 1),
+	},
+}
+
 // blendNode combines b onto a. An optional gray mask scales the opacity.
 func blendNode(e *graph.Env) (*img.Buffer, error) {
 	a, err := e.Required("a")

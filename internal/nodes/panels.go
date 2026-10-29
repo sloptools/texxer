@@ -60,6 +60,24 @@ func (l *panelLayout) split(c panelCell, depth int) {
 	l.split(b, depth+1)
 }
 
+var panelsDef = Def{
+	Eval:     panelsNode,
+	Category: "shape",
+	Outputs:  []string{"out", "cell", "id"},
+	Params: []Param{
+		px("grid", 16, 4, 128),
+		px("min", 32, 4, 512),
+		px("max", 160, 4, 512),
+		integer("depth", 6, 1, 12),
+		num("stop", 0.3, 0, 1),
+		data("shapes", []string{"chamfer"}),
+		px("inset", 6, 0, 64),
+		px("chamfer", 6, 0, 64),
+		num("taper", 0.25, 0, 0.9),
+		seedParam,
+	},
+}
+
 // panelsNode subdivides the area into grid-aligned panels. The main output is
 // the SDF of a shape fitted into each panel; "cell" is the SDF of the panel
 // rectangles and "id" a random value per panel.

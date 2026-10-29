@@ -6,12 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"strings"
 
 	"texxer/internal/graph"
 )
 
 //go:embed *.json
 var files embed.FS
+
+func Names() []string {
+	entries, _ := files.ReadDir(".")
+
+	var names []string
+	for _, e := range entries {
+		names = append(names, strings.TrimSuffix(e.Name(), ".json"))
+	}
+	return names
+}
 
 func Load(name string) (*graph.Graph, error) {
 	data, err := files.ReadFile(name + ".json")

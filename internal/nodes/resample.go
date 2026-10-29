@@ -7,6 +7,20 @@ import (
 	"texxer/internal/img"
 )
 
+var downsampleDef = Def{
+	Eval:     downsampleNode,
+	Category: "output",
+	Inputs:   []string{"in"},
+	Params:   []Param{integer("factor", 4, 1, 8)},
+}
+
+var sharpenDef = Def{
+	Eval:     sharpenNode,
+	Category: "filter",
+	Inputs:   []string{"in"},
+	Params:   []Param{num("amount", 0.5, 0, 4)},
+}
+
 // downsampleNode renders its input at factor times the resolution and
 // box-filters it down. Fine detail collapsing into few pixels is a big part of the retro look.
 func downsampleNode(e *graph.Env) (*img.Buffer, error) {

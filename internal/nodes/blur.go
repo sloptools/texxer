@@ -7,6 +7,13 @@ import (
 	"texxer/internal/img"
 )
 
+var blurDef = Def{
+	Eval:     blurNode,
+	Category: "filter",
+	Inputs:   []string{"in"},
+	Params:   []Param{px("radius", 2, 0, 64)},
+}
+
 // blurNode approximates a gaussian with repeated box blurs.
 func blurNode(e *graph.Env) (*img.Buffer, error) {
 	src, err := e.Required("in")
