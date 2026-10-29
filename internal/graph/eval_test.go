@@ -135,3 +135,65 @@ func TestSubgraph(t *testing.T) {
 		t.Error("typo: expected unknown param error")
 	}
 }
+
+func TestSubgraphNodes(t *testing.T) {
+	sub := &Graph{Nodes: map[string]Node{
+		"fallback": {Type: "const", Params: Params{"value": 5.0}},
+		"x":        {Type: "input", Params: Params{"name": "x"}, Inputs: map[string]string{"default": "fallback"}},
+		"k":        {Type: "const", Params: Params{"value": 1.0}},
+		"sum":      {Type: "add", Inputs: map[string]string{"a": "x", "b": "k"}},
+		"main":     {Type: "output", Inputs: map[string]string{"in": "sum"}},
+		"side":     {Type: "output", Params: Params{"name": "side"}, Inputs: map[string]string{"in": "k"}},
+	}}
+	load := func(name string) (*Graph, error) {
+		if name == "sub" {
+			return sub, nil
+		}
+		return nil, nil
+	}
+
+	g := &Graph{Nodes: map[string]Node{
+		"two":    {Type: "const", Params: Params{"value": 2.0}},
+		"wired":  {Type: "sub", Inputs: map[string]string{"x": "two"}},
+		"loose":  {Type: "sub"},
+		"direct": {Type: "input", Params: Params{"name": "x"}, Inputs: map[string]string{"default": "two"}},
+	}}
+
+	cases := map[string]float32{"wired": 3, "loose": 6, "wired.side": 1, "direct": 2}
+	for ref, want := range cases {
+		if v := eval(t, g, load, 0, ref); v != want {
+			t.Errorf("%s: got %v, want %v", ref, v, want)
+		}
+	}
+}
+
+func TestSubgraphEditInvalidatesCache(t *testing.T) {
+	sub := &Graph{Nodes: map[string]Node{
+		"k":   {Type: "const", Params: Params{"value": 1.0}},
+		"out": {Type: "output", Inputs: map[string]string{"in": "k"}},
+	}}
+	load := func(name string) (*Graph, error) {
+		if name == "sub" {
+			return sub, nil
+		}
+		return nil, nil
+	}
+	g := &Graph{Nodes: map[string]Node{"s": {Type: "sub"}}}
+
+	cache := NewCache(1 << 20)
+	run := func() float32 {
+		ev := NewEvaluator(g, testNodes, load)
+		ev.UseCache(cache)
+		b, err := ev.Eval("s", testCtx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b.Pix[0]
+	}
+
+	run()
+	sub.Nodes["k"] = Node{Type: "const", Params: Params{"value": 7.0}}
+	if v := run(); v != 7 {
+		t.Errorf("got %v after editing the subgraph, want 7", v)
+	}
+}

@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"texxer/internal/graph"
@@ -39,3 +42,24 @@ func Load(name string) (*graph.Graph, error) {
 	}
 	return g, nil
 }
+
+// Library resolves presets first, then graph files in dir, so every saved graph is usable as a node type.
+func Library(dir string) graph.Loader {
+	return func(name string) (*graph.Graph, error) {
+		g, err := Load(name)
+		if g != nil || err != nil {
+			return g, err
+		}
+
+		if !validName.MatchString(name) {
+			return nil, nil
+		}
+		path := filepath.Join(dir, name+".json")
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return graph.Load(path)
+	}
+}
+
+var validName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)

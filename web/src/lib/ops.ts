@@ -1,5 +1,6 @@
 import type { Edge } from '@xyflow/svelte';
 import { edge, fromGraph, toGraph, uniqueId, type TexNode } from './graph';
+import type { Exposed } from './types';
 
 export const validId = /^[A-Za-z][A-Za-z0-9_]*$/;
 
@@ -16,6 +17,19 @@ export function rename(nodes: TexNode[], edges: Edge[], from: string, to: string
   };
 }
 
+/** Points exposed param targets at a renamed node. */
+export function renameTargets(exposed: Record<string, Exposed>, from: string, to: string): Record<string, Exposed> {
+  const out: Record<string, Exposed> = {};
+  for (const [name, ex] of Object.entries(exposed)) {
+    const targets = ex.targets.map((t) => {
+      const [node, param] = t.split('.');
+      return node === from ? `${to}.${param}` : t;
+    });
+    out[name] = { ...ex, targets };
+  }
+  return out;
+}
+
 const marker = 'texxer-nodes';
 
 /** Serializes the selected nodes and the edges between them for the clipboard. */
@@ -25,7 +39,7 @@ export function copy(nodes: TexNode[], edges: Edge[]): string | undefined {
 
   const ids = new Set(picked.map((n) => n.id));
   const inner = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
-  return JSON.stringify({ [marker]: toGraph(picked, inner, 0, '').nodes });
+  return JSON.stringify({ [marker]: toGraph(picked, inner, { size: 0, output: '' }).nodes });
 }
 
 /** Adds clipboard nodes under fresh ids, offset and selected. */

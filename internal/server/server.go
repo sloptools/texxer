@@ -39,7 +39,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
-	c, err := catalog()
+	c, err := catalog(s.dir)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return

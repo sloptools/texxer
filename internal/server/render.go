@@ -46,7 +46,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 		ref = g.Output
 	}
 
-	ev := graph.NewEvaluator(g, nodes.Evals(), presets.Load)
+	ev := graph.NewEvaluator(g, nodes.Evals(), presets.Library(s.dir))
 	ev.SetSeed(req.Seed)
 	ev.UseCache(s.cache)
 

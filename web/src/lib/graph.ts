@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/svelte';
-import type { Graph, GraphNode, NodeDef, TexData } from './types';
+import type { Exposed, Graph, GraphMeta, GraphNode, NodeDef, TexData } from './types';
 
 export type TexNode = Node<TexData>;
 
@@ -27,8 +27,8 @@ export function fromGraph(g: Graph): { nodes: TexNode[]; edges: Edge[] } {
   return { nodes, edges };
 }
 
-export function toGraph(nodes: TexNode[], edges: Edge[], size: number, output: string, withUI = true): Graph {
-  const g: Graph = { size, output, nodes: {} };
+export function toGraph(nodes: TexNode[], edges: Edge[], meta: GraphMeta, withUI = true): Graph {
+  const g: Graph = { size: meta.size, output: meta.output, nodes: {} };
 
   for (const n of nodes) {
     const node: GraphNode = { type: n.data.type };
@@ -47,7 +47,22 @@ export function toGraph(nodes: TexNode[], edges: Edge[], size: number, output: s
     target.inputs[e.targetHandle ?? 'in'] = output === 'out' ? e.source : `${e.source}.${output}`;
   }
 
+  if (meta.outputs && Object.keys(meta.outputs).length > 0) g.outputs = meta.outputs;
+
+  const params = liveExposed(meta.params ?? {}, g);
+  if (Object.keys(params).length > 0) g.params = params;
+
   return g;
+}
+
+/** Drops exposed targets whose node is gone, and params left without targets. */
+function liveExposed(params: Record<string, Exposed>, g: Graph): Record<string, Exposed> {
+  const out: Record<string, Exposed> = {};
+  for (const [name, ex] of Object.entries(params)) {
+    const targets = ex.targets.filter((t) => g.nodes[t.split('.')[0]]);
+    if (targets.length > 0) out[name] = { ...ex, targets };
+  }
+  return out;
 }
 
 export function edge(source: string, output: string, target: string, input: string): Edge {

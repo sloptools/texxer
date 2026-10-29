@@ -2,14 +2,16 @@
   import { Background, Controls, SvelteFlow, type Connection, type Edge, type useSvelteFlow } from '@xyflow/svelte';
   import { onMount, untrack } from 'svelte';
   import * as api from './lib/api';
-  import { editor } from './lib/editor.svelte';
+  import { editor, graphMeta } from './lib/editor.svelte';
   import { edge, fromGraph, inputsOf, toGraph, uniqueId, type TexNode } from './lib/graph';
+  import { group } from './lib/group';
   import { History } from './lib/history';
   import * as ops from './lib/ops';
   import { renderer } from './lib/renderer.svelte';
   import { layoutStrips, type Strip } from './lib/trim';
   import AddMenu from './components/AddMenu.svelte';
   import FlowBridge from './components/FlowBridge.svelte';
+  import GraphPanel from './components/GraphPanel.svelte';
   import Inspector from './components/Inspector.svelte';
   import Preview from './components/Preview.svelte';
   import TexNodeView from './components/TexNode.svelte';
@@ -23,6 +25,7 @@
 
   let graphs = $state<string[]>([]);
   let name = $state('');
+  let trail = $state<string[]>([]);
   let savedKey = $state('');
   let seed = $state(0);
   let previewSize = $state(512);
@@ -43,7 +46,7 @@
   });
 
   // Positions don't affect the result, so dragging nodes doesn't re-render.
-  const renderGraph = $derived(toGraph(nodes, edges, editor.size, editor.output, false));
+  const renderGraph = $derived(toGraph(nodes, edges, graphMeta(), false));
   const renderKey = $derived(JSON.stringify(renderGraph) + previewRef + seed + previewSize);
 
   $effect(() => {
@@ -71,6 +74,7 @@
 
   onMount(async () => {
     try {
+      editor.openGraph = enter;
       editor.catalog = await api.getCatalog();
       graphs = await api.listGraphs();
       if (graphs.length) await open(graphs[0]);
@@ -80,7 +84,7 @@
   });
 
   function currentGraph() {
-    return toGraph(nodes, edges, editor.size, editor.output);
+    return toGraph(nodes, edges, graphMeta());
   }
 
   function flushHistory() {
@@ -96,6 +100,8 @@
     nodes = loaded.nodes.map((n) => ({ ...n, selected: keep.has(n.id) }));
     edges = loaded.edges;
     editor.output = g.output;
+    editor.outputs = g.outputs ?? {};
+    editor.exposed = g.params ?? {};
   }
 
   function undo() {
@@ -120,6 +126,8 @@
     edges = loaded.edges;
     editor.size = g.size || 512;
     editor.output = g.output;
+    editor.outputs = g.outputs ?? {};
+    editor.exposed = g.params ?? {};
     name = graphName;
     savedKey = JSON.stringify(currentGraph());
     history.reset(savedKey);
@@ -134,18 +142,85 @@
       await api.saveGraph(name, doc);
       savedKey = JSON.stringify(doc);
       message = `saved ${name}`;
+      await refreshLibrary();
     } catch (e) {
       message = (e as Error).message;
     }
+  }
+
+  /** Saved graphs are node types, so their inputs, outputs and params can change the catalog. */
+  async function refreshLibrary() {
+    editor.catalog = await api.getCatalog();
+    graphs = await api.listGraphs();
+  }
+
+  /** Offers to save before the open graph is replaced. Returns false to stay. */
+  async function leave(): Promise<boolean> {
+    if (!dirty) return true;
+    if (window.confirm(`"${name}" has unsaved changes. Save them first?`)) {
+      await save();
+      return !dirty;
+    }
+    return window.confirm(`Discard the changes to "${name}"?`);
+  }
+
+  async function switchTo(graphName: string) {
+    if (!(await leave())) return;
+    trail = [];
+    await open(graphName);
+  }
+
+  /** Opens a subgraph used in the current graph, remembering the way back. */
+  async function enter(graphName: string) {
+    if (!(await leave())) return;
+    trail = [...trail, name];
+    await open(graphName);
+  }
+
+  async function back(index: number) {
+    if (!(await leave())) return;
+    const target = trail[index];
+    trail = trail.slice(0, index);
+    await open(target);
+  }
+
+  async function groupSelection() {
+    const typeName = window.prompt('Name of the new subgraph (letters, digits, - and _)');
+    if (!typeName) return;
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(typeName) || typeName in editor.catalog || graphs.includes(typeName)) {
+      message = `can't use "${typeName}" as a graph name`;
+      return;
+    }
+
+    const result = group(nodes, edges, typeName, editor.size, editor.output);
+    if (!result) return;
+
+    try {
+      await api.saveGraph(typeName, result.sub);
+      await refreshLibrary();
+    } catch (e) {
+      message = (e as Error).message;
+      return;
+    }
+
+    nodes = result.nodes;
+    edges = result.edges;
+    if (result.output) editor.output = result.output;
+    message = `grouped into ${typeName}`;
   }
 
   async function create() {
     const newName = window.prompt('Graph name (letters, digits, - and _)');
     if (!newName) return;
 
+    if (!(await leave())) return;
+
     nodes = [];
     edges = [];
     editor.output = '';
+    editor.outputs = {};
+    editor.exposed = {};
+    trail = [];
     name = newName;
     savedKey = '';
     history.reset(JSON.stringify(currentGraph()));
@@ -177,6 +252,7 @@
 
     ({ nodes, edges } = ops.rename(nodes, edges, from, to));
     if (editor.output === from) editor.output = to;
+    editor.exposed = ops.renameTargets(editor.exposed, from, to);
     renderer.thumbs[to] = renderer.thumbs[from];
   }
 
@@ -219,6 +295,9 @@
     } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
       e.preventDefault();
       redo();
+    } else if (e.key === 'g') {
+      e.preventDefault();
+      if (picked.length > 0) groupSelection();
     } else if (e.key === 'd') {
       e.preventDefault();
       const text = ops.copy(nodes, edges);
@@ -248,14 +327,16 @@
   <Toolbar
     {graphs}
     {name}
+    {trail}
     {dirty}
     {message}
     bind:seed
     bind:previewSize
-    onopen={open}
+    onopen={switchTo}
     oncreate={create}
     onsave={save}
     onadd={(x, y) => (menu = { x, y })}
+    onback={back}
   />
 
   <div class="flex min-h-0 flex-1">
@@ -291,11 +372,18 @@
             />
           {/key}
         {:else if picked.length > 1}
-          <p class="p-3 text-fg-dim">{picked.length} nodes selected. ⌘C / ⌘V to copy, ⌘D to duplicate, ⌫ to delete.</p>
+          <div class="flex flex-col gap-2 p-3 text-fg-dim">
+            <p>{picked.length} nodes selected. ⌘C / ⌘V to copy, ⌘D to duplicate, ⌫ to delete.</p>
+            <button class="self-start rounded border border-line px-2 py-0.5 text-fg hover:border-accent" onclick={groupSelection}>
+              group into subgraph <span class="text-fg-faint">⌘G</span>
+            </button>
+          </div>
         {:else}
+          {#if name}<GraphPanel {name} {nodes} />{/if}
           <p class="p-3 leading-relaxed text-fg-dim">
             Select a node to edit it. Right-click the canvas to add one. Shift-drag selects several.
-            <br />⌘Z / ⇧⌘Z undo and redo, ⌘C / ⌘V copy and paste, ⌘D duplicates.
+            <br />⌘Z / ⇧⌘Z undo and redo, ⌘C / ⌘V copy and paste, ⌘D duplicates, ⌘G groups into a subgraph.
+            Double-click a graph node to open it.
           </p>
         {/if}
       </div>
@@ -304,5 +392,5 @@
 </div>
 
 {#if menu}
-  <AddMenu x={menu.x} y={menu.y} onpick={addNode} onclose={() => (menu = null)} />
+  <AddMenu x={menu.x} y={menu.y} onpick={addNode} onclose={() => (menu = null)} exclude={name} />
 {/if}

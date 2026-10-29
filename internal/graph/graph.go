@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -37,8 +38,9 @@ type Graph struct {
 }
 
 // Exposed is a subgraph param that sets one or more "node.param" targets.
+// Without a default the targets keep their own values.
 type Exposed struct {
-	Default any      `json:"default"`
+	Default any      `json:"default,omitempty"`
 	Targets []string `json:"targets"`
 	Min     float64  `json:"min,omitempty"`
 	Max     float64  `json:"max,omitempty"`
@@ -71,6 +73,64 @@ func Parse(data []byte) (*Graph, error) {
 	return &g, nil
 }
 
+// OutputRef resolves a subgraph output from the outputs map, an output node
+// with that name, or the graph's main output for "out".
+func (g *Graph) OutputRef(name string) (string, bool) {
+	if ref, ok := g.Outputs[name]; ok {
+		return ref, true
+	}
+
+	for id, n := range g.Nodes {
+		if n.Type == "output" && n.Params.String("name", "out") == name {
+			return id, true
+		}
+	}
+
+	if name == "out" && g.Output != "" {
+		return g.Output, true
+	}
+	return "", false
+}
+
+// OutputNames lists the outputs OutputRef can resolve.
+func (g *Graph) OutputNames() []string {
+	seen := map[string]bool{}
+	for name := range g.Outputs {
+		seen[name] = true
+	}
+	for _, n := range g.Nodes {
+		if n.Type == "output" {
+			seen[n.Params.String("name", "out")] = true
+		}
+	}
+	if len(seen) == 0 && g.Output != "" {
+		seen["out"] = true
+	}
+	return slices.Sorted(maps.Keys(seen))
+}
+
+// InputNames lists the names of the graph's input nodes.
+func (g *Graph) InputNames() []string {
+	var names []string
+	for _, n := range g.Nodes {
+		if n.Type == "input" {
+			names = append(names, n.Params.String("name", ""))
+		}
+	}
+	slices.Sort(names)
+	return slices.Compact(names)
+}
+
+// types lists the node types used in the graph, sorted.
+func (g *Graph) types() []string {
+	var out []string
+	for _, n := range g.Nodes {
+		out = append(out, n.Type)
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
 // withParams returns a copy with exposed params set from values or their defaults.
 func (g *Graph) withParams(values Params) (*Graph, error) {
 	for name := range values {
@@ -89,6 +149,9 @@ func (g *Graph) withParams(values Params) (*Graph, error) {
 		v, ok := values[name]
 		if !ok {
 			v = ex.Default
+		}
+		if v == nil {
+			continue
 		}
 
 		for _, t := range ex.Targets {

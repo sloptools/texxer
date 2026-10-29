@@ -10,11 +10,16 @@
     value,
     onchange,
     onreset,
+    exposed,
+    onexpose,
   }: {
     param: ParamDef;
     value: unknown;
     onchange: (v: unknown) => void;
     onreset: () => void;
+    /** Name of the subgraph param this one is exposed as. */
+    exposed?: string;
+    onexpose?: () => void;
   } = $props();
 
   const set = $derived(value !== undefined);
@@ -56,9 +61,20 @@
       {param.name}
       {#if param.px}<span class="text-fg-faint">px</span>{/if}
     </span>
-    {#if set}
-      <button class="text-[11px] text-fg-dim hover:text-accent" onclick={onreset} title="Reset to default">reset</button>
-    {/if}
+    <span class="flex gap-2">
+      {#if set}
+        <button class="text-[11px] text-fg-dim hover:text-accent" onclick={onreset} title="Reset to default">reset</button>
+      {/if}
+      {#if onexpose}
+        <button
+          class="text-[11px] {exposed ? 'text-accent' : 'text-fg-faint hover:text-accent'}"
+          onclick={onexpose}
+          title={exposed ? `Exposed as "${exposed}" when used as a node. Click to unexpose.` : 'Expose as a param of this graph'}
+        >
+          {exposed ? `◆ ${exposed}` : '◇'}
+        </button>
+      {/if}
+    </span>
   </div>
 
   {#if param.kind === 'float' || param.kind === 'int'}

@@ -99,7 +99,7 @@ func render(path, out, node string, size, seed int) error {
 	start := time.Now()
 	ctx := graph.Ctx{W: size, H: size, Tiling: img.TileBoth, Scale: float64(size) / float64(g.Size)}
 
-	ev := graph.NewEvaluator(g, nodes.Evals(), presets.Load)
+	ev := graph.NewEvaluator(g, nodes.Evals(), presets.Library(g.Dir))
 	ev.SetSeed(seed)
 	// A cache also dedupes equal work inside presets.
 	ev.UseCache(graph.NewCache(2 << 30))

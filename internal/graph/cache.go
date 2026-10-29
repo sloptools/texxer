@@ -103,7 +103,7 @@ func (ev *Evaluator) structHash(id string, seen map[string]bool) (hash, error) {
 		return hash{}, fmt.Errorf("unknown node %q", id)
 	}
 
-	if node.Type == "input" && ev.parent != nil {
+	if node.Type == "input" && ev.parentConnected(node.Params.String("name", "")) {
 		h, err := ev.parent.inputHash(node.Params.String("name", ""))
 		if err != nil {
 			return hash{}, err
@@ -117,8 +117,13 @@ func (ev *Evaluator) structHash(id string, seen map[string]bool) (hash, error) {
 		return hash{}, err
 	}
 
+	th, err := ev.typeHash(node.Type, 0)
+	if err != nil {
+		return hash{}, err
+	}
+
 	s := sha256.New()
-	fmt.Fprintf(s, "%s\x00%s\x00%s\x00%d\x00", node.Type, params, ev.graph.Dir, ev.seed)
+	fmt.Fprintf(s, "%s\x00%x\x00%s\x00%s\x00%d\x00", node.Type, th, params, ev.graph.Dir, ev.seed)
 
 	names := make([]string, 0, len(node.Inputs))
 	for name := range node.Inputs {
@@ -140,6 +145,43 @@ func (ev *Evaluator) structHash(id string, seen map[string]bool) (hash, error) {
 	var h hash
 	s.Sum(h[:0])
 	ev.hashes[id] = h
+	return h, nil
+}
+
+// typeHash covers the content of a subgraph type and the subgraphs it uses,
+// so editing a graph file invalidates the nodes built on it. Built-in types hash to zero.
+func (ev *Evaluator) typeHash(name string, depth int) (hash, error) {
+	if h, ok := ev.types[name]; ok {
+		return h, nil
+	}
+
+	var h hash
+	if _, ok := ev.nodes[name]; ok || name == "input" || name == "output" || ev.load == nil || depth > maxDepth {
+		return h, nil
+	}
+
+	sub, err := ev.load(name)
+	if err != nil || sub == nil {
+		return h, err
+	}
+
+	data, err := json.Marshal(sub)
+	if err != nil {
+		return h, err
+	}
+
+	s := sha256.New()
+	s.Write(data)
+	for _, t := range sub.types() {
+		th, err := ev.typeHash(t, depth+1)
+		if err != nil {
+			return h, err
+		}
+		fmt.Fprintf(s, "\x00%s\x00%x", t, th)
+	}
+
+	s.Sum(h[:0])
+	ev.types[name] = h
 	return h, nil
 }
 

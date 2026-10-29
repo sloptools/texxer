@@ -27,11 +27,23 @@ export interface GraphNode {
   ui?: { x: number; y: number };
 }
 
+/** A param of a subgraph that sets "node.param" targets inside it. */
+export interface Exposed {
+  default?: unknown;
+  targets: string[];
+  min?: number;
+  max?: number;
+}
+
 export interface Graph {
   size: number;
   output: string;
   nodes: Record<string, GraphNode>;
+  outputs?: Record<string, string>;
+  params?: Record<string, Exposed>;
 }
+
+export type GraphMeta = Omit<Graph, 'nodes'>;
 
 export interface TexData extends Record<string, unknown> {
   type: string;

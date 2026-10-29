@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { editor } from '../lib/editor.svelte';
+  import { editor, exposedName, toggleExposed } from '../lib/editor.svelte';
   import type { TexNode } from '../lib/graph';
   import { renderer } from '../lib/renderer.svelte';
   import ParamField from './ParamField.svelte';
@@ -26,6 +26,7 @@
   }
 
   const def = $derived(editor.catalog[node.data.type]);
+  const io = $derived(def?.category === 'io');
   const error = $derived(renderer.errors[node.id]);
 
   function set(name: string, value: unknown) {
@@ -51,11 +52,22 @@
       <div class="text-[11px] text-fg-dim">{node.data.type} · {def?.category ?? 'unknown'}</div>
       {#if renameError}<div class="text-[11px] text-danger">{renameError}</div>{/if}
     </div>
-    {#if node.id !== editor.output}
-      <button class="rounded border border-line px-2 py-0.5 text-[11px] hover:border-accent" onclick={onoutput}>
-        set as output
-      </button>
-    {/if}
+    <div class="flex shrink-0 gap-1">
+      {#if def?.category === 'graph'}
+        <button
+          class="rounded border border-line px-2 py-0.5 text-[11px] hover:border-accent"
+          onclick={() => editor.openGraph?.(node.data.type)}
+          title="Or double-click the node"
+        >
+          open
+        </button>
+      {/if}
+      {#if node.id !== editor.output}
+        <button class="rounded border border-line px-2 py-0.5 text-[11px] hover:border-accent" onclick={onoutput}>
+          set as output
+        </button>
+      {/if}
+    </div>
   </div>
 
   {#if error}
@@ -68,6 +80,8 @@
       value={node.data.params[param.name]}
       onchange={(v) => set(param.name, v)}
       onreset={() => reset(param.name)}
+      exposed={exposedName(node.id, param.name)}
+      onexpose={io ? undefined : () => toggleExposed(node.id, param.name)}
     />
   {/each}
 </div>

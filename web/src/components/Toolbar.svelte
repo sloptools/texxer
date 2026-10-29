@@ -4,6 +4,7 @@
   let {
     graphs,
     name,
+    trail,
     dirty,
     message,
     seed = $bindable(),
@@ -12,9 +13,12 @@
     oncreate,
     onsave,
     onadd,
+    onback,
   }: {
     graphs: string[];
     name: string;
+    /** Parent graphs when a subgraph was opened from them, outermost first. */
+    trail: string[];
     dirty: boolean;
     message: string;
     seed: number;
@@ -23,6 +27,7 @@
     oncreate: () => void;
     onsave: () => void;
     onadd: (x: number, y: number) => void;
+    onback: (index: number) => void;
   } = $props();
 
   const button = 'rounded border border-line px-2 py-0.5 hover:border-accent';
@@ -30,6 +35,11 @@
 
 <header class="flex items-center gap-3 border-b border-line-soft bg-panel px-3 py-1.5">
   <span class="font-semibold tracking-tight text-accent">texxer</span>
+
+  {#each trail as parent, i}
+    <button class="text-fg-muted hover:text-accent" onclick={() => onback(i)} title="Back to {parent}">{parent}</button>
+    <span class="text-fg-faint">›</span>
+  {/each}
 
   <select class="rounded border border-line bg-field px-1 py-0.5" value={name} onchange={(e) => onopen(e.currentTarget.value)}>
     {#each graphs as g}
@@ -50,7 +60,12 @@
   </label>
   <label class="flex items-center gap-1 text-fg-muted">
     preview
-    <select class="rounded border border-line bg-field px-1 py-0.5" bind:value={previewSize}>
+    {#each trail as parent, i}
+    <button class="text-fg-muted hover:text-accent" onclick={() => onback(i)} title="Back to {parent}">{parent}</button>
+    <span class="text-fg-faint">›</span>
+  {/each}
+
+  <select class="rounded border border-line bg-field px-1 py-0.5" bind:value={previewSize}>
       <option value={256}>256</option>
       <option value={512}>512</option>
       <option value={1024}>1024</option>

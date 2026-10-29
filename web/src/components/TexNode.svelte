@@ -15,7 +15,9 @@
   const error = $derived(renderer.errors[id]);
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+  ondblclick={() => def?.category === 'graph' && editor.openGraph?.(data.type)}
   class="w-36 overflow-hidden rounded-md border bg-panel shadow-lg shadow-shadow
     {selected ? 'border-accent' : error ? 'border-danger' : 'border-line'}"
 >

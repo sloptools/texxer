@@ -1,7 +1,6 @@
 package graph
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -55,6 +54,7 @@ type Evaluator struct {
 
 	shared *Cache
 	hashes map[string]hash
+	types  map[string]hash
 }
 
 // UseCache shares results with other evaluations through c.
@@ -71,6 +71,7 @@ func NewEvaluator(g *Graph, nodes map[string]EvalFunc, load Loader) *Evaluator {
 		busy:     map[nodeKey]bool{},
 		children: map[nodeKey]*Evaluator{},
 		hashes:   map[string]hash{},
+		types:    map[string]hash{},
 	}
 }
 
@@ -132,8 +133,11 @@ func (ev *Evaluator) Eval(ref string, ctx Ctx) (*img.Buffer, error) {
 func (ev *Evaluator) evalNode(nk nodeKey, node Node, out string) (*img.Buffer, error) {
 	env := &Env{Ctx: nk.ctx, Params: node.Params, node: node, ev: ev}
 
-	if node.Type == "input" {
+	switch node.Type {
+	case "input":
 		return ev.parentInput(env)
+	case "output":
+		return env.Required("in")
 	}
 
 	if fn, ok := ev.nodes[node.Type]; ok {
@@ -161,24 +165,35 @@ func (ev *Evaluator) evalNode(nk nodeKey, node Node, out string) (*img.Buffer, e
 		return nil, err
 	}
 
-	ref, ok := child.graph.Outputs[out]
+	ref, ok := child.graph.OutputRef(out)
 	if !ok {
 		return nil, fmt.Errorf("no output %q", out)
 	}
 	return child.Eval(ref, nk.ctx)
 }
 
+// parentInput evaluates what the parent connected to this input. The input
+// node's own "default" input stands in when nothing is connected, which also
+// lets a subgraph be previewed on its own.
 func (ev *Evaluator) parentInput(env *Env) (*img.Buffer, error) {
-	if ev.parent == nil {
-		return nil, errors.New("input node outside a subgraph")
+	name := env.Params.String("name", "")
+	if ev.parentConnected(name) {
+		return ev.parent.InputAt(name, env.Ctx)
 	}
 
-	name := env.Params.String("name", "")
-	b, err := ev.parent.InputAt(name, env.Ctx)
+	b, err := env.Input("default")
 	if err == nil && b == nil {
 		err = fmt.Errorf("input %q not connected", name)
 	}
 	return b, err
+}
+
+func (ev *Evaluator) parentConnected(name string) bool {
+	if ev.parent == nil {
+		return false
+	}
+	_, ok := ev.parent.node.Inputs[name]
+	return ok
 }
 
 // child returns the evaluator for a subgraph node, created once per node and context.

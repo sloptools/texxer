@@ -6,9 +6,10 @@
     y,
     onpick,
     onclose,
-  }: { x: number; y: number; onpick: (type: string) => void; onclose: () => void } = $props();
+    exclude,
+  }: { x: number; y: number; onpick: (type: string) => void; onclose: () => void; exclude?: string } = $props();
 
-  const order = ['generator', 'grunge', 'shape', 'filter', 'color', 'light', 'preset', 'output'];
+  const order = ['generator', 'grunge', 'shape', 'filter', 'color', 'light', 'preset', 'graph', 'io', 'output'];
 
   let query = $state('');
 
@@ -17,6 +18,7 @@
     const byCategory: Record<string, string[]> = {};
 
     for (const [type, def] of Object.entries(editor.catalog)) {
+      if (type === exclude) continue;
       if (q && !type.includes(q) && !def.category.includes(q)) continue;
       (byCategory[def.category] ??= []).push(type);
     }
