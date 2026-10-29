@@ -5,6 +5,7 @@
     "ao_floor": { "targets": ["occ.out_low"] },
     "form_floor": { "targets": ["forml.out_low"] },
     "azimuth": { "targets": ["form.azimuth", "key.azimuth"] },
+    "both_sides": { "targets": ["form.mirror", "key.mirror"] },
     "key_color": { "targets": ["keycol.color"] },
     "key": { "targets": ["lit.opacity"] },
     "under_color": { "targets": ["undercol.color"] },

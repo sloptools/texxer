@@ -30,6 +30,7 @@ var shadeDef = Def{
 		num("elevation", 50, -90, 90),
 		num("power", 1, 0.1, 128),
 		flag("wrap", false),
+		flag("mirror", false),
 	},
 }
 
@@ -79,6 +80,8 @@ func colorSelectNode(e *graph.Env) (*img.Buffer, error) {
 // shadeNode lights a baked world normal map from a direction: 1 facing the
 // light, 0 facing away. A high power narrows it to a glint, which fakes
 // reflections on glass; wrap lights half the back too, for softer falloff.
+// mirror adds the same light mirrored across the model's sides (x), so a
+// game asset seen from both sides is lit on both.
 func shadeNode(e *graph.Env) (*img.Buffer, error) {
 	n, err := e.Required("normal")
 	if err != nil {
@@ -89,13 +92,15 @@ func shadeNode(e *graph.Env) (*img.Buffer, error) {
 	el := e.Params.Float("elevation", 50) * math.Pi / 180
 	power := e.Params.Float("power", 1)
 	wrap := e.Params.Bool("wrap", false)
+	mirror := e.Params.Bool("mirror", false)
 	l := [3]float64{math.Cos(el) * math.Cos(az), math.Sin(el), math.Cos(el) * math.Sin(az)}
 
 	out := img.New(n.W, n.H, 1, n.Tiling)
 	for i := range out.Pix {
-		d := 0.0
-		for k := range 3 {
-			d += (float64(n.Value(i, k))*2 - 1) * l[k]
+		nx, ny, nz := float64(n.Value(i, 0))*2-1, float64(n.Value(i, 1))*2-1, float64(n.Value(i, 2))*2-1
+		d := nx*l[0] + ny*l[1] + nz*l[2]
+		if mirror {
+			d = max(d, -nx*l[0]+ny*l[1]+nz*l[2])
 		}
 		if wrap {
 			d = d*0.5 + 0.5
