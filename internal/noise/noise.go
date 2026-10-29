@@ -56,6 +56,33 @@ func FBM(x, y float64, px, py, octaves int, persistence float64, seed int) float
 	return sum / norm
 }
 
+// Ridged is fractal noise made of sharp creases, for rock and cracks. About 0..1.
+func Ridged(x, y float64, px, py, octaves int, persistence float64, seed int) float64 {
+	return octaveSum(x, y, px, py, octaves, persistence, seed, func(v float64) float64 {
+		r := 1 - math.Abs(v)*1.4
+		return r * r
+	})
+}
+
+// Billow is fractal noise made of soft rounded lumps, for clouds and blisters. About 0..1.
+func Billow(x, y float64, px, py, octaves int, persistence float64, seed int) float64 {
+	return octaveSum(x, y, px, py, octaves, persistence, seed, func(v float64) float64 {
+		return math.Abs(v) * 1.4
+	})
+}
+
+func octaveSum(x, y float64, px, py, octaves int, persistence float64, seed int, shape func(float64) float64) float64 {
+	sum, amp, norm := 0.0, 1.0, 0.0
+
+	for o := range octaves {
+		f := float64(int(1) << o)
+		sum += amp * shape(Perlin(x*f, y*f, px<<o, py<<o, seed+o*101))
+		norm += amp
+		amp *= persistence
+	}
+	return sum / norm
+}
+
 // Worley returns the distances to the nearest and second nearest feature point in cell units.
 func Worley(x, y float64, px, py, seed int) (f1, f2 float64) {
 	ix, iy := int(math.Floor(x)), int(math.Floor(y))
