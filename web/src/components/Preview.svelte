@@ -1,12 +1,23 @@
 <script lang="ts">
   import { renderer } from '../lib/renderer.svelte';
   import type { StripBox } from '../lib/trim';
+  import type { ModelRef } from '../lib/types';
   import Preview3D from './Preview3D.svelte';
 
   // strips are drawn as an overlay when a trim node is previewed.
-  let { label, strips = [], size }: { label: string; strips?: StripBox[]; size: number } = $props();
+  let {
+    label,
+    strips = [],
+    size,
+    model,
+  }: { label: string; strips?: StripBox[]; size: number; model?: ModelRef } = $props();
 
   let mode = $state<'2d' | '3d'>('2d');
+
+  // Graphs built on a model open in 3D.
+  $effect(() => {
+    if (model) mode = '3d';
+  });
   let tiles = $state(2);
 
   const preview = $derived(renderer.preview);
@@ -60,7 +71,9 @@
           {/each}
         {/each}
       {:else}
-        <Preview3D url={preview.url} />
+        {#key model?.path}
+          <Preview3D url={preview.url} {model} />
+        {/key}
       {/if}
     {/if}
 

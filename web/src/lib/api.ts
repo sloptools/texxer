@@ -36,3 +36,7 @@ export async function render(graph: Graph, node: string, size: number, seed: num
   });
   return URL.createObjectURL(await res.blob());
 }
+
+export function fileURL(path: string): string {
+  return `/api/file?path=${encodeURIComponent(path)}`;
+}

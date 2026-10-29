@@ -6,6 +6,8 @@ var Registry = map[string]Def{
 	"cells": cellsDef,
 	"color": colorDef,
 	"image": imageDef,
+	"mesh":  meshDef,
+	"shade": shadeDef,
 
 	"dirt":      dirtDef,
 	"spots":     spotsDef,
@@ -49,7 +51,8 @@ var Registry = map[string]Def{
 	"ao":        aoDef,
 	"shadow":    shadowDef,
 
-	"mask": maskDef,
+	"mask":        maskDef,
+	"colorselect": colorSelectDef,
 
 	"downsample": downsampleDef,
 	"quantize":   quantizeDef,

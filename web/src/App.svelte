@@ -49,6 +49,12 @@
   const docKey = $derived(JSON.stringify(currentGraph()));
   const dirty = $derived(name !== '' && docKey !== savedKey);
 
+  const model = $derived.by(() => {
+    const node = nodes.find((n) => n.data.type === 'mesh' && n.data.params.path);
+    if (!node) return undefined;
+    return { path: String(node.data.params.path), material: String(node.data.params.material ?? '') };
+  });
+
   const strips = $derived.by(() => {
     if (selected?.data.type !== 'trim') return [];
     const def = editor.catalog.trim?.params.find((p) => p.name === 'strips')?.default;
@@ -411,7 +417,7 @@
     </main>
 
     <aside class="flex w-80 shrink-0 flex-col border-l border-line-soft bg-panel">
-      <Preview label={previewRef || 'no output'} {strips} size={editor.size} />
+      <Preview label={previewRef || 'no output'} {strips} size={editor.size} {model} />
       <div class="min-h-0 flex-1 overflow-y-auto">
         {#if selected}
           {#key selected.id}

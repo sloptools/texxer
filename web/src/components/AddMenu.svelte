@@ -18,7 +18,7 @@
     needsInput?: boolean;
   } = $props();
 
-  const order = ['generator', 'grunge', 'mask', 'shape', 'filter', 'color', 'light', 'preset', 'graph', 'io', 'output'];
+  const order = ['mesh', 'generator', 'grunge', 'mask', 'shape', 'filter', 'color', 'light', 'preset', 'graph', 'io', 'output'];
 
   let query = $state('');
 

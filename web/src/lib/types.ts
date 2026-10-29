@@ -54,3 +54,9 @@ export interface Stop {
   pos: number;
   color: string;
 }
+
+/** A model the 3D preview shows the texture on, taken from the graph's mesh node. */
+export interface ModelRef {
+  path: string;
+  material: string;
+}
