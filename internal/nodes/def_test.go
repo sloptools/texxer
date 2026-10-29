@@ -15,6 +15,11 @@ func TestDefaults(t *testing.T) {
 	ctx := graph.Ctx{W: 64, H: 64, Tiling: img.TileBoth, Scale: 0.25}
 
 	for name, def := range Registry {
+		// Nodes that read files have no meaningful defaults.
+		if name == "image" {
+			continue
+		}
+
 		inputs := def.Inputs
 		if def.Dynamic {
 			inputs = []string{"s1", "s2"}

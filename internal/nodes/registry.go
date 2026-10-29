@@ -4,12 +4,14 @@ var Registry = map[string]Def{
 	"noise": noiseDef,
 	"cells": cellsDef,
 	"color": colorDef,
+	"image": imageDef,
 
 	"dirt":      dirtDef,
 	"spots":     spotsDef,
 	"streaks":   streaksDef,
 	"scratches": scratchesDef,
 	"grain":     grainDef,
+	"strokes":   strokesDef,
 
 	"pattern": patternDef,
 	"panels":  panelsDef,
@@ -23,6 +25,10 @@ var Registry = map[string]Def{
 
 	"floodfill": floodFillDef,
 	"warp":      warpDef,
+	"dirwarp":   dirwarpDef,
+	"gradwarp":  gradwarpDef,
+	"slopeblur": slopeBlurDef,
+	"scan":      scanDef,
 	"blur":      blurDef,
 	"repeat":    repeatDef,
 	"transform": transformDef,
