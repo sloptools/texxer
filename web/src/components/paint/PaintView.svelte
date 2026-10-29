@@ -81,7 +81,7 @@
 
   <main class="relative min-w-0 flex-1 bg-panel">
     {#if preview.url}
-      <Preview3D url={preview.url} {model} onpick={pick} />
+      <Preview3D url={preview.url} {model} onpick={pick} autoRotate={false} />
     {/if}
     <div class="pointer-events-none absolute inset-x-3 top-2 flex items-center gap-2 text-[11px] text-fg-dim">
       <span>{showMask && layer ? `Maske: ${layer.name}` : node.id}</span>

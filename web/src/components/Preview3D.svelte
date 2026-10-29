@@ -14,11 +14,13 @@
     url,
     model,
     onpick,
+    autoRotate = true,
   }: {
     url: string;
     model?: ModelRef;
     /** Called on a click (not a drag) on the model with the part and the original texture color there. */
     onpick?: (hit: { part: string; color?: string }) => void;
+    autoRotate?: boolean;
   } = $props();
 
   let container: HTMLDivElement;
@@ -47,13 +49,13 @@
 
     const controls = new OrbitControls(cam, renderer.domElement);
     controls.enableDamping = true;
-    controls.autoRotate = true;
+    controls.autoRotate = autoRotate;
     controls.autoRotateSpeed = 1;
 
     // Only emissive colors above 1 glow, like bloom in the engine.
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, cam));
-    const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.9, 0.5, 1);
+    const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.45, 0.4, 1);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
 
