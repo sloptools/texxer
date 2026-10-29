@@ -14,6 +14,9 @@ var Registry = map[string]Def{
 	"pattern": patternDef,
 	"panels":  panelsDef,
 	"tiles":   tilesDef,
+	"shape":   shapeDef,
+	"grid":    gridDef,
+	"text":    textDef,
 	"trim":    trimDef,
 	"sdf":     sdfDef,
 	"profile": profileDef,
@@ -21,6 +24,8 @@ var Registry = map[string]Def{
 	"floodfill": floodFillDef,
 	"warp":      warpDef,
 	"blur":      blurDef,
+	"repeat":    repeatDef,
+	"transform": transformDef,
 	"sharpen":   sharpenDef,
 	"levels":    levelsDef,
 	"gradient":  gradientDef,
@@ -30,6 +35,7 @@ var Registry = map[string]Def{
 	"slope":     slopeDef,
 	"curvature": curvatureDef,
 	"ao":        aoDef,
+	"shadow":    shadowDef,
 
 	"mask": maskDef,
 

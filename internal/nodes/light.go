@@ -103,3 +103,57 @@ func curvatureNode(e *graph.Env) (*img.Buffer, error) {
 		return img.Clamp01(0.5 + (h.At(x, y, 0)-avg)*gain)
 	}), nil
 }
+
+var shadowDef = Def{
+	Eval:     shadowNode,
+	Category: "light",
+	Inputs:   []string{"height"},
+	Params: []Param{
+		px("depth", 8, 0, 64),
+		num("azimuth", 100, 0, 360),
+		num("elevation", 40, 1, 89),
+		px("distance", 24, 1, 128),
+		num("softness", 0.5, 0, 4),
+	},
+}
+
+// shadowNode casts shadows from a height map, where height 1 stands depth px
+// above 0. It marches from each pixel towards the light and darkens it when
+// the surface rises above the ray. 1 is lit, 0 in shadow.
+func shadowNode(e *graph.Env) (*img.Buffer, error) {
+	h, err := e.Required("height")
+	if err != nil {
+		return nil, err
+	}
+	h = gray(h)
+
+	depth := e.Px("depth", 8)
+	az := e.Params.Float("azimuth", 100) * math.Pi / 180
+	slope := math.Tan(e.Params.Float("elevation", 40) * math.Pi / 180)
+	dist := e.Px("distance", 24)
+	soft := max(e.Params.Float("softness", 0.5)*e.Ctx.Scale, 1e-3)
+
+	// Image y points down, so a positive azimuth lights from above.
+	dx, dy := math.Cos(az), -math.Sin(az)
+	steps := int(math.Ceil(dist))
+
+	return fill(e.Ctx, func(x, y int) float32 {
+		z0 := float64(h.At(x, y, 0)) * depth
+		lit := 1.0
+
+		for s := 1; s <= steps; s++ {
+			t := float64(s)
+			sx := int(math.Round(float64(x) + dx*t))
+			sy := int(math.Round(float64(y) + dy*t))
+
+			above := float64(h.At(sx, sy, 0))*depth - (z0 + t*slope)
+			if above > 0 {
+				lit = min(lit, 1-clamp01(above/soft))
+				if lit == 0 {
+					break
+				}
+			}
+		}
+		return float32(lit)
+	}), nil
+}
