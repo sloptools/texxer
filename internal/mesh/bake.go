@@ -28,6 +28,11 @@ type Maps struct {
 	AO, Edges, Cavity, Up        []float32
 	Height, Part, Selected, Mask []float32
 	Normal                       []float32
+	// Position holds world positions as (p - Min) / diagonal, three per texel,
+	// so decals can be placed in space. Diag is the model's diagonal.
+	Position []float32
+	Min      Vec
+	Diag     float64
 	// PartID holds (part index + 0.5) / 256 of the face that covers a texel.
 	PartID []float32
 }
@@ -60,6 +65,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 		make([]float64, n), make([]float64, n), make([]float64, n), make([]float64, n),
 	}
 	normals := make([]Vec, n)
+	positions := make([]Vec, n)
 	partID := make([]float32, n)
 
 	results := make([][3]float64, len(samples))
@@ -85,6 +91,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 			sum.sel[t]++
 		}
 		normals[t] = normals[t].Add(s.n)
+		positions[t] = positions[t].Add(s.p)
 		partID[t] = (float32(s.part) + 0.5) / 256
 		sum.count[t]++
 	}
@@ -105,14 +112,18 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	maps.PartID = partID
 	maps.Mask = make([]float32, n)
 	maps.Normal = make([]float32, n*3)
+	maps.Position = make([]float32, n*3)
+	maps.Min, maps.Diag = m.Min, max(diag, 1e-9)
 	for i, c := range sum.count {
 		if c == 0 {
 			continue
 		}
 		maps.Mask[i] = 1
 		nv := normals[i].Norm()
+		pv := positions[i].Scale(1 / c).Sub(m.Min).Scale(1 / maps.Diag)
 		for k := range 3 {
 			maps.Normal[i*3+k] = float32(nv[k]*0.5 + 0.5)
+			maps.Position[i*3+k] = float32(pv[k])
 		}
 	}
 
@@ -237,12 +248,14 @@ func (m *Maps) pad(texels int) {
 					}
 					buf[i] = s / float32(len(nb))
 				}
-				for k := range 3 {
-					var s float32
-					for _, j := range nb {
-						s += m.Normal[j*3+k]
+				for _, buf := range [][]float32{m.Normal, m.Position} {
+					for k := range 3 {
+						var s float32
+						for _, j := range nb {
+							s += buf[j*3+k]
+						}
+						buf[i*3+k] = s / float32(len(nb))
 					}
-					m.Normal[i*3+k] = s / float32(len(nb))
 				}
 				next[i] = 1
 			}

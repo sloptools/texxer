@@ -1,0 +1,15 @@
+{
+  "size": 512,
+  "output": "out",
+  "params": {
+    "frame": { "targets": ["ring.amount"] }
+  },
+  "nodes": {
+    "tri":   { "type": "shape", "params": { "shape": "trapezoid", "width": 440, "height": 380, "taper": 0.98, "bevel": 0.5, "profile": "flat" } },
+    "ring":  { "type": "sdf", "params": { "op": "shell", "amount": 36 }, "inputs": { "a": "tri.sdf" } },
+    "ringm": { "type": "profile", "params": { "bevel": 0.5, "profile": "flat" }, "inputs": { "in": "ring" } },
+    "mark":  { "type": "text", "params": { "text": "!", "x": 212, "y": 150, "size": 30, "bevel": 0.5 } },
+    "both":  { "type": "blend", "params": { "mode": "lighten" }, "inputs": { "a": "ringm", "b": "mark" } },
+    "out":   { "type": "output", "inputs": { "in": "both" } }
+  }
+}

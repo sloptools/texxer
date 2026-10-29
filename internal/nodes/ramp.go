@@ -39,8 +39,13 @@ func rampNode(e *graph.Env) (*img.Buffer, error) {
 	cx, cy := 0.5+p.Float("x", 0), 0.5+p.Float("y", 0)
 	w, h := float64(e.Ctx.W), float64(e.Ctx.H)
 
+	// Linear ramps measure in widths, so angles hold in non-square buffers.
+	aspect := h / w
 	return fill(e.Ctx, func(x, y int) float32 {
 		u, v := (float64(x)+0.5)/w, (float64(y)+0.5)/h
+		if mode != "radial" {
+			v *= aspect
+		}
 
 		var t float64
 		if mode == "radial" {

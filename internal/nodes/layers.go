@@ -52,6 +52,14 @@ type maskPart struct {
 	Breakup *float64 `json:"breakup,omitempty"`
 	// Grow widens color picks by px, e.g. to take the stripes between picked ones.
 	Grow *float64 `json:"grow,omitempty"`
+
+	// Decals project the motif node Type at Center along Direction.
+	Center    []float64 `json:"center,omitempty"`
+	Direction []float64 `json:"direction,omitempty"`
+	Size      *float64  `json:"size,omitempty"`
+	Aspect    *float64  `json:"aspect,omitempty"`
+	Rotation  *float64  `json:"rotation,omitempty"`
+	Depth     *float64  `json:"depth,omitempty"`
 }
 
 type effect struct {
@@ -288,7 +296,7 @@ func (b *layerBuilder) mask(steps []maskPart) (string, error) {
 }
 
 func (b *layerBuilder) maskStep(s maskPart) (string, error) {
-	if !b.hasMesh && (s.Kind == "parts" || s.Kind == "mesh" || s.Kind == "color") {
+	if !b.hasMesh && (s.Kind == "parts" || s.Kind == "mesh" || s.Kind == "color" || s.Kind == "decal") {
 		return "", fmt.Errorf("%s masks need a model path", s.Kind)
 	}
 	level := func(def float64) float64 { return deref(s.Level, def) }
@@ -355,6 +363,27 @@ func (b *layerBuilder) maskStep(s maskPart) (string, error) {
 		blurred := b.add("pick", "blur", graph.Params{"radius": radius}, map[string]string{"in": raw})
 		return b.add("pick", "scan", graph.Params{"position": pos, "contrast": 0.85}, map[string]string{"in": blurred}), nil
 
+	case "decal":
+		params := graph.Params{
+			"size": deref(s.Size, 0.2), "aspect": deref(s.Aspect, 1),
+			"rotation": deref(s.Rotation, 0), "depth": deref(s.Depth, 0.1),
+		}
+		if s.Center != nil {
+			params["center"] = toAny(s.Center)
+		}
+		if s.Direction != nil {
+			params["direction"] = toAny(s.Direction)
+		}
+
+		inputs := map[string]string{"position": "mesh.position", "normal": "mesh.normal"}
+		if s.Type != "" {
+			if !b.env.HasType(s.Type) {
+				return "", fmt.Errorf("unknown motif %q", s.Type)
+			}
+			inputs["motif"] = b.add("motif", s.Type, s.Params, nil)
+		}
+		return b.add("decal", "decal", params, inputs), nil
+
 	case "graph":
 		if !b.env.HasType(s.Type) {
 			return "", fmt.Errorf("unknown mask graph %q", s.Type)
@@ -387,6 +416,14 @@ func partMaskNode(e *graph.Env) (*img.Buffer, error) {
 		}
 	}
 	return out, nil
+}
+
+func toAny(v []float64) []any {
+	out := make([]any, len(v))
+	for i, x := range v {
+		out[i] = x
+	}
+	return out
 }
 
 func deref(v *float64, def float64) float64 {

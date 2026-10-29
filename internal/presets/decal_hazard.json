@@ -1,0 +1,14 @@
+{
+  "size": 512,
+  "output": "out",
+  "params": {
+    "stripes": { "targets": ["ramp.repeat"] },
+    "angle": { "targets": ["ramp.angle"] },
+    "width": { "targets": ["stripes.position"] }
+  },
+  "nodes": {
+    "ramp":    { "type": "ramp", "params": { "angle": 45, "repeat": 6 } },
+    "stripes": { "type": "scan", "params": { "position": 0.5, "contrast": 1 }, "inputs": { "in": "ramp" } },
+    "out":     { "type": "output", "inputs": { "in": "stripes" } }
+  }
+}

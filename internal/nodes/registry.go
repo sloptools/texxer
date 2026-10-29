@@ -8,6 +8,7 @@ var Registry = map[string]Def{
 	"image":    imageDef,
 	"mesh":     meshDef,
 	"layers":   layersDef,
+	"decal":    decalDef,
 	"partmask": partMaskDef,
 	"shade":    shadeDef,
 

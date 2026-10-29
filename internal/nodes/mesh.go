@@ -15,7 +15,7 @@ import (
 )
 
 // meshMaps are the baked maps the mesh node outputs, which layers wire into materials and masks.
-var meshMaps = []string{"ao", "edges", "cavity", "up", "height", "normal", "part", "partid", "selected", "mask"}
+var meshMaps = []string{"ao", "edges", "cavity", "up", "height", "normal", "position", "part", "partid", "selected", "mask"}
 
 var meshDef = Def{
 	Eval:     meshNode,
@@ -92,12 +92,14 @@ func meshNode(e *graph.Env) (*img.Buffer, error) {
 	}
 	e.SetOutput("partid", nearest(maps.PartID, bw, bh, w, h, t))
 
-	normal := img.New(bw, bh, 4, t)
-	for i := range bw * bh {
-		copy(normal.Pix[i*4:], maps.Normal[i*3:i*3+3])
-		normal.Pix[i*4+3] = 1
+	for name, src := range map[string][]float32{"normal": maps.Normal, "position": maps.Position} {
+		rgba := make([]float32, bw*bh*4)
+		for i := range bw * bh {
+			copy(rgba[i*4:], src[i*3:i*3+3])
+			rgba[i*4+3] = 1
+		}
+		e.SetOutput(name, shrink(rgba, bw, bh, 4, w, h, t))
 	}
-	e.SetOutput("normal", shrink(normal.Pix, bw, bh, 4, w, h, t))
 
 	return modelTexture(model.m, w, h, t, p.String("filter", "nearest") == "linear"), nil
 }
