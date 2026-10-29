@@ -7,7 +7,16 @@
     onpick,
     onclose,
     exclude,
-  }: { x: number; y: number; onpick: (type: string) => void; onclose: () => void; exclude?: string } = $props();
+    needsInput = false,
+  }: {
+    x: number;
+    y: number;
+    onpick: (type: string) => void;
+    onclose: () => void;
+    exclude?: string;
+    /** Only offer types that can take a connection, when one is being dropped. */
+    needsInput?: boolean;
+  } = $props();
 
   const order = ['generator', 'grunge', 'mask', 'shape', 'filter', 'color', 'light', 'preset', 'graph', 'io', 'output'];
 
@@ -19,6 +28,7 @@
 
     for (const [type, def] of Object.entries(editor.catalog)) {
       if (type === exclude) continue;
+      if (needsInput && def.inputs.length === 0 && !def.dynamic) continue;
       if (q && !type.includes(q) && !def.category.includes(q)) continue;
       (byCategory[def.category] ??= []).push(type);
     }

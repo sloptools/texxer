@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { Background, Controls, SvelteFlow, type Connection, type Edge, type useSvelteFlow } from '@xyflow/svelte';
+  import {
+    Background,
+    Controls,
+    SvelteFlow,
+    type Connection,
+    type Edge,
+    type OnConnectEnd,
+    type useSvelteFlow,
+  } from '@xyflow/svelte';
   import { onMount, untrack } from 'svelte';
   import * as api from './lib/api';
   import { editor, graphMeta } from './lib/editor.svelte';
@@ -31,6 +39,8 @@
   let previewSize = $state(512);
   let message = $state('');
   let menu = $state<{ x: number; y: number } | null>(null);
+  /** Set when the add menu was opened by dropping a connection on empty canvas. */
+  let dangling = $state<{ node: string; handle: string; type: 'source' | 'target' } | null>(null);
   let flow: ReturnType<typeof useSvelteFlow> | undefined;
 
   const picked = $derived(nodes.filter((n) => n.selected));
@@ -261,13 +271,50 @@
 
     const id = uniqueId(type, nodes);
     const position = flow.screenToFlowPosition({ x: menu.x, y: menu.y });
-    nodes = [
-      ...nodes.map((n) => ({ ...n, selected: false })),
-      { id, type: 'tex', position, data: { type, params: {} }, selected: true },
-    ];
+    const data = { type, params: {} };
+
+    // A node fed from the left sits right of the drop point, one feeding an input sits left of it.
+    if (dangling?.type === 'target') position.x -= 160;
+    position.y -= 20;
+
+    nodes = [...nodes.map((n) => ({ ...n, selected: false })), { id, type: 'tex', position, data, selected: true }];
     if (!editor.output) editor.output = id;
-    menu = null;
+
+    if (dangling) {
+      const def = editor.catalog[type];
+      if (dangling.type === 'source') {
+        const input = inputsOf(def, data)[0];
+        if (input) edges = [...edges, edge(dangling.node, dangling.handle, id, input)];
+      } else {
+        const output = def?.outputs[0] ?? 'out';
+        edges = [...edges.filter((e) => !(e.target === dangling!.node && e.targetHandle === dangling!.handle)), edge(id, output, dangling.node, dangling.handle)];
+      }
+    }
+    closeMenu();
   }
+
+  function closeMenu() {
+    menu = null;
+    dangling = null;
+  }
+
+  /** Dropping a connection on empty canvas opens the add menu to create the other end. */
+  const connectEnd: OnConnectEnd = (event, state) => {
+    if (!('fromNode' in state) || !state.fromNode || state.toNode || state.isValid) return;
+
+    const handle = state.fromHandle;
+    const type = handle.type;
+    const id = handle.id ?? (type === 'source' ? 'out' : 'in');
+
+    // Pulling a connected input into the void disconnects it.
+    if (type === 'target') {
+      edges = edges.filter((e) => !(e.target === state.fromNode!.id && e.targetHandle === id));
+    }
+
+    const point = 'changedTouches' in event ? event.changedTouches[0] : event;
+    dangling = { node: state.fromNode.id, handle: id, type };
+    menu = { x: point.clientX, y: point.clientY };
+  };
 
   function pasteText(text: string) {
     const result = ops.paste(text, nodes, edges);
@@ -348,6 +395,10 @@
         colorMode={editor.theme}
         minZoom={0.1}
         onbeforeconnect={connect}
+        onconnectend={connectEnd}
+        onedgeclick={({ edge, event }) => {
+          if (event.altKey) edges = edges.filter((e) => e.id !== edge.id);
+        }}
         onpanecontextmenu={({ event }) => {
           event.preventDefault();
           menu = { x: event.clientX, y: event.clientY };
@@ -384,6 +435,8 @@
             Select a node to edit it. Right-click the canvas to add one. Shift-drag selects several.
             <br />⌘Z / ⇧⌘Z undo and redo, ⌘C / ⌘V copy and paste, ⌘D duplicates, ⌘G groups into a subgraph.
             Double-click a graph node to open it.
+            <br />Drop a connection on empty canvas to add a node there. To disconnect, click a connection and press ⌫,
+            ⌥-click it, or drag from the input into empty space.
           </p>
         {/if}
       </div>
@@ -392,5 +445,12 @@
 </div>
 
 {#if menu}
-  <AddMenu x={menu.x} y={menu.y} onpick={addNode} onclose={() => (menu = null)} exclude={name} />
+  <AddMenu
+    x={menu.x}
+    y={menu.y}
+    onpick={addNode}
+    onclose={closeMenu}
+    exclude={name}
+    needsInput={dangling?.type === 'source'}
+  />
 {/if}
