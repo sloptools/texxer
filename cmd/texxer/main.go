@@ -10,6 +10,7 @@ import (
 	"texxer/internal/graph"
 	"texxer/internal/img"
 	"texxer/internal/nodes"
+	"texxer/internal/presets"
 )
 
 func main() {
@@ -22,6 +23,7 @@ func main() {
 	out := fs.String("o", "out.png", "output file")
 	size := fs.Int("size", 0, "render size in px (default: graph size)")
 	node := fs.String("node", "", "render this node instead of the graph output")
+	seed := fs.Int("seed", 0, "variant seed, shifts all seeds in the graph")
 	fs.Parse(os.Args[2:])
 
 	if fs.NArg() != 1 {
@@ -29,13 +31,13 @@ func main() {
 		os.Exit(2)
 	}
 
-	if err := render(fs.Arg(0), *out, *node, *size); err != nil {
+	if err := render(fs.Arg(0), *out, *node, *size, *seed); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func render(path, out, node string, size int) error {
+func render(path, out, node string, size, seed int) error {
 	g, err := graph.Load(path)
 	if err != nil {
 		return err
@@ -51,7 +53,10 @@ func render(path, out, node string, size int) error {
 	start := time.Now()
 	ctx := graph.Ctx{W: size, H: size, Tiling: img.TileBoth, Scale: float64(size) / float64(g.Size)}
 
-	b, err := graph.NewEvaluator(g, nodes.Registry).Eval(node, ctx)
+	ev := graph.NewEvaluator(g, nodes.Registry, presets.Load)
+	ev.SetSeed(seed)
+
+	b, err := ev.Eval(node, ctx)
 	if err != nil {
 		return err
 	}

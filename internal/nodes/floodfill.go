@@ -26,7 +26,7 @@ func floodFillNode(e *graph.Env) (*img.Buffer, error) {
 	if mode != "random" && mode != "gradient" {
 		return nil, fmt.Errorf("unknown flood fill mode %q", mode)
 	}
-	seed := p.Int("seed", 0)
+	seed := e.Seed()
 	angle := p.Float("angle", 0) * math.Pi / 180
 	spread := p.Float("spread", 360) * math.Pi / 180
 	variation := p.Float("variation", 0)

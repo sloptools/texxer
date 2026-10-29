@@ -31,7 +31,7 @@ func grungeNode(e *graph.Env) (*img.Buffer, error) {
 func dirt(e *graph.Env) *img.Buffer {
 	p := e.Params
 	px, py := periods(e.Ctx, p.Float("scale", 4))
-	seed := p.Int("seed", 0)
+	seed := e.Seed()
 	edge := 1 - p.Float("coverage", 0.5)
 	soft := p.Float("softness", 0.15)
 
@@ -45,7 +45,7 @@ func dirt(e *graph.Env) *img.Buffer {
 func spots(e *graph.Env) *img.Buffer {
 	p := e.Params
 	px, py := periods(e.Ctx, p.Float("scale", 8))
-	seed := p.Int("seed", 0)
+	seed := e.Seed()
 	size := p.Float("size", 0.35)
 
 	return fill(e.Ctx, func(x, y int) float32 {
@@ -60,7 +60,7 @@ func spots(e *graph.Env) *img.Buffer {
 // grain is white noise in blocks of size px, the speckle that survives downsampling.
 func grain(e *graph.Env) *img.Buffer {
 	size := max(1, int(math.Round(e.Px("size", 1))))
-	seed := e.Params.Int("seed", 0)
+	seed := e.Seed()
 
 	return fill(e.Ctx, func(x, y int) float32 {
 		return float32(noise.Rand01(x/size, y/size, seed))
@@ -70,7 +70,7 @@ func grain(e *graph.Env) *img.Buffer {
 func streaks(e *graph.Env) *img.Buffer {
 	p := e.Params
 	scale := p.Float("scale", 6)
-	seed := p.Int("seed", 0)
+	seed := e.Seed()
 	edge := 1 - p.Float("coverage", 0.4)
 
 	// Stretched cells: many columns, few rows.

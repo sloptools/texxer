@@ -15,7 +15,7 @@ func scratches(e *graph.Env) *img.Buffer {
 	width := e.Px("width", 1)
 	angle := p.Float("angle", 30) * math.Pi / 180
 	spread := p.Float("spread", 40) * math.Pi / 180
-	seed := p.Int("seed", 0)
+	seed := e.Seed()
 
 	b := img.New(e.Ctx.W, e.Ctx.H, 1, e.Ctx.Tiling)
 

@@ -1,0 +1,12 @@
+{
+  "outputs": { "out": "sharp" },
+  "params": {
+    "factor":  { "default": 2,   "targets": ["small.factor"] },
+    "sharpen": { "default": 0.6, "targets": ["sharp.amount"] }
+  },
+  "nodes": {
+    "color": { "type": "input", "params": { "name": "color" } },
+    "small": { "type": "downsample", "inputs": { "in": "color" } },
+    "sharp": { "type": "sharpen", "inputs": { "in": "small" } }
+  }
+}

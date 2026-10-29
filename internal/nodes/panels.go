@@ -1,7 +1,6 @@
 package nodes
 
 import (
-	"fmt"
 	"math"
 
 	"texxer/internal/graph"
@@ -61,9 +60,9 @@ func (l *panelLayout) split(c panelCell, depth int) {
 	l.split(b, depth+1)
 }
 
-// panelsNode subdivides the area into grid-aligned panels. output selects
-// "shape" (SDF of a shape fitted into each panel), "cell" (SDF of the panel
-// rectangles) or "id" (random value per panel).
+// panelsNode subdivides the area into grid-aligned panels. The main output is
+// the SDF of a shape fitted into each panel; "cell" is the SDF of the panel
+// rectangles and "id" a random value per panel.
 func panelsNode(e *graph.Env) (*img.Buffer, error) {
 	p := e.Params
 	grid := p.Float("grid", 16)
@@ -75,14 +74,9 @@ func panelsNode(e *graph.Env) (*img.Buffer, error) {
 		max:   max(1, int(math.Round(p.Float("max", 160)/grid))),
 		depth: p.Int("depth", 6),
 		stop:  p.Float("stop", 0.3),
-		seed:  p.Int("seed", 0),
+		seed:  e.Seed(),
 	}
 	l.split(panelCell{0, 0, unitsX, unitsY, 0}, 0)
-
-	output := p.String("output", "shape")
-	if output != "shape" && output != "cell" && output != "id" {
-		return nil, fmt.Errorf("unknown panels output %q", output)
-	}
 
 	var shapeNames []string
 	if err := p.Decode("shapes", &shapeNames); err != nil {
@@ -101,24 +95,30 @@ func panelsNode(e *graph.Env) (*img.Buffer, error) {
 	ux := float64(e.Ctx.W) / float64(unitsX)
 	uy := float64(e.Ctx.H) / float64(unitsY)
 
-	return fill(e.Ctx, func(x, y int) float32 {
-		fx, fy := float64(x)+0.5, float64(y)+0.5
-		c := l.cells[l.find(fx/ux, fy/uy)]
+	shape := img.New(e.Ctx.W, e.Ctx.H, 1, e.Ctx.Tiling)
+	cell := img.New(e.Ctx.W, e.Ctx.H, 1, e.Ctx.Tiling)
+	id := img.New(e.Ctx.W, e.Ctx.H, 1, e.Ctx.Tiling)
 
-		hw := float64(c.x1-c.x0) * ux / 2
-		hh := float64(c.y1-c.y0) * uy / 2
-		lx := fx - float64(c.x0)*ux - hw
-		ly := fy - float64(c.y0)*uy - hh
+	img.Rows(e.Ctx.H, func(y int) {
+		for x := range e.Ctx.W {
+			fx, fy := float64(x)+0.5, float64(y)+0.5
+			c := l.cells[l.find(fx/ux, fy/uy)]
 
-		switch output {
-		case "id":
-			return float32(l.rand(c.id, 3))
-		case "cell":
-			return float32(sdBox(lx, ly, hw, hh, 0))
-		default:
-			return float32(fit.dist(&l, c, lx, ly, hw, hh))
+			hw := float64(c.x1-c.x0) * ux / 2
+			hh := float64(c.y1-c.y0) * uy / 2
+			lx := fx - float64(c.x0)*ux - hw
+			ly := fy - float64(c.y0)*uy - hh
+
+			i := y*e.Ctx.W + x
+			shape.Pix[i] = float32(fit.dist(&l, c, lx, ly, hw, hh))
+			cell.Pix[i] = float32(sdBox(lx, ly, hw, hh, 0))
+			id.Pix[i] = float32(l.rand(c.id, 3))
 		}
-	}), nil
+	})
+
+	e.SetOutput("cell", cell)
+	e.SetOutput("id", id)
+	return shape, nil
 }
 
 func (l *panelLayout) find(gx, gy float64) int {

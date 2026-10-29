@@ -17,7 +17,7 @@ func warpNode(e *graph.Env) (*img.Buffer, error) {
 	amount := e.Px("amount", 4)
 	px, py := periods(e.Ctx, p.Float("scale", 16))
 	octaves := p.Int("octaves", 3)
-	seed := p.Int("seed", 0)
+	seed := e.Seed()
 
 	out := img.New(src.W, src.H, src.C, src.Tiling)
 	img.Rows(src.H, func(y int) {

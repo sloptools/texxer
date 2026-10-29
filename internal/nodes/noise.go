@@ -11,7 +11,7 @@ func noiseNode(e *graph.Env) (*img.Buffer, error) {
 	px, py := periods(e.Ctx, p.Float("scale", 4))
 	octaves := p.Int("octaves", 5)
 	persistence := p.Float("persistence", 0.5)
-	seed := p.Int("seed", 0)
+	seed := e.Seed()
 
 	return fill(e.Ctx, func(x, y int) float32 {
 		u, v := cell(e.Ctx, x, y, px, py)

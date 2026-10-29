@@ -13,7 +13,7 @@ import (
 func cellsNode(e *graph.Env) (*img.Buffer, error) {
 	p := e.Params
 	px, py := periods(e.Ctx, p.Float("scale", 8))
-	seed := p.Int("seed", 0)
+	seed := e.Seed()
 	width := p.Float("width", 0.05)
 
 	mode := p.String("mode", "distance")
