@@ -19,6 +19,8 @@
     onpaint,
     onpaintend,
     overlay,
+    lit = false,
+    onhover,
   }: {
     url: string;
     model?: ModelRef;
@@ -31,6 +33,10 @@
     onpaintend?: () => void;
     /** A gray mask drawn tinted over the texture, updated whenever version changes. */
     overlay?: { canvas: HTMLCanvasElement; version: number };
+    /** Light the model like the game does instead of showing the texture unlit. */
+    lit?: boolean;
+    /** Called with the part under the pointer, or '' when there is none. */
+    onhover?: (part: string) => void;
   } = $props();
 
   let container: HTMLDivElement;
@@ -38,10 +44,14 @@
   let fit: ((object: THREE.Object3D) => void) | undefined;
 
   // Materials showing the rendered texture; emissive ones keep their own color.
-  let textured: THREE.MeshBasicMaterial[] = [];
+  let textured: (THREE.MeshBasicMaterial | THREE.MeshLambertMaterial)[] = [];
+  let lights: THREE.Group | undefined;
+  let rendererRef: THREE.WebGLRenderer | undefined;
+  let hovered = '';
   // State, so the paint overlay recomposes when a new render arrives.
   let texture = $state.raw<THREE.Texture | undefined>();
-  let root: THREE.Object3D | undefined;
+  // State, so switching to the lit look also reaches a model that loads later.
+  let root = $state.raw<THREE.Object3D | undefined>();
   let camera: THREE.PerspectiveCamera | undefined;
   // The model's own texture, for picking colors.
   let original: CanvasRenderingContext2D | undefined;
@@ -57,10 +67,23 @@
     container.appendChild(renderer.domElement);
 
     scene = new THREE.Scene();
+    rendererRef = renderer;
+
+    // Like Substratum's hangar: teal ambient, a spot from above and a faint headlight from the camera.
+    lights = new THREE.Group();
+    lights.add(new THREE.AmbientLight(new THREE.Color(0.25, 0.44, 0.51), 1.5));
+    const spot = new THREE.SpotLight(0xd8ecff, 40, 0, Math.PI / 5, 0.6, 1.2);
+    spot.position.set(0, 3, 0.4);
+    lights.add(spot, spot.target);
+    lights.visible = false;
+    scene.add(lights);
 
     const cam = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
     cam.position.set(2.2, 1.6, 2.2);
     camera = cam;
+    const headlight = new THREE.PointLight(0xfff2dd, 1.5, 0, 1.5);
+    cam.add(headlight);
+    lights.add(cam);
 
     const controls = new OrbitControls(cam, renderer.domElement);
     controlsRef = controls;
@@ -125,9 +148,10 @@
       }
     };
     const onMove = (e: PointerEvent) => {
-      const hit = brush ? raycast(e) : undefined;
-      showRing(hit);
+      const hit = brush || onhover ? raycast(e) : undefined;
+      showRing(brush ? hit : undefined);
       if (painting && hit) onpaint?.(hit, false, e.altKey);
+      if (!painting && e.buttons === 0) hover(hit?.part ?? '');
     };
     const onUp = (e: PointerEvent) => {
       if (painting) {
@@ -139,7 +163,10 @@
       }
       down = undefined;
     };
-    const onLeave = () => showRing(undefined);
+    const onLeave = () => {
+      showRing(undefined);
+      hover('');
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || (e.target as HTMLElement).closest('input, textarea, select')) return;
       spaceDown = e.type === 'keydown';
@@ -277,6 +304,51 @@
     composite.flipY = false;
     applyTexture();
   });
+
+  // Switching between the unlit and the game-like look swaps the textured materials.
+  $effect(() => {
+    const l = lit;
+    if (lights) lights.visible = l;
+    if (rendererRef) {
+      rendererRef.toneMapping = l ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+      rendererRef.toneMappingExposure = 1.1;
+    }
+    if (!root) return;
+
+    const next: typeof textured = [];
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const swap = (m: THREE.Material) => {
+        if (!textured.includes(m as never)) return m;
+        const made = l
+          ? new THREE.MeshLambertMaterial({ side: THREE.DoubleSide })
+          : new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+        next.push(made);
+        m.dispose();
+        return made;
+      };
+      child.material = Array.isArray(child.material) ? child.material.map(swap) : swap(child.material);
+    });
+    textured = next;
+    applyTexture();
+  });
+
+  /** Brightens the part under the pointer and reports it. */
+  function hover(part: string) {
+    if (part === hovered || !root) return;
+    hovered = part;
+    onhover?.(part);
+
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      let top: THREE.Object3D = child;
+      while (top.parent && top.parent !== root) top = top.parent;
+      const on = part !== '' && top.name === part;
+      for (const m of Array.isArray(child.material) ? child.material : [child.material]) {
+        if (textured.includes(m as never)) (m as THREE.MeshBasicMaterial).color.setScalar(on ? 1.45 : 1);
+      }
+    });
+  }
 
   function syncControls() {
     if (controlsRef) controlsRef.enabled = !brush || spaceDown;

@@ -5,11 +5,14 @@
   let {
     layers,
     effects,
+    thumbs = {},
     selected = $bindable(),
     onchange,
   }: {
     layers: Layer[];
     effects: Effect[];
+    /** Mask renders by layer index. */
+    thumbs?: Record<number, string>;
     /** "l3" for layer 3, "e1" for effect 1. */
     selected: string;
     onchange: (layers: Layer[], effects: Effect[]) => void;
@@ -84,6 +87,11 @@
             setLayers(replace(layers, i, { ...l, hidden: !l.hidden }));
           }}>{l.hidden ? '○' : '●'}</button
         >
+        {#if thumbs[i]}
+          <img src={thumbs[i]} alt="" class="pixelated size-6 shrink-0 rounded-sm border border-line-soft" />
+        {:else}
+          <span class="size-6 shrink-0 rounded-sm border border-line-soft {l.mask?.length ? 'bg-field' : 'bg-fg-faint'}" title={l.mask?.length ? '' : 'ohne Maske: deckt alles'}></span>
+        {/if}
         <span class="truncate {l.hidden ? 'text-fg-dim' : ''}">{l.name}</span>
         <span class="ml-auto truncate text-[10px] text-fg-dim">
           {l.post ? 'post · ' : ''}{l.fill.type?.replace(/^mat_/, '') ?? 'Farbe'}

@@ -34,6 +34,10 @@
 
   let armed = $state(-1);
   let hint = $state('');
+  let hoverPart = $state('');
+  let lit = $state(false);
+  /** Small renders of each layer's mask, by layer index. */
+  let thumbs = $state<Record<number, string>>({});
 
   const stack = $derived(stackOf(node.data.params));
   const layerIndex = $derived(selected.startsWith('l') ? Number(selected.slice(1)) : -1);
@@ -45,6 +49,30 @@
   $effect(() => {
     selected;
     armed = -1;
+  });
+
+  // Mask thumbnails follow each finished preview render, so they show the current stack.
+  let thumbGen = 0;
+  $effect(() => {
+    if (!preview.url || preview.busy) return;
+    const gen = ++thumbGen;
+    const g = untrack(() => graph);
+    const layers = untrack(() => stack.layers);
+
+    (async () => {
+      const next: Record<number, string> = {};
+      for (const [i, l] of layers.entries()) {
+        if (!l.mask?.length || l.hidden) continue;
+        try {
+          next[i] = await api.render(g, `${node.id}.mask${i}`, 48, 0);
+        } catch {
+          // A broken mask shows its error in the preview already.
+        }
+        if (gen !== thumbGen) return;
+      }
+      for (const url of Object.values(untrack(() => thumbs))) URL.revokeObjectURL(url);
+      thumbs = next;
+    })();
   });
 
   // The brush is active while a painted mask step is armed.
@@ -150,7 +178,7 @@
 
 <div class="flex min-h-0 flex-1">
   <aside class="w-60 shrink-0 border-r border-line-soft bg-panel">
-    <LayerList layers={stack.layers} effects={stack.effects} bind:selected onchange={save} />
+    <LayerList layers={stack.layers} effects={stack.effects} {thumbs} bind:selected onchange={save} />
   </aside>
 
   <main class="relative min-w-0 flex-1 bg-panel">
@@ -164,15 +192,23 @@
         onpaint={paint}
         onpaintend={paintEnd}
         overlay={painter ? { canvas: painter.canvas, version: overlayVersion } : undefined}
+        {lit}
+        onhover={(p) => (hoverPart = p)}
       />
     {/if}
     <div class="pointer-events-none absolute inset-x-3 top-2 flex items-center gap-2 text-[11px] text-fg-dim">
       <span>{showMask && layer ? `Maske: ${layer.name}` : node.id}</span>
       {#if armed >= 0}<span class="text-accent">Klick wählt im Modell</span>{/if}
+      {#if hoverPart}<span class="rounded bg-field px-1.5 text-fg">{hoverPart}</span>{/if}
       <span class="ml-auto">
         {#if preview.busy}rendering…{:else if preview.ms !== undefined}{preview.ms} ms{/if}
         {#if hint} · {hint}{/if}
       </span>
+      <div class="pointer-events-auto flex overflow-hidden rounded border border-line" title="Textur unbeleuchtet oder mit Licht wie im Spiel">
+        {#each [[false, 'Textur'], [true, 'Szene']] as [on, label]}
+          <button class="px-2 py-0.5 {lit === on ? 'bg-line text-fg' : 'text-fg-muted hover:text-fg'}" onclick={() => (lit = on as boolean)}>{label}</button>
+        {/each}
+      </div>
     </div>
     {#if preview.error}
       <div class="absolute inset-x-3 bottom-3 rounded bg-danger-bg p-2 font-mono text-[11px] text-danger">{preview.error}</div>
