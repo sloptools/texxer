@@ -7,6 +7,7 @@
   import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
   import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
   import { fileURL } from '../lib/api';
+  import { editor } from '../lib/editor.svelte';
   import type { ModelRef } from '../lib/types';
 
   let {
@@ -39,7 +40,6 @@
     container.appendChild(renderer.domElement);
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(getComputedStyle(container).getPropertyValue('--color-panel').trim() || '#18181b');
 
     const cam = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
     cam.position.set(2.2, 1.6, 2.2);
@@ -106,6 +106,23 @@
       renderer.domElement.remove();
       scene = undefined;
     };
+  });
+
+  // The panel color of the current theme, resolved by the browser since theme colors are oklch.
+  $effect(() => {
+    editor.theme;
+    const target = scene;
+    if (!target) return;
+
+    // Wait a frame, so the theme's CSS is applied before reading it.
+    const frame = requestAnimationFrame(() => {
+      const ctx = document.createElement('canvas').getContext('2d')!;
+      ctx.fillStyle = getComputedStyle(container).backgroundColor;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+      target.background = new THREE.Color(r / 255, g / 255, b / 255).convertSRGBToLinear();
+    });
+    return () => cancelAnimationFrame(frame);
   });
 
   // The model, or a cube for tiling textures.
@@ -224,4 +241,4 @@
   }
 </script>
 
-<div bind:this={container} class="absolute inset-0"></div>
+<div bind:this={container} class="absolute inset-0 bg-panel"></div>

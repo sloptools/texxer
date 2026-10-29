@@ -14,6 +14,7 @@
   import { edge, fromGraph, inputsOf, toGraph, uniqueId, type TexNode } from './lib/graph';
   import { group } from './lib/group';
   import { History } from './lib/history';
+  import type { ModelRef } from './lib/types';
   import * as ops from './lib/ops';
   import { renderer } from './lib/renderer.svelte';
   import { layoutStrips, type Strip } from './lib/trim';
@@ -64,11 +65,13 @@
   const docKey = $derived(JSON.stringify(currentGraph()));
   const dirty = $derived(name !== '' && docKey !== savedKey);
 
-  const model = $derived.by(() => {
+  // A string first, so param edits that keep the model don't hand the 3D view a new object and reload it.
+  const modelKey = $derived.by(() => {
     const node = nodes.find((n) => (n.data.type === 'mesh' || n.data.type === 'layers') && n.data.params.path);
-    if (!node) return undefined;
-    return { path: String(node.data.params.path), material: String(node.data.params.material ?? '') };
+    if (!node) return '';
+    return JSON.stringify({ path: String(node.data.params.path), material: String(node.data.params.material ?? '') });
   });
+  const model = $derived(modelKey ? (JSON.parse(modelKey) as ModelRef) : undefined);
 
   const strips = $derived.by(() => {
     if (selected?.data.type !== 'trim') return [];
@@ -85,7 +88,7 @@
     const [g, ref, s, ps] = untrack(() => [renderGraph, previewRef, seed, previewSize] as const);
     if (!ref || !g.nodes[ref.split('.')[0]]) return;
 
-    const timer = setTimeout(() => renderer.update(g, ref, ps, s), 150);
+    const timer = setTimeout(() => renderer.update(g, ref, ps, Math.round(s) || 0), 150);
     return () => clearTimeout(timer);
   });
 
