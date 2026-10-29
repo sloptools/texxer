@@ -2,6 +2,7 @@ package nodes
 
 var Registry = map[string]Def{
 	"noise": noiseDef,
+	"ramp":  rampDef,
 	"cells": cellsDef,
 	"color": colorDef,
 	"image": imageDef,
@@ -16,6 +17,7 @@ var Registry = map[string]Def{
 	"pattern":     patternDef,
 	"panels":      panelsDef,
 	"tiles":       tilesDef,
+	"greeble":     greebleDef,
 	"shape":       shapeDef,
 	"tilesampler": tileSamplerDef,
 	"grid":        gridDef,

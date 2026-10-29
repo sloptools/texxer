@@ -126,13 +126,22 @@ func slopeBlurNode(e *graph.Env) (*img.Buffer, error) {
 		return nil, err
 	}
 
-	return displace(src, func(x, y int, offsets [][2]float64) [][2]float64 {
-		i := y*src.W + x
-		dx, dy := float64(gx[i])*amount, float64(gy[i])*amount
+	// Gradients as buffers, so steps can read them between pixels.
+	gxb := &img.Buffer{W: src.W, H: src.H, C: 1, Tiling: src.Tiling, Pix: gx}
+	gyb := &img.Buffer{W: src.W, H: src.H, C: 1, Tiling: src.Tiling, Pix: gy}
+	step := amount / float64(n-1)
 
-		for k := range n {
-			t := float64(k) / float64(n-1)
-			offsets = append(offsets, [2]float64{dx * t, dy * t})
+	// Each step follows the slope where the previous one landed, so the
+	// smear flows along the slope map instead of running straight.
+	return displace(src, func(x, y int, offsets [][2]float64) [][2]float64 {
+		px, py := float64(x)+0.5, float64(y)+0.5
+		ox, oy := 0.0, 0.0
+
+		offsets = append(offsets, [2]float64{0, 0})
+		for range n - 1 {
+			ox += float64(gxb.Sample(px+ox, py+oy, 0)) * step
+			oy += float64(gyb.Sample(px+ox, py+oy, 0)) * step
+			offsets = append(offsets, [2]float64{ox, oy})
 		}
 		return offsets
 	}, combine), nil
