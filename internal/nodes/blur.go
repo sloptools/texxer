@@ -34,18 +34,40 @@ func blurNode(e *graph.Env) (*img.Buffer, error) {
 	return b, nil
 }
 
+// boxPass blurs along rows (dx=1) or columns (dy=1) with a running sum, so
+// the cost doesn't grow with the radius.
 func boxPass(src *img.Buffer, r, dx, dy int) *img.Buffer {
 	out := img.New(src.W, src.H, src.C, src.Tiling)
 	n := float32(2*r + 1)
 
-	img.Rows(src.H, func(y int) {
-		for x := range src.W {
-			for ch := range src.C {
-				var sum float32
-				for k := -r; k <= r; k++ {
-					sum += src.At(x+k*dx, y+k*dy, ch)
-				}
+	lines, length := src.H, src.W
+	if dy == 1 {
+		lines, length = src.W, src.H
+	}
+
+	img.Rows(lines, func(line int) {
+		// k runs along the line; x, y follow from the direction.
+		pos := func(k int) (int, int) {
+			if dx == 1 {
+				return k, line
+			}
+			return line, k
+		}
+
+		for ch := range src.C {
+			var sum float32
+			for k := -r; k <= r; k++ {
+				x, y := pos(k)
+				sum += src.At(x, y, ch)
+			}
+
+			for k := range length {
+				x, y := pos(k)
 				out.Pix[(y*src.W+x)*src.C+ch] = sum / n
+
+				ax, ay := pos(k + r + 1)
+				bx, by := pos(k - r)
+				sum += src.At(ax, ay, ch) - src.At(bx, by, ch)
 			}
 		}
 	})

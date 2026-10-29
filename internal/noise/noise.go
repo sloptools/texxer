@@ -16,6 +16,15 @@ func Rand01(x, y, seed int) float64 {
 	return float64(Hash(x, y, seed)) / (1 << 32)
 }
 
+// gradients are unit vectors around the circle; a table is much faster than cos/sin per corner.
+var gradients = func() (g [256][2]float64) {
+	for i := range g {
+		a := float64(i) / 256 * 2 * math.Pi
+		g[i] = [2]float64{math.Cos(a), math.Sin(a)}
+	}
+	return g
+}()
+
 // Perlin returns gradient noise in about [-1, 1].
 func Perlin(x, y float64, px, py, seed int) float64 {
 	x0, y0 := math.Floor(x), math.Floor(y)
@@ -23,8 +32,8 @@ func Perlin(x, y float64, px, py, seed int) float64 {
 	ix, iy := int(x0), int(y0)
 
 	grad := func(dx, dy int) float64 {
-		a := Rand01(mod(ix+dx, px), mod(iy+dy, py), seed) * 2 * math.Pi
-		return math.Cos(a)*(fx-float64(dx)) + math.Sin(a)*(fy-float64(dy))
+		g := gradients[Hash(mod(ix+dx, px), mod(iy+dy, py), seed)>>24]
+		return g[0]*(fx-float64(dx)) + g[1]*(fy-float64(dy))
 	}
 
 	u, v := fade(fx), fade(fy)

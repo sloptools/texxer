@@ -13,6 +13,7 @@ var Registry = map[string]Def{
 
 	"pattern": patternDef,
 	"panels":  panelsDef,
+	"tiles":   tilesDef,
 	"trim":    trimDef,
 	"sdf":     sdfDef,
 	"profile": profileDef,

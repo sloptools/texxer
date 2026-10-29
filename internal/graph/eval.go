@@ -99,32 +99,33 @@ func (ev *Evaluator) Eval(ref string, ctx Ctx) (*img.Buffer, error) {
 		return nil, fmt.Errorf("cycle at node %q", id)
 	}
 
-	// Subgraphs depend on their parent's inputs, so only top-level results are shared.
-	var key hash
-	shared := ev.shared != nil && ev.parent == nil
-	if shared {
-		var err error
+	eval := func() (*img.Buffer, error) {
+		ev.busy[nk] = true
+		defer delete(ev.busy, nk)
+
+		b, err := ev.evalNode(nk, node, out)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", id, err)
+		}
+		return b, nil
+	}
+
+	var b *img.Buffer
+	var err error
+	if ev.shared == nil {
+		b, err = eval()
+	} else {
+		var key hash
 		if key, err = ev.cacheKey(id, out, ctx); err != nil {
 			return nil, err
 		}
-		if b, ok := ev.shared.get(key); ok {
-			ev.cache[outKey{nk, out}] = b
-			return b, nil
-		}
+		b, err = ev.shared.do(key, eval)
 	}
-
-	ev.busy[nk] = true
-	defer delete(ev.busy, nk)
-
-	b, err := ev.evalNode(nk, node, out)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", id, err)
+		return nil, err
 	}
 
 	ev.cache[outKey{nk, out}] = b
-	if shared {
-		ev.shared.put(key, b)
-	}
 	return b, nil
 }
 
@@ -204,6 +205,7 @@ func (ev *Evaluator) child(nk nodeKey, env *Env) (*Evaluator, error) {
 
 	c := NewEvaluator(g, ev.nodes, ev.load)
 	c.parent = env
+	c.shared = ev.shared
 	c.depth = ev.depth + 1
 	c.seed = ev.seed + env.Params.Int("seed", 0)*seedStride
 

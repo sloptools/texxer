@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime/pprof"
 	"time"
 
 	"texxer/internal/graph"
@@ -60,11 +61,23 @@ func renderCmd(args []string) error {
 	size := fs.Int("size", 0, "render size in px (default: graph size)")
 	node := fs.String("node", "", "render this node instead of the graph output")
 	seed := fs.Int("seed", 0, "variant seed, shifts all seeds in the graph")
+	profile := fs.String("cpuprofile", "", "write a CPU profile to this file")
 	fs.Parse(args)
 
 	if fs.NArg() != 1 {
 		fs.Usage()
 		os.Exit(2)
+	}
+
+	if *profile != "" {
+		f, err := os.Create(*profile)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
 	}
 
 	return render(fs.Arg(0), *out, *node, *size, *seed)
@@ -88,6 +101,8 @@ func render(path, out, node string, size, seed int) error {
 
 	ev := graph.NewEvaluator(g, nodes.Evals(), presets.Load)
 	ev.SetSeed(seed)
+	// A cache also dedupes equal work inside presets.
+	ev.UseCache(graph.NewCache(2 << 30))
 
 	b, err := ev.Eval(node, ctx)
 	if err != nil {

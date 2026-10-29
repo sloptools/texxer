@@ -17,29 +17,61 @@ type hash [32]byte
 // node's type, params and everything upstream, so editing a param only
 // invalidates the nodes after it.
 type Cache struct {
-	mu    sync.Mutex
-	items map[hash]*img.Buffer
-	order []hash
-	bytes int
-	limit int
+	mu       sync.Mutex
+	items    map[hash]*img.Buffer
+	inflight map[hash]*call
+	order    []hash
+	bytes    int
+	limit    int
+}
+
+type call struct {
+	done chan struct{}
+	b    *img.Buffer
+	err  error
 }
 
 func NewCache(limitBytes int) *Cache {
-	return &Cache{items: map[hash]*img.Buffer{}, limit: limitBytes}
+	return &Cache{
+		items:    map[hash]*img.Buffer{},
+		inflight: map[hash]*call{},
+		limit:    limitBytes,
+	}
 }
 
-func (c *Cache) get(k hash) (*img.Buffer, bool) {
+// do returns the result for k, computing it with fn at most once even when
+// several evaluations ask for it at the same time.
+func (c *Cache) do(k hash, fn func() (*img.Buffer, error)) (*img.Buffer, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	if b, ok := c.items[k]; ok {
+		c.mu.Unlock()
+		return b, nil
+	}
+	if cl, ok := c.inflight[k]; ok {
+		c.mu.Unlock()
+		<-cl.done
+		return cl.b, cl.err
+	}
 
-	b, ok := c.items[k]
-	return b, ok
+	cl := &call{done: make(chan struct{})}
+	c.inflight[k] = cl
+	c.mu.Unlock()
+
+	cl.b, cl.err = fn()
+
+	c.mu.Lock()
+	delete(c.inflight, k)
+	if cl.err == nil {
+		c.put(k, cl.b)
+	}
+	c.mu.Unlock()
+
+	close(cl.done)
+	return cl.b, cl.err
 }
 
+// put stores b; the caller holds the lock.
 func (c *Cache) put(k hash, b *img.Buffer) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if _, ok := c.items[k]; ok {
 		return
 	}
@@ -71,6 +103,15 @@ func (ev *Evaluator) structHash(id string, seen map[string]bool) (hash, error) {
 		return hash{}, fmt.Errorf("unknown node %q", id)
 	}
 
+	if node.Type == "input" && ev.parent != nil {
+		h, err := ev.parent.inputHash(node.Params.String("name", ""))
+		if err != nil {
+			return hash{}, err
+		}
+		ev.hashes[id] = h
+		return h, nil
+	}
+
 	params, err := json.Marshal(node.Params)
 	if err != nil {
 		return hash{}, err
@@ -99,6 +140,27 @@ func (ev *Evaluator) structHash(id string, seen map[string]bool) (hash, error) {
 	var h hash
 	s.Sum(h[:0])
 	ev.hashes[id] = h
+	return h, nil
+}
+
+// inputHash identifies what is connected to a subgraph input, so equal work in
+// different subgraphs shares cache entries.
+func (e *Env) inputHash(name string) (hash, error) {
+	var h hash
+	ref, ok := e.node.Inputs[name]
+	if !ok {
+		return h, nil
+	}
+
+	up, out, _ := strings.Cut(ref, ".")
+	uh, err := e.ev.structHash(up, map[string]bool{})
+	if err != nil {
+		return h, err
+	}
+
+	s := sha256.New()
+	fmt.Fprintf(s, "input\x00%x\x00%s", uh, out)
+	s.Sum(h[:0])
 	return h, nil
 }
 
