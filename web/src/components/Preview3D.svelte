@@ -9,7 +9,16 @@
   import { fileURL } from '../lib/api';
   import type { ModelRef } from '../lib/types';
 
-  let { url, model }: { url: string; model?: ModelRef } = $props();
+  let {
+    url,
+    model,
+    onpick,
+  }: {
+    url: string;
+    model?: ModelRef;
+    /** Called on a click (not a drag) on the model with the part and the original texture color there. */
+    onpick?: (hit: { part: string; color?: string }) => void;
+  } = $props();
 
   let container: HTMLDivElement;
   let scene: THREE.Scene | undefined;
@@ -19,6 +28,9 @@
   let textured: THREE.MeshBasicMaterial[] = [];
   let texture: THREE.Texture | undefined;
   let root: THREE.Object3D | undefined;
+  let camera: THREE.PerspectiveCamera | undefined;
+  // The model's own texture, for picking colors.
+  let original: CanvasRenderingContext2D | undefined;
 
   // Baked lighting is in the texture, so unlit materials show it as in a Quake-style engine.
   $effect(() => {
@@ -29,17 +41,18 @@
     scene = new THREE.Scene();
     scene.background = new THREE.Color(getComputedStyle(container).getPropertyValue('--color-panel').trim() || '#18181b');
 
-    const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
-    camera.position.set(2.2, 1.6, 2.2);
+    const cam = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
+    cam.position.set(2.2, 1.6, 2.2);
+    camera = cam;
 
-    const controls = new OrbitControls(camera, renderer.domElement);
+    const controls = new OrbitControls(cam, renderer.domElement);
     controls.enableDamping = true;
     controls.autoRotate = true;
     controls.autoRotateSpeed = 1;
 
     // Only emissive colors above 1 glow, like bloom in the engine.
     const composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(new RenderPass(scene, cam));
     const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.9, 0.5, 1);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
@@ -50,10 +63,10 @@
       const radius = box.getSize(new THREE.Vector3()).length() / 2;
 
       controls.target.copy(center);
-      camera.position.copy(center).add(new THREE.Vector3(1, 0.7, 1).normalize().multiplyScalar(radius * 3));
-      camera.near = radius / 100;
-      camera.far = radius * 100;
-      camera.updateProjectionMatrix();
+      cam.position.copy(center).add(new THREE.Vector3(1, 0.7, 1).normalize().multiplyScalar(radius * 3));
+      cam.near = radius / 100;
+      cam.far = radius * 100;
+      cam.updateProjectionMatrix();
     };
 
     const resize = new ResizeObserver(() => {
@@ -61,8 +74,8 @@
       renderer.setSize(w, h);
       composer.setSize(w, h);
       bloom.resolution.set(w, h);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
+      cam.aspect = w / h;
+      cam.updateProjectionMatrix();
     });
     resize.observe(container);
 
@@ -71,8 +84,20 @@
       composer.render();
     });
 
+    // A click picks, a drag orbits.
+    let down: { x: number; y: number } | undefined;
+    const onDown = (e: PointerEvent) => (down = { x: e.clientX, y: e.clientY });
+    const onUp = (e: PointerEvent) => {
+      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 4) pick(e);
+      down = undefined;
+    };
+    renderer.domElement.addEventListener('pointerdown', onDown);
+    renderer.domElement.addEventListener('pointerup', onUp);
+
     return () => {
       renderer.setAnimationLoop(null);
+      renderer.domElement.removeEventListener('pointerdown', onDown);
+      renderer.domElement.removeEventListener('pointerup', onUp);
       resize.disconnect();
       controls.dispose();
       texture?.dispose();
@@ -128,6 +153,32 @@
     });
   });
 
+  function pick(e: PointerEvent) {
+    if (!onpick || !root || !camera) return;
+
+    const rect = container.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, camera);
+
+    const hit = ray.intersectObject(root, true)[0];
+    if (!hit) return;
+
+    // Parts are the model's top-level nodes, as the bake names them.
+    let part: THREE.Object3D = hit.object;
+    while (part.parent && part.parent !== root) part = part.parent;
+
+    let color: string | undefined;
+    if (original && hit.uv) {
+      const { width, height } = original.canvas;
+      const x = Math.min(width - 1, Math.max(0, Math.floor(hit.uv.x * width)));
+      const y = Math.min(height - 1, Math.max(0, Math.floor(hit.uv.y * height)));
+      const [r, g, b] = original.getImageData(x, y, 1, 1).data;
+      color = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+    }
+    onpick({ part: part.name, color });
+  }
+
   function applyTexture() {
     for (const m of textured) {
       m.map = texture ?? null;
@@ -151,6 +202,15 @@
         }
         if (material && m.name !== material) {
           return new THREE.MeshBasicMaterial({ color: std.color ?? 0x808080, side: THREE.DoubleSide });
+        }
+
+        const image = std.map?.image as CanvasImageSource & { width: number; height: number } | undefined;
+        if (image && !original) {
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          original = canvas.getContext('2d', { willReadFrequently: true }) ?? undefined;
+          original?.drawImage(image, 0, 0);
         }
 
         const basic = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });

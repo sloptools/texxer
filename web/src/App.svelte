@@ -24,6 +24,7 @@
   import Preview from './components/Preview.svelte';
   import TexNodeView from './components/TexNode.svelte';
   import Toolbar from './components/Toolbar.svelte';
+  import PaintView from './components/paint/PaintView.svelte';
 
   const nodeTypes = { tex: TexNodeView };
   const history = new History();
@@ -43,14 +44,28 @@
   let dangling = $state<{ node: string; handle: string; type: 'source' | 'target' } | null>(null);
   let flow: ReturnType<typeof useSvelteFlow> | undefined;
 
+  let mode = $state<'graph' | 'paint'>('graph');
+  /** Selection in the layer list: "l3" for layer 3, "e1" for effect 1. */
+  let paintSelected = $state('');
+  let showMask = $state(false);
+
   const picked = $derived(nodes.filter((n) => n.selected));
   const selected = $derived(picked.length === 1 ? picked[0] : undefined);
-  const previewRef = $derived(selected?.id ?? editor.output);
+  const paintNode = $derived(nodes.find((n) => n.data.type === 'layers'));
+  const painting = $derived(mode === 'paint' && paintNode !== undefined);
+  const previewRef = $derived.by(() => {
+    if (!painting) return selected?.id ?? editor.output;
+
+    const id = paintNode!.id;
+    const i = paintSelected.startsWith('l') ? Number(paintSelected.slice(1)) : -1;
+    const layers = (paintNode!.data.params.layers ?? []) as { mask?: unknown[] }[];
+    return showMask && layers[i]?.mask?.length ? `${id}.mask${i}` : id;
+  });
   const docKey = $derived(JSON.stringify(currentGraph()));
   const dirty = $derived(name !== '' && docKey !== savedKey);
 
   const model = $derived.by(() => {
-    const node = nodes.find((n) => n.data.type === 'mesh' && n.data.params.path);
+    const node = nodes.find((n) => (n.data.type === 'mesh' || n.data.type === 'layers') && n.data.params.path);
     if (!node) return undefined;
     return { path: String(node.data.params.path), material: String(node.data.params.material ?? '') };
   });
@@ -68,7 +83,7 @@
   $effect(() => {
     renderKey;
     const [g, ref, s, ps] = untrack(() => [renderGraph, previewRef, seed, previewSize] as const);
-    if (!ref || !g.nodes[ref]) return;
+    if (!ref || !g.nodes[ref.split('.')[0]]) return;
 
     const timer = setTimeout(() => renderer.update(g, ref, ps, s), 150);
     return () => clearTimeout(timer);
@@ -141,6 +156,10 @@
     nodes = loaded.nodes;
     edges = loaded.edges;
     editor.size = g.size || 512;
+    // Graphs built on a layer stack open for painting.
+    mode = loaded.nodes.some((n) => n.data.type === 'layers') ? 'paint' : 'graph';
+    paintSelected = '';
+    showMask = false;
     editor.output = g.output;
     editor.outputs = g.outputs ?? {};
     editor.exposed = g.params ?? {};
@@ -333,6 +352,12 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    if (e.key === 'Tab' && !editingText(e) && paintNode) {
+      e.preventDefault();
+      mode = mode === 'paint' ? 'graph' : 'paint';
+      return;
+    }
+
     const mod = e.metaKey || e.ctrlKey;
     if (!mod) return;
 
@@ -390,64 +415,76 @@
     onsave={save}
     onadd={(x, y) => (menu = { x, y })}
     onback={back}
+    bind:mode
+    canPaint={paintNode !== undefined}
   />
 
-  <div class="flex min-h-0 flex-1">
-    <main class="relative min-w-0 flex-1">
-      <SvelteFlow
-        bind:nodes
-        bind:edges
-        {nodeTypes}
-        colorMode={editor.theme}
-        minZoom={0.1}
-        onbeforeconnect={connect}
-        onconnectend={connectEnd}
-        onedgeclick={({ edge, event }) => {
-          if (event.altKey) edges = edges.filter((e) => e.id !== edge.id);
-        }}
-        onpanecontextmenu={({ event }) => {
-          event.preventDefault();
-          menu = { x: event.clientX, y: event.clientY };
-        }}
-      >
-        <FlowBridge onready={(a) => (flow = a)} />
-        <Background gap={24} />
-        <Controls showLock={false} />
-      </SvelteFlow>
-    </main>
+  {#if painting}
+    <PaintView
+      node={paintNode!}
+      {model}
+      bind:selected={paintSelected}
+      bind:showMask
+      onparams={(p) => setParams(paintNode!.id, p)}
+    />
+  {:else}
+    <div class="flex min-h-0 flex-1">
+      <main class="relative min-w-0 flex-1">
+        <SvelteFlow
+          bind:nodes
+          bind:edges
+          {nodeTypes}
+          colorMode={editor.theme}
+          minZoom={0.1}
+          onbeforeconnect={connect}
+          onconnectend={connectEnd}
+          onedgeclick={({ edge, event }) => {
+            if (event.altKey) edges = edges.filter((e) => e.id !== edge.id);
+          }}
+          onpanecontextmenu={({ event }) => {
+            event.preventDefault();
+            menu = { x: event.clientX, y: event.clientY };
+          }}
+        >
+          <FlowBridge onready={(a) => (flow = a)} />
+          <Background gap={24} />
+          <Controls showLock={false} />
+        </SvelteFlow>
+      </main>
 
-    <aside class="flex w-80 shrink-0 flex-col border-l border-line-soft bg-panel">
-      <Preview label={previewRef || 'no output'} {strips} size={editor.size} {model} />
-      <div class="min-h-0 flex-1 overflow-y-auto">
-        {#if selected}
-          {#key selected.id}
-            <Inspector
-              node={selected}
-              onparams={(p) => setParams(selected.id, p)}
-              onoutput={() => (editor.output = selected.id)}
-              onrename={(id) => rename(selected.id, id)}
-            />
-          {/key}
-        {:else if picked.length > 1}
-          <div class="flex flex-col gap-2 p-3 text-fg-dim">
-            <p>{picked.length} nodes selected. ⌘C / ⌘V to copy, ⌘D to duplicate, ⌫ to delete.</p>
-            <button class="self-start rounded border border-line px-2 py-0.5 text-fg hover:border-accent" onclick={groupSelection}>
-              group into subgraph <span class="text-fg-faint">⌘G</span>
-            </button>
-          </div>
-        {:else}
-          {#if name}<GraphPanel {name} {nodes} />{/if}
-          <p class="p-3 leading-relaxed text-fg-dim">
-            Select a node to edit it. Right-click the canvas to add one. Shift-drag selects several.
-            <br />⌘Z / ⇧⌘Z undo and redo, ⌘C / ⌘V copy and paste, ⌘D duplicates, ⌘G groups into a subgraph.
-            Double-click a graph node to open it.
-            <br />Drop a connection on empty canvas to add a node there. To disconnect, click a connection and press ⌫,
-            ⌥-click it, or drag from the input into empty space.
-          </p>
-        {/if}
-      </div>
-    </aside>
-  </div>
+      <aside class="flex w-80 shrink-0 flex-col border-l border-line-soft bg-panel">
+        <Preview label={previewRef || 'no output'} {strips} size={editor.size} {model} />
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          {#if selected}
+            {#key selected.id}
+              <Inspector
+                node={selected}
+                onparams={(p) => setParams(selected.id, p)}
+                onoutput={() => (editor.output = selected.id)}
+                onrename={(id) => rename(selected.id, id)}
+              />
+            {/key}
+          {:else if picked.length > 1}
+            <div class="flex flex-col gap-2 p-3 text-fg-dim">
+              <p>{picked.length} nodes selected. ⌘C / ⌘V to copy, ⌘D to duplicate, ⌫ to delete.</p>
+              <button class="self-start rounded border border-line px-2 py-0.5 text-fg hover:border-accent" onclick={groupSelection}>
+                group into subgraph <span class="text-fg-faint">⌘G</span>
+              </button>
+            </div>
+          {:else}
+            {#if name}<GraphPanel {name} {nodes} />{/if}
+            <p class="p-3 leading-relaxed text-fg-dim">
+              Select a node to edit it. Right-click the canvas to add one. Shift-drag selects several.
+              <br />⌘Z / ⇧⌘Z undo and redo, ⌘C / ⌘V copy and paste, ⌘D duplicates, ⌘G groups into a subgraph.
+              Double-click a graph node to open it.
+              <br />Drop a connection on empty canvas to add a node there. To disconnect, click a connection and press ⌫,
+              ⌥-click it, or drag from the input into empty space.
+            </p>
+          {/if}
+        </div>
+      </aside>
+    </div>
+  {/if}
 </div>
 
 {#if menu}
