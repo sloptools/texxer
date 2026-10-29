@@ -48,3 +48,9 @@ export async function listModels(): Promise<ModelInfo[]> {
 export async function putFile(path: string, data: Blob): Promise<void> {
   await request(`/api/file?path=${encodeURIComponent(path)}`, { method: 'PUT', body: data });
 }
+
+/** The graph's model as a GLB with the rendered texture in it. */
+export async function exportGLB(graph: Graph, seed: number): Promise<Blob> {
+  const res = await request('/api/export', { method: 'POST', body: JSON.stringify({ graph, seed }) });
+  return res.blob();
+}

@@ -225,6 +225,22 @@
     await open(target);
   }
 
+  /** Downloads the model with the texture rendered at the graph's size. */
+  async function exportModel() {
+    message = 'exporting…';
+    try {
+      const blob = await api.exportGLB(toGraph(nodes, edges, graphMeta(), false), Math.round(seed) || 0);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name || 'model'}.glb`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      message = `exported ${a.download}`;
+    } catch (e) {
+      message = (e as Error).message;
+    }
+  }
+
   /** Opens a model for painting: its project if one exists, else a new one. */
   async function openModel(m: ModelInfo) {
     const project = m.path.split('/').pop()!.replace(/\.glb$/i, '').replace(/[^A-Za-z0-9_-]/g, '_');
@@ -443,6 +459,7 @@
     onadd={(x, y) => (menu = { x, y })}
     onback={back}
     bind:mode
+    onexport={model ? exportModel : undefined}
   />
 
   {#if mode === 'paint' && !paintNode}

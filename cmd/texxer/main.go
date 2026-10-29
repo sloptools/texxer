@@ -21,7 +21,8 @@ import (
 const usage = `usage:
   texxer render [flags] graph.json
   texxer serve [flags]
-  texxer stats file.png|graph.json ...`
+  texxer stats file.png|graph.json ...
+  texxer export [-o out.glb] graph.json`
 
 func main() {
 	if len(os.Args) < 2 {
@@ -37,6 +38,8 @@ func main() {
 		err = serveCmd(os.Args[2:])
 	case "stats":
 		err = statsCmd(os.Args[2:])
+	case "export":
+		err = exportCmd(os.Args[2:])
 	default:
 		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(2)

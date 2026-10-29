@@ -15,6 +15,7 @@
     onadd,
     onback,
     mode = $bindable(),
+    onexport,
   }: {
     graphs: string[];
     name: string;
@@ -30,6 +31,8 @@
     onadd: (x: number, y: number) => void;
     onback: (index: number) => void;
     mode: 'graph' | 'paint';
+    /** Set when the graph textures a model. */
+    onexport?: () => void;
   } = $props();
 
   const button = 'rounded border border-line px-2 py-0.5 hover:border-accent';
@@ -53,6 +56,9 @@
     save{#if dirty}<span class="text-accent"> •</span>{/if}
   </button>
   <button class={button} onclick={(e) => onadd(e.clientX, e.clientY + 20)}>+ node</button>
+  {#if onexport}
+    <button class={button} onclick={onexport} title="Modell mit Textur als .glb herunterladen">export .glb</button>
+  {/if}
 
   <div class="flex overflow-hidden rounded border border-line text-[11px]" title="Tab wechselt">
     {#each [['graph', 'Graph'], ['paint', 'Paint']] as [m, label]}
