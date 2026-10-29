@@ -39,6 +39,13 @@ func blendNode(e *graph.Env) (*img.Buffer, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Switched-off layers, common in presets, don't render b or the mask.
+	opacity := float32(e.Params.Float("opacity", 1))
+	if opacity == 0 {
+		return clamped(a), nil
+	}
+
 	b, err := e.Required("b")
 	if err != nil {
 		return nil, err
@@ -53,7 +60,6 @@ func blendNode(e *graph.Env) (*img.Buffer, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown blend mode %q", mode)
 	}
-	opacity := float32(e.Params.Float("opacity", 1))
 
 	c := max(a.C, b.C)
 	out := img.New(a.W, a.H, c, a.Tiling)
@@ -77,4 +83,17 @@ func blendNode(e *graph.Env) (*img.Buffer, error) {
 		}
 	})
 	return out, nil
+}
+
+// clamped copies b with its color channels clamped to 0..1, as a blend outputs them.
+func clamped(b *img.Buffer) *img.Buffer {
+	out := img.New(b.W, b.H, b.C, b.Tiling)
+	for i, v := range b.Pix {
+		if b.C == 4 && i%4 == 3 {
+			out.Pix[i] = v
+			continue
+		}
+		out.Pix[i] = img.Clamp01(v)
+	}
+	return out
 }

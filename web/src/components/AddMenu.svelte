@@ -9,7 +9,7 @@
     exclude,
   }: { x: number; y: number; onpick: (type: string) => void; onclose: () => void; exclude?: string } = $props();
 
-  const order = ['generator', 'grunge', 'shape', 'filter', 'color', 'light', 'preset', 'graph', 'io', 'output'];
+  const order = ['generator', 'grunge', 'mask', 'shape', 'filter', 'color', 'light', 'preset', 'graph', 'io', 'output'];
 
   let query = $state('');
 

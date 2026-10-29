@@ -1,12 +1,19 @@
 {
-  "outputs": { "out": "sharp" },
+  "outputs": { "out": "crunched" },
   "params": {
-    "factor":  { "default": 2,   "targets": ["small.factor"] },
-    "sharpen": { "default": 0.6, "targets": ["sharp.amount"] }
+    "factor":   { "default": 2,   "targets": ["small.factor"] },
+    "sharpen":  { "default": 0.6, "targets": ["sharp.amount"] },
+    "quantize": { "default": 0,   "targets": ["crunched.opacity"] },
+    "colors":   { "default": 96,  "targets": ["quant.colors"] },
+    "palette":  { "default": "",  "targets": ["quant.palette"] },
+    "dither":   { "default": "none", "targets": ["quant.dither"] },
+    "dither_strength": { "default": 0.03, "targets": ["quant.dither_strength"] }
   },
   "nodes": {
-    "color": { "type": "input", "params": { "name": "color" } },
-    "small": { "type": "downsample", "inputs": { "in": "color" } },
-    "sharp": { "type": "sharpen", "inputs": { "in": "small" } }
+    "color":    { "type": "input", "params": { "name": "color" } },
+    "small":    { "type": "downsample", "inputs": { "in": "color" } },
+    "sharp":    { "type": "sharpen", "inputs": { "in": "small" } },
+    "quant":    { "type": "quantize", "inputs": { "in": "sharp" } },
+    "crunched": { "type": "blend", "inputs": { "a": "sharp", "b": "quant" } }
   }
 }

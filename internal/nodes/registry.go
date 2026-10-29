@@ -29,6 +29,9 @@ var Registry = map[string]Def{
 	"light":     lightDef,
 	"slope":     slopeDef,
 	"curvature": curvatureDef,
+	"ao":        aoDef,
+
+	"mask": maskDef,
 
 	"downsample": downsampleDef,
 	"quantize":   quantizeDef,
