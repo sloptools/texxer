@@ -16,7 +16,7 @@ func TestDefaults(t *testing.T) {
 
 	for name, def := range Registry {
 		// Nodes that read files have no meaningful defaults.
-		if name == "image" || name == "mesh" {
+		if name == "image" || name == "mesh" || name == "layers" {
 			continue
 		}
 

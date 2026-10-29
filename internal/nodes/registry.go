@@ -1,13 +1,15 @@
 package nodes
 
 var Registry = map[string]Def{
-	"noise": noiseDef,
-	"ramp":  rampDef,
-	"cells": cellsDef,
-	"color": colorDef,
-	"image": imageDef,
-	"mesh":  meshDef,
-	"shade": shadeDef,
+	"noise":    noiseDef,
+	"ramp":     rampDef,
+	"cells":    cellsDef,
+	"color":    colorDef,
+	"image":    imageDef,
+	"mesh":     meshDef,
+	"layers":   layersDef,
+	"partmask": partMaskDef,
+	"shade":    shadeDef,
 
 	"dirt":      dirtDef,
 	"spots":     spotsDef,

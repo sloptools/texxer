@@ -28,6 +28,8 @@ type Maps struct {
 	AO, Edges, Cavity, Up        []float32
 	Height, Part, Selected, Mask []float32
 	Normal                       []float32
+	// PartID holds (part index + 0.5) / 256 of the face that covers a texel.
+	PartID []float32
 }
 
 type sample struct {
@@ -58,6 +60,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 		make([]float64, n), make([]float64, n), make([]float64, n), make([]float64, n),
 	}
 	normals := make([]Vec, n)
+	partID := make([]float32, n)
 
 	results := make([][3]float64, len(samples))
 	parallel(len(samples), func(i int) {
@@ -82,6 +85,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 			sum.sel[t]++
 		}
 		normals[t] = normals[t].Add(s.n)
+		partID[t] = (float32(s.part) + 0.5) / 256
 		sum.count[t]++
 	}
 
@@ -98,6 +102,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	maps.AO, maps.Edges, maps.Cavity = avg(sum.ao), avg(sum.edges), avg(sum.cavity)
 	maps.Up, maps.Height, maps.Part, maps.Selected = avg(sum.up), avg(sum.height), avg(sum.part), avg(sum.sel)
 
+	maps.PartID = partID
 	maps.Mask = make([]float32, n)
 	maps.Normal = make([]float32, n*3)
 	for i, c := range sum.count {
@@ -223,6 +228,8 @@ func (m *Maps) pad(texels int) {
 					continue
 				}
 
+				// Ids can't be averaged, so padding copies one neighbor.
+				m.PartID[i] = m.PartID[nb[0]]
 				for _, buf := range gray {
 					var s float32
 					for _, j := range nb {

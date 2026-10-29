@@ -281,3 +281,51 @@ func (e *Env) Path(rel string) string {
 	}
 	return filepath.Join(e.ev.graph.Dir, rel)
 }
+
+// Generated evaluates a graph the node built from its params, like a
+// subgraph: input nodes read this node's inputs, and results are shared
+// through the cache. refs are evaluated at the node's context.
+func (e *Env) Generated(g *Graph, refs ...string) ([]*img.Buffer, error) {
+	if e.ev.depth >= maxDepth {
+		return nil, fmt.Errorf("graphs nested too deep")
+	}
+
+	g.Dir = e.ev.graph.Dir
+	if g.Size == 0 {
+		g.Size = e.ev.graph.Size
+	}
+
+	c := NewEvaluator(g, e.ev.nodes, e.ev.load)
+	c.parent = e
+	c.shared = e.ev.shared
+	c.depth = e.ev.depth + 1
+	c.seed = e.ev.seed
+
+	out := make([]*img.Buffer, len(refs))
+	for i, ref := range refs {
+		b, err := c.Eval(ref, e.Ctx)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = b
+	}
+	return out, nil
+}
+
+// HasType reports whether a node type exists, built in or loadable.
+func (e *Env) HasType(name string) bool {
+	if _, ok := e.ev.nodes[name]; ok || name == "input" || name == "output" {
+		return true
+	}
+	if e.ev.load == nil {
+		return false
+	}
+	g, err := e.ev.load(name)
+	return err == nil && g != nil
+}
+
+// HasInput reports whether something is connected to the node's input name.
+func (e *Env) HasInput(name string) bool {
+	_, ok := e.node.Inputs[name]
+	return ok
+}

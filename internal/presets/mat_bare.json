@@ -1,0 +1,13 @@
+{
+  "size": 512,
+  "output": "out",
+  "params": {
+    "color_stops": { "targets": ["bare.stops"] }
+  },
+  "nodes": {
+
+    "brushed": { "type": "noise", "params": { "scale": 64, "octaves": 4, "persistence": 0.6, "stretch": 6, "seed": 5 } },
+    "bare":    { "type": "gradient", "params": { "stops": [{ "pos": 0.0, "color": "#4a4744" }, { "pos": 0.5, "color": "#6e6a62" }, { "pos": 1.0, "color": "#8e877c" }] }, "inputs": { "in": "brushed" } },
+    "out":     { "type": "output", "inputs": { "in": "bare" } }
+  }
+}

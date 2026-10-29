@@ -1,0 +1,20 @@
+{
+  "size": 512,
+  "output": "out",
+  "params": {
+    "color_stops": { "targets": ["metal.stops"] },
+    "brushed": { "targets": ["mix.opacity"] },
+    "part_var": { "targets": ["parttone.opacity"] }
+  },
+  "nodes": {
+    "demopart": { "type": "noise", "params": { "scale": 3, "octaves": 2, "seed": 99 } },
+    "part":     { "type": "input", "params": { "name": "part" }, "inputs": { "default": "demopart" } },
+
+    "brushed":  { "type": "noise", "params": { "scale": 96, "octaves": 3, "stretch": 10, "seed": 3 } },
+    "tone":     { "type": "noise", "params": { "scale": 16, "octaves": 4, "seed": 4 } },
+    "mix":      { "type": "blend", "params": { "mode": "overlay", "opacity": 0.5 }, "inputs": { "a": "tone", "b": "brushed" } },
+    "parttone": { "type": "blend", "params": { "mode": "overlay", "opacity": 0.4 }, "inputs": { "a": "mix", "b": "part" } },
+    "metal":    { "type": "gradient", "params": { "stops": [{ "pos": 0.0, "color": "#1c1d20" }, { "pos": 0.5, "color": "#2a2c30" }, { "pos": 1.0, "color": "#3a3b3e" }] }, "inputs": { "in": "parttone" } },
+    "out":      { "type": "output", "inputs": { "in": "metal" } }
+  }
+}

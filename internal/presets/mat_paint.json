@@ -1,0 +1,21 @@
+{
+  "size": 512,
+  "output": "out",
+  "params": {
+    "color_stops": { "targets": ["paint.stops"] },
+    "part_var": { "targets": ["parttone.opacity"] },
+    "tone_scale": { "targets": ["tone.scale"] },
+    "grain": { "targets": ["grained.opacity"] }
+  },
+  "nodes": {
+    "demopart": { "type": "noise", "params": { "scale": 3, "octaves": 2, "seed": 99 } },
+    "part":     { "type": "input", "params": { "name": "part" }, "inputs": { "default": "demopart" } },
+
+    "tone":     { "type": "noise", "params": { "scale": 24, "octaves": 5, "persistence": 0.6, "seed": 1 } },
+    "parttone": { "type": "blend", "params": { "mode": "overlay", "opacity": 0.5 }, "inputs": { "a": "tone", "b": "part" } },
+    "paint":    { "type": "gradient", "params": { "stops": [{ "pos": 0.0, "color": "#14303e" }, { "pos": 0.5, "color": "#1e4656" }, { "pos": 1.0, "color": "#2c5e6e" }] }, "inputs": { "in": "parttone" } },
+    "grain":    { "type": "grain", "params": { "seed": 2 } },
+    "grained":  { "type": "blend", "params": { "mode": "overlay", "opacity": 0.12 }, "inputs": { "a": "paint", "b": "grain" } },
+    "out":      { "type": "output", "inputs": { "in": "grained" } }
+  }
+}
