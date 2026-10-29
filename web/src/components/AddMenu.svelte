@@ -35,13 +35,13 @@
 <div class="fixed inset-0 z-40" onclick={onclose}></div>
 
 <div
-  class="fixed z-50 flex max-h-96 w-56 flex-col overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 shadow-xl"
+  class="fixed z-50 flex max-h-96 w-56 flex-col overflow-hidden rounded-md border border-line bg-panel shadow-xl"
   style:left="{x}px"
   style:top="{y}px"
 >
   <!-- svelte-ignore a11y_autofocus -->
   <input
-    class="border-b border-zinc-700 bg-zinc-900 px-2 py-1.5 outline-none placeholder:text-zinc-600"
+    class="border-b border-line bg-panel px-2 py-1.5 outline-none placeholder:text-fg-faint"
     placeholder="Add node…"
     bind:value={query}
     {onkeydown}
@@ -49,9 +49,9 @@
   />
   <div class="overflow-y-auto py-1">
     {#each groups as group}
-      <div class="px-2 pt-1.5 pb-0.5 text-[10px] tracking-wide text-zinc-500 uppercase">{group.category}</div>
+      <div class="px-2 pt-1.5 pb-0.5 text-[10px] tracking-wide text-fg-dim uppercase">{group.category}</div>
       {#each group.types as type}
-        <button class="block w-full px-3 py-0.5 text-left hover:bg-zinc-800 hover:text-accent" onclick={() => onpick(type)}>
+        <button class="block w-full px-3 py-0.5 text-left hover:bg-field hover:text-accent" onclick={() => onpick(type)}>
           {type}
         </button>
       {/each}

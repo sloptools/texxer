@@ -8,11 +8,22 @@
     node,
     onparams,
     onoutput,
+    onrename,
   }: {
     node: TexNode;
     onparams: (params: Record<string, unknown>) => void;
     onoutput: () => void;
+    /** Returns an error message if the name can't be used. */
+    onrename: (id: string) => string | undefined;
   } = $props();
+
+  let renameError = $state('');
+
+  function rename(input: HTMLInputElement) {
+    const id = input.value.trim();
+    renameError = id === node.id ? '' : (onrename(id) ?? '');
+    if (renameError) input.value = node.id;
+  }
 
   const def = $derived(editor.catalog[node.data.type]);
   const error = $derived(renderer.errors[node.id]);
@@ -29,19 +40,26 @@
 
 <div class="flex flex-col gap-3 p-3">
   <div class="flex items-baseline justify-between">
-    <div>
-      <div class="font-semibold">{node.id}</div>
-      <div class="text-[11px] text-zinc-500">{node.data.type} · {def?.category ?? 'unknown'}</div>
+    <div class="min-w-0">
+      <input
+        class="w-full rounded bg-transparent font-semibold outline-none focus:bg-field"
+        value={node.id}
+        title="Rename"
+        onchange={(e) => rename(e.currentTarget)}
+        onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+      />
+      <div class="text-[11px] text-fg-dim">{node.data.type} · {def?.category ?? 'unknown'}</div>
+      {#if renameError}<div class="text-[11px] text-danger">{renameError}</div>{/if}
     </div>
     {#if node.id !== editor.output}
-      <button class="rounded border border-zinc-700 px-2 py-0.5 text-[11px] hover:border-accent" onclick={onoutput}>
+      <button class="rounded border border-line px-2 py-0.5 text-[11px] hover:border-accent" onclick={onoutput}>
         set as output
       </button>
     {/if}
   </div>
 
   {#if error}
-    <div class="rounded border border-red-500/50 bg-red-950/40 p-2 font-mono text-[11px] text-red-300">{error}</div>
+    <div class="rounded border border-danger bg-danger-bg p-2 font-mono text-[11px] text-danger">{error}</div>
   {/if}
 
   {#each def?.params ?? [] as param (param.name)}

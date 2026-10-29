@@ -19,13 +19,13 @@
 </script>
 
 <div class="flex flex-col gap-1.5">
-  <div class="h-4 rounded border border-zinc-700" style:background={css}></div>
+  <div class="h-4 rounded border border-line" style:background={css}></div>
 
   {#each stops as stop, i}
     <div class="flex items-center gap-2">
       <input
         type="color"
-        class="h-6 w-8 shrink-0 cursor-pointer rounded border border-zinc-700 bg-zinc-800"
+        class="h-6 w-8 shrink-0 cursor-pointer rounded border border-line bg-field"
         value={stop.color}
         oninput={(e) => update(i, { color: e.currentTarget.value })}
       />
@@ -38,9 +38,9 @@
         value={stop.pos}
         oninput={(e) => update(i, { pos: parseFloat(e.currentTarget.value) })}
       />
-      <span class="w-8 text-right font-mono text-[11px] text-zinc-400">{stop.pos.toFixed(2)}</span>
+      <span class="w-8 text-right font-mono text-[11px] text-fg-muted">{stop.pos.toFixed(2)}</span>
       <button
-        class="text-zinc-500 hover:text-red-400 disabled:opacity-30"
+        class="text-fg-dim hover:text-danger disabled:opacity-30"
         disabled={stops.length <= 1}
         onclick={() => onchange(stops.filter((_, j) => j !== i))}
         title="Remove stop">×</button
@@ -48,5 +48,5 @@
     </div>
   {/each}
 
-  <button class="self-start text-[11px] text-zinc-400 hover:text-accent" onclick={add}>+ stop</button>
+  <button class="self-start text-[11px] text-fg-muted hover:text-accent" onclick={add}>+ stop</button>
 </div>

@@ -16,19 +16,19 @@
 </script>
 
 <div
-  class="w-36 overflow-hidden rounded-md border bg-zinc-900 shadow-lg shadow-black/40
-    {selected ? 'border-accent' : error ? 'border-red-500/70' : 'border-zinc-700'}"
+  class="w-36 overflow-hidden rounded-md border bg-panel shadow-lg shadow-shadow
+    {selected ? 'border-accent' : error ? 'border-danger' : 'border-line'}"
 >
   <div class="flex items-baseline justify-between gap-2 px-2 py-1">
     <span class="truncate font-medium">{id}</span>
     {#if id === editor.output}
-      <span class="rounded bg-accent px-1 text-[10px] font-semibold text-zinc-950">OUT</span>
+      <span class="rounded bg-accent px-1 text-[10px] font-semibold text-on-accent">OUT</span>
     {:else}
-      <span class="truncate text-[11px] text-zinc-500">{data.type}</span>
+      <span class="truncate text-[11px] text-fg-dim">{data.type}</span>
     {/if}
   </div>
 
-  <div class="aspect-square bg-zinc-800" title={error}>
+  <div class="aspect-square bg-field" title={error}>
     {#if thumb}
       <img src={thumb} alt="" class="pixelated size-full {error ? 'opacity-30' : ''}" draggable="false" />
     {/if}
@@ -37,7 +37,7 @@
   {#if rows > 0}
     <div class="py-1">
       {#each { length: rows } as _, i}
-        <div class="relative flex h-5 items-center justify-between px-2 text-[11px] text-zinc-400">
+        <div class="relative flex h-5 items-center justify-between px-2 text-[11px] text-fg-muted">
           {#if inputs[i]}
             <Handle type="target" position={Position.Left} id={inputs[i]} />
             <span>{inputs[i]}</span>

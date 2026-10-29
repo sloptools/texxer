@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { ParamDef, Stop } from '../lib/types';
+  import { editor } from '../lib/editor.svelte';
+  import type { Strip } from '../lib/trim';
   import GradientEditor from './GradientEditor.svelte';
+  import TrimEditor from './TrimEditor.svelte';
 
   let {
     param,
@@ -49,12 +52,12 @@
 
 <div class="flex flex-col gap-1">
   <div class="flex items-center justify-between">
-    <span class={set ? 'text-zinc-200' : 'text-zinc-500'}>
+    <span class={set ? 'text-fg' : 'text-fg-dim'}>
       {param.name}
-      {#if param.px}<span class="text-zinc-600">px</span>{/if}
+      {#if param.px}<span class="text-fg-faint">px</span>{/if}
     </span>
     {#if set}
-      <button class="text-[11px] text-zinc-500 hover:text-accent" onclick={onreset} title="Reset to default">reset</button>
+      <button class="text-[11px] text-fg-dim hover:text-accent" onclick={onreset} title="Reset to default">reset</button>
     {/if}
   </div>
 
@@ -71,7 +74,7 @@
       />
       <input
         type="number"
-        class="w-16 rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 text-right font-mono text-xs"
+        class="w-16 rounded border border-line bg-field px-1 py-0.5 text-right font-mono text-xs"
         step={param.kind === 'int' ? 1 : 'any'}
         value={current as number}
         onchange={(e) => setNumber(e.currentTarget.value)}
@@ -85,11 +88,11 @@
         checked={current as boolean}
         onchange={(e) => onchange(e.currentTarget.checked)}
       />
-      <span class="text-zinc-400">{current ? 'on' : 'off'}</span>
+      <span class="text-fg-muted">{current ? 'on' : 'off'}</span>
     </label>
   {:else if param.kind === 'enum'}
     <select
-      class="rounded border border-zinc-700 bg-zinc-800 px-1 py-1"
+      class="rounded border border-line bg-field px-1 py-1"
       value={current as string}
       onchange={(e) => onchange(e.currentTarget.value)}
     >
@@ -101,25 +104,27 @@
     <div class="flex items-center gap-2">
       <input
         type="color"
-        class="h-7 w-10 cursor-pointer rounded border border-zinc-700 bg-zinc-800"
+        class="h-7 w-10 cursor-pointer rounded border border-line bg-field"
         value={current as string}
         oninput={(e) => onchange(e.currentTarget.value)}
       />
-      <span class="font-mono text-xs text-zinc-400">{current}</span>
+      <span class="font-mono text-xs text-fg-muted">{current}</span>
     </div>
   {:else if param.kind === 'json' && param.name.endsWith('stops')}
     <GradientEditor stops={current as Stop[]} onchange={(s) => onchange(s)} />
+  {:else if param.kind === 'json' && param.name === 'strips'}
+    <TrimEditor strips={current as Strip[]} size={editor.size} onchange={(s) => onchange(s)} />
   {:else if param.kind === 'json'}
     <textarea
-      class="min-h-20 rounded border bg-zinc-800 p-1 font-mono text-xs {jsonError ? 'border-red-500' : 'border-zinc-700'}"
+      class="min-h-20 rounded border bg-field p-1 font-mono text-xs {jsonError ? 'border-danger' : 'border-line'}"
       bind:value={jsonText}
       onchange={() => setJSON(jsonText)}
     ></textarea>
-    {#if jsonError}<span class="text-[11px] text-red-400">{jsonError}</span>{/if}
+    {#if jsonError}<span class="text-[11px] text-danger">{jsonError}</span>{/if}
   {:else}
     <input
       type="text"
-      class="rounded border border-zinc-700 bg-zinc-800 px-1 py-1 font-mono text-xs"
+      class="rounded border border-line bg-field px-1 py-1 font-mono text-xs"
       value={current as string}
       onchange={(e) => onchange(e.currentTarget.value)}
     />

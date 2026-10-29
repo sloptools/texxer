@@ -9,12 +9,12 @@
 
   // Baked lighting is in the texture, so an unlit material shows it as in a Quake-style engine.
   $effect(() => {
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Transparent, so the panel color of the current theme shows through.
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x18181b);
 
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
     camera.position.set(2.2, 1.6, 2.2);
