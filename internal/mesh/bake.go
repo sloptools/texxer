@@ -71,7 +71,10 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	results := make([][3]float64, len(samples))
 	parallel(len(samples), func(i int) {
 		s := samples[i]
-		ao := occlusion(bvh, s, o.AORays, o.AODist*diag)
+		ao, flipped := occlusion(bvh, s, o.AORays, o.AODist*diag)
+		if flipped {
+			samples[i].n = s.n.Scale(-1)
+		}
 		convex, concave := grid.near(s.p, o.EdgeWidth*diag)
 		if o.CavityWidth != o.EdgeWidth {
 			_, concave = grid.near(s.p, o.CavityWidth*diag)
@@ -175,27 +178,40 @@ func rasterize(m *Model, o BakeOptions) []sample {
 	return out
 }
 
-// occlusion is the fraction of cosine-weighted rays that escape, 1 fully open.
-func occlusion(b *BVH, s sample, rays int, dist float64) float64 {
+// occlusion is the fraction of cosine-weighted rays that escape, 1 fully
+// open. Mostly occluded surfaces are tested from their other side too: when
+// that side is much more open, the normal points into the solid, as with
+// flipped faces, and flipped reports it so lighting can turn it around.
+func occlusion(b *BVH, s sample, rays int, dist float64) (open float64, flipped bool) {
 	if rays <= 0 || dist <= 0 {
-		return 1
+		return 1, false
 	}
 
-	// Faces are often double sided, so start on the side the normal points to.
+	open = hemisphere(b, s, s.n, rays, dist)
+	if open < 0.5 {
+		if back := hemisphere(b, s, s.n.Scale(-1), rays, dist); back > open+0.3 {
+			return back, true
+		}
+	}
+	return open, false
+}
+
+func hemisphere(b *BVH, s sample, n Vec, rays int, dist float64) float64 {
+	// Start just off the surface on the side n points to.
 	ng := s.ng
-	if ng.Dot(s.n) < 0 {
+	if ng.Dot(n) < 0 {
 		ng = ng.Scale(-1)
 	}
 	origin := s.p.Add(ng.Scale(dist * 1e-3))
 
-	t, bt := basis(s.n)
+	t, bt := basis(n)
 	open := 0
 	for k := range rays {
 		r1 := fract(float64(k)*0.618034 + hash01(s.texel, 1))
 		r2 := (float64(k) + hash01(s.texel, 2)) / float64(rays)
 		phi := 2 * math.Pi * r1
 		sr := math.Sqrt(r2)
-		d := t.Scale(math.Cos(phi) * sr).Add(bt.Scale(math.Sin(phi) * sr)).Add(s.n.Scale(math.Sqrt(1 - r2)))
+		d := t.Scale(math.Cos(phi) * sr).Add(bt.Scale(math.Sin(phi) * sr)).Add(n.Scale(math.Sqrt(1 - r2)))
 
 		if !b.Occluded(origin, d.Norm(), dist) {
 			open++
