@@ -20,7 +20,8 @@ import (
 
 const usage = `usage:
   texxer render [flags] graph.json
-  texxer serve [flags]`
+  texxer serve [flags]
+  texxer stats file.png|graph.json ...`
 
 func main() {
 	if len(os.Args) < 2 {
@@ -34,6 +35,8 @@ func main() {
 		err = renderCmd(os.Args[2:])
 	case "serve":
 		err = serveCmd(os.Args[2:])
+	case "stats":
+		err = statsCmd(os.Args[2:])
 	default:
 		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(2)
@@ -84,27 +87,8 @@ func renderCmd(args []string) error {
 }
 
 func render(path, out, node string, size, seed int) error {
-	g, err := graph.Load(path)
-	if err != nil {
-		return err
-	}
-
-	if size == 0 {
-		size = g.Size
-	}
-	if node == "" {
-		node = g.Output
-	}
-
 	start := time.Now()
-	ctx := graph.Ctx{W: size, H: size, Tiling: img.TileBoth, Scale: float64(size) / float64(g.Size)}
-
-	ev := graph.NewEvaluator(g, nodes.Evals(), presets.Library(g.Dir))
-	ev.SetSeed(seed)
-	// A cache also dedupes equal work inside presets.
-	ev.UseCache(graph.NewCache(2 << 30))
-
-	b, err := ev.Eval(node, ctx)
+	b, err := evalGraph(path, node, size, seed)
 	if err != nil {
 		return err
 	}
@@ -121,4 +105,28 @@ func render(path, out, node string, size, seed int) error {
 
 	fmt.Printf("%s: %dx%d in %v\n", out, b.W, b.H, time.Since(start).Round(time.Millisecond))
 	return nil
+}
+
+// evalGraph renders a graph file at size, or its design size when 0.
+func evalGraph(path, node string, size, seed int) (*img.Buffer, error) {
+	g, err := graph.Load(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if size == 0 {
+		size = g.Size
+	}
+	if node == "" {
+		node = g.Output
+	}
+
+	ctx := graph.Ctx{W: size, H: size, Tiling: img.TileBoth, Scale: float64(size) / float64(g.Size)}
+
+	ev := graph.NewEvaluator(g, nodes.Evals(), presets.Library(g.Dir))
+	ev.SetSeed(seed)
+	// A cache also dedupes equal work inside presets.
+	ev.UseCache(graph.NewCache(2 << 30))
+
+	return ev.Eval(node, ctx)
 }
