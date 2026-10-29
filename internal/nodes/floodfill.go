@@ -18,17 +18,20 @@ var floodFillDef = Def{
 	Category: "filter",
 	Inputs:   []string{"in"},
 	Params: []Param{
-		enum("mode", "random", "random", "gradient"),
+		enum("mode", "random", "random", "gradient", "facets"),
 		num("threshold", 0.5, 0, 1),
 		num("angle", 0, -180, 180),
 		num("spread", 360, 0, 360),
 		num("variation", 0, 0, 1),
+		integer("layers", 5, 2, 12),
 		seedParam,
 	},
 }
 
 // floodFillNode finds connected islands in a mask and fills each with a random
-// value or a random linear gradient. Islands continue across tiled edges.
+// value, a random linear gradient, or facets: several gradients at random
+// angles combined into a chunky, flat-sided shape like a cut stone. Islands
+// continue across tiled edges.
 func floodFillNode(e *graph.Env) (*img.Buffer, error) {
 	src, err := e.Required("in")
 	if err != nil {
@@ -37,7 +40,7 @@ func floodFillNode(e *graph.Env) (*img.Buffer, error) {
 
 	p := e.Params
 	mode := p.String("mode", "random")
-	if mode != "random" && mode != "gradient" {
+	if mode != "random" && mode != "gradient" && mode != "facets" {
 		return nil, fmt.Errorf("unknown flood fill mode %q", mode)
 	}
 	seed := e.Seed()
@@ -58,10 +61,52 @@ func floodFillNode(e *graph.Env) (*img.Buffer, error) {
 			continue
 		}
 
+		if mode == "facets" {
+			fillFacets(out, isl, p.Int("layers", 5), r, strength)
+			continue
+		}
+
 		a := angle + (r(0)-0.5)*spread
 		fillGradient(out, isl, math.Cos(a), math.Sin(a), strength)
 	}
 	return out, nil
+}
+
+// fillFacets takes the lowest of several ramps that each rise from one side
+// of the island. Directions are spread around the circle with some jitter,
+// and each ramp gets its own steepness, so every island gets its own facets.
+func fillFacets(out *img.Buffer, isl []point, layers int, r func(int) float64, strength float64) {
+	type ramp struct{ dx, dy, lo, span, steep float64 }
+
+	ramps := make([]ramp, layers)
+	turn := r(2) * 2 * math.Pi
+	for k := range ramps {
+		a := turn + (float64(k)+(r(10+k)-0.5)*0.6)*2*math.Pi/float64(layers)
+		dx, dy := math.Cos(a), math.Sin(a)
+
+		lo, hi := math.Inf(1), math.Inf(-1)
+		for _, pt := range isl {
+			d := float64(pt.x)*dx + float64(pt.y)*dy
+			lo, hi = min(lo, d), max(hi, d)
+		}
+		ramps[k] = ramp{dx, dy, lo, max(hi-lo, 1), 1.2 + 1.6*r(30+k)}
+	}
+
+	vals := make([]float64, len(isl))
+	peak := 1e-6
+	for j, pt := range isl {
+		v := math.Inf(1)
+		for _, rp := range ramps {
+			d := float64(pt.x)*rp.dx + float64(pt.y)*rp.dy
+			v = min(v, (d-rp.lo)/rp.span*rp.steep)
+		}
+		vals[j] = v
+		peak = max(peak, v)
+	}
+
+	for j, pt := range isl {
+		out.Pix[pt.i] = float32(vals[j] / peak * strength)
+	}
 }
 
 func fillGradient(out *img.Buffer, isl []point, dx, dy, strength float64) {
