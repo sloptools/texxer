@@ -14,7 +14,7 @@
   import { edge, fromGraph, inputsOf, toGraph, uniqueId, type TexNode } from './lib/graph';
   import { group } from './lib/group';
   import { History } from './lib/history';
-  import type { ModelRef } from './lib/types';
+  import type { ModelInfo, ModelRef } from './lib/types';
   import * as ops from './lib/ops';
   import { renderer } from './lib/renderer.svelte';
   import { layoutStrips, type Strip } from './lib/trim';
@@ -25,7 +25,9 @@
   import Preview from './components/Preview.svelte';
   import TexNodeView from './components/TexNode.svelte';
   import Toolbar from './components/Toolbar.svelte';
+  import PaintStart from './components/paint/PaintStart.svelte';
   import PaintView from './components/paint/PaintView.svelte';
+  import { newProject } from './lib/layers';
 
   const nodeTypes = { tex: TexNodeView };
   const history = new History();
@@ -156,6 +158,7 @@
 
     renderer.thumbs = {};
     renderer.errors = {};
+    renderer.preview = { busy: false };
     nodes = loaded.nodes;
     edges = loaded.edges;
     editor.size = g.size || 512;
@@ -220,6 +223,27 @@
     const target = trail[index];
     trail = trail.slice(0, index);
     await open(target);
+  }
+
+  /** Opens a model for painting: its project if one exists, else a new one. */
+  async function openModel(m: ModelInfo) {
+    const project = m.path.split('/').pop()!.replace(/\.glb$/i, '').replace(/[^A-Za-z0-9_-]/g, '_');
+
+    if (!graphs.includes(project)) {
+      if (!(await leave())) return;
+      try {
+        await api.saveGraph(project, newProject(m.path, m.material));
+        await refreshLibrary();
+      } catch (e) {
+        message = (e as Error).message;
+        return;
+      }
+      trail = [];
+      await open(project);
+      message = `new project ${project}`;
+      return;
+    }
+    await switchTo(project);
   }
 
   async function groupSelection() {
@@ -355,7 +379,7 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
-    if (e.key === 'Tab' && !editingText(e) && paintNode) {
+    if (e.key === 'Tab' && !editingText(e)) {
       e.preventDefault();
       mode = mode === 'paint' ? 'graph' : 'paint';
       return;
@@ -419,10 +443,11 @@
     onadd={(x, y) => (menu = { x, y })}
     onback={back}
     bind:mode
-    canPaint={paintNode !== undefined}
   />
 
-  {#if painting}
+  {#if mode === 'paint' && !paintNode}
+    <PaintStart onopen={openModel} />
+  {:else if painting}
     <PaintView
       node={paintNode!}
       {model}

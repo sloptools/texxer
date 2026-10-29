@@ -41,8 +41,10 @@
   }
 
   function addStep(kind: MaskKind) {
+    // Read the index before the change, steps already includes the new step after it.
+    const index = steps.length;
     set({ mask: [...steps, newStep(kind)] });
-    if (kind === 'parts' || kind === 'color') onarm(steps.length);
+    if (kind === 'parts' || kind === 'color' || kind === 'decal') onarm(index);
   }
 
   const field = 'rounded border border-line bg-field px-1 py-0.5';
@@ -119,7 +121,7 @@
       />
     {/each}
     <div class="flex flex-wrap gap-1">
-      {#each [['parts', 'Teile'], ['mesh', 'Mesh-Map'], ['noise', 'Noise'], ['color', 'Farbe'], ['graph', 'Graph']] as [kind, label]}
+      {#each [['parts', 'Teile'], ['mesh', 'Mesh-Map'], ['noise', 'Noise'], ['decal', 'Decal'], ['color', 'Farbe'], ['graph', 'Graph']] as [kind, label]}
         <button class="rounded border border-line px-2 py-0.5 text-[11px] hover:border-accent" onclick={() => addStep(kind as MaskKind)}>
           + {label}
         </button>

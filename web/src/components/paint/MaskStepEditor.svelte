@@ -1,6 +1,6 @@
 <script lang="ts">
   import { editor } from '../../lib/editor.svelte';
-  import { maskGraphs, meshSources, noises, type MaskStep } from '../../lib/layers';
+  import { maskGraphs, meshSources, motifs, noises, type MaskStep } from '../../lib/layers';
   import type { ParamDef } from '../../lib/types';
   import ParamField from '../ParamField.svelte';
 
@@ -26,6 +26,7 @@
     mesh: 'Mesh-Map',
     noise: 'Noise',
     color: 'Farbe aus Textur',
+    decal: 'Decal',
     graph: 'Masken-Graph',
   };
 
@@ -89,6 +90,31 @@
     </div>
     <ParamField param={slider('tolerance', 0.05, 0.5)} value={step.tolerance} onchange={(v) => set({ tolerance: v as number })} onreset={() => unset('tolerance')} />
     <ParamField param={{ ...slider('grow', 0, 32), px: true }} value={step.grow} onchange={(v) => set({ grow: v as number })} onreset={() => unset('grow')} />
+  {:else if step.kind === 'decal'}
+    <select class={field} value={step.type} onchange={(e) => set({ type: e.currentTarget.value, params: {} })}>
+      {#each motifs(editor.catalog) as t}<option value={t}>{t.replace(/^decal_/, '')}</option>{/each}
+    </select>
+    <div class="flex items-center gap-2">
+      <button class="rounded border px-2 py-0.5 text-[11px] {armed ? 'border-accent text-accent' : 'border-line hover:border-accent'}" onclick={onarm}>
+        {armed ? 'Stelle im Modell anklicken…' : step.center ? 'neu platzieren' : 'im Modell platzieren'}
+      </button>
+      {#if !step.center}<span class="text-[11px] text-fg-dim">noch nicht platziert</span>{/if}
+    </div>
+    <ParamField param={slider('size', 0.15)} value={step.size} onchange={(v) => set({ size: v as number })} onreset={() => unset('size')} />
+    <ParamField param={{ ...slider('aspect', 1, 20), min: 0.1 }} value={step.aspect} onchange={(v) => set({ aspect: v as number })} onreset={() => unset('aspect')} />
+    <ParamField param={{ ...slider('rotation', 0, 180), min: -180 }} value={step.rotation} onchange={(v) => set({ rotation: v as number })} onreset={() => unset('rotation')} />
+    <ParamField param={slider('depth', 0.08, 0.5)} value={step.depth} onchange={(v) => set({ depth: v as number })} onreset={() => unset('depth')} />
+    {#each (nodeDef?.params ?? []).filter((p) => p.name !== 'seed') as p (p.name)}
+      <ParamField
+        param={p}
+        value={step.params?.[p.name]}
+        onchange={(v) => set({ params: { ...step.params, [p.name]: v } })}
+        onreset={() => {
+          const { [p.name]: _, ...rest } = step.params ?? {};
+          set({ params: rest });
+        }}
+      />
+    {/each}
   {:else}
     <select class={field} value={step.type} onchange={(e) => set({ type: e.currentTarget.value, params: {} })}>
       {#if step.kind === 'graph'}<option value="">wählen…</option>{/if}

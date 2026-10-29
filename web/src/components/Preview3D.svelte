@@ -8,7 +8,7 @@
   import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
   import { fileURL } from '../lib/api';
   import { editor } from '../lib/editor.svelte';
-  import type { ModelRef } from '../lib/types';
+  import type { ModelRef, Pick } from '../lib/types';
 
   let {
     url,
@@ -19,7 +19,7 @@
     url: string;
     model?: ModelRef;
     /** Called on a click (not a drag) on the model with the part and the original texture color there. */
-    onpick?: (hit: { part: string; color?: string }) => void;
+    onpick?: (hit: Pick) => void;
     autoRotate?: boolean;
   } = $props();
 
@@ -195,7 +195,16 @@
       const [r, g, b] = original.getImageData(x, y, 1, 1).data;
       color = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
     }
-    onpick({ part: part.name, color });
+    // Positions in the bake's units: offset from the model's minimum, in model diagonals.
+    const box = new THREE.Box3().setFromObject(root, true);
+    const diag = box.getSize(new THREE.Vector3()).length() || 1;
+    const p = hit.point.clone().sub(box.min).divideScalar(diag);
+    const n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3(0, 0, 1);
+    // Faces may be seen from behind; point the normal at the camera.
+    if (n.dot(ray.ray.direction) > 0) n.negate();
+
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    onpick({ part: part.name, color, position: p.toArray().map(round), normal: n.toArray().map(round) });
   }
 
   function applyTexture() {

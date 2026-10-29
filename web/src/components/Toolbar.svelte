@@ -15,7 +15,6 @@
     onadd,
     onback,
     mode = $bindable(),
-    canPaint,
   }: {
     graphs: string[];
     name: string;
@@ -31,8 +30,6 @@
     onadd: (x: number, y: number) => void;
     onback: (index: number) => void;
     mode: 'graph' | 'paint';
-    /** The graph has a layer stack to paint. */
-    canPaint: boolean;
   } = $props();
 
   const button = 'rounded border border-line px-2 py-0.5 hover:border-accent';
@@ -57,16 +54,14 @@
   </button>
   <button class={button} onclick={(e) => onadd(e.clientX, e.clientY + 20)}>+ node</button>
 
-  {#if canPaint}
-    <div class="flex overflow-hidden rounded border border-line text-[11px]" title="Tab wechselt">
-      {#each [['graph', 'Graph'], ['paint', 'Paint']] as [m, label]}
-        <button
-          class="px-2 py-0.5 {mode === m ? 'bg-line text-fg' : 'text-fg-muted hover:text-fg'}"
-          onclick={() => (mode = m as 'graph' | 'paint')}>{label}</button
-        >
-      {/each}
-    </div>
-  {/if}
+  <div class="flex overflow-hidden rounded border border-line text-[11px]" title="Tab wechselt">
+    {#each [['graph', 'Graph'], ['paint', 'Paint']] as [m, label]}
+      <button
+        class="px-2 py-0.5 {mode === m ? 'bg-line text-fg' : 'text-fg-muted hover:text-fg'}"
+        onclick={() => (mode = m as 'graph' | 'paint')}>{label}</button
+      >
+    {/each}
+  </div>
 
   <span class="truncate text-[11px] text-fg-dim">{message}</span>
 

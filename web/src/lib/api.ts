@@ -1,4 +1,4 @@
-import type { Catalog, Graph } from './types';
+import type { Catalog, Graph, ModelInfo } from './types';
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(path, init);
@@ -39,4 +39,8 @@ export async function render(graph: Graph, node: string, size: number, seed: num
 
 export function fileURL(path: string): string {
   return `/api/file?path=${encodeURIComponent(path)}`;
+}
+
+export async function listModels(): Promise<ModelInfo[]> {
+  return (await request('/api/models')).json();
 }

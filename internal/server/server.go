@@ -30,6 +30,7 @@ func New(dir string, static fs.FS) *Server {
 	s.mux.HandleFunc("PUT /api/graphs/{name}", s.handlePutGraph)
 	s.mux.HandleFunc("POST /api/render", s.handleRender)
 	s.mux.HandleFunc("GET /api/file", s.handleFile)
+	s.mux.HandleFunc("GET /api/models", s.handleListModels)
 	s.mux.Handle("/", http.FileServerFS(static))
 
 	return s

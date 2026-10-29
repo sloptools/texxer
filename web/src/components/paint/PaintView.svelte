@@ -3,7 +3,7 @@
   import type { TexNode } from '../../lib/graph';
   import { replace, stackOf, type Effect, type Layer } from '../../lib/layers';
   import { renderer } from '../../lib/renderer.svelte';
-  import type { ModelRef } from '../../lib/types';
+  import type { ModelRef, Pick } from '../../lib/types';
   import ParamField from '../ParamField.svelte';
   import Preview3D from '../Preview3D.svelte';
   import LayerList from './LayerList.svelte';
@@ -47,7 +47,7 @@
   }
 
   /** Clicks in the 3D view go to the armed mask step: they toggle parts or set the picked color. */
-  function pick(hit: { part: string; color?: string }) {
+  function pick(hit: Pick) {
     hint = hit.color ? `${hit.part} · ${hit.color}` : hit.part;
     if (!layer || armed < 0) return;
 
@@ -58,6 +58,9 @@
       const parts = step.parts ?? [];
       const next = parts.includes(hit.part) ? parts.filter((p) => p !== hit.part) : [...parts, hit.part];
       setLayer({ ...layer, mask: replace(layer.mask!, armed, { ...step, parts: next }) });
+    } else if (step.kind === 'decal') {
+      setLayer({ ...layer, mask: replace(layer.mask!, armed, { ...step, center: hit.position, direction: hit.normal }) });
+      armed = -1;
     } else if (step.kind === 'color' && hit.color) {
       setLayer({ ...layer, mask: replace(layer.mask!, armed, { ...step, color: hit.color }) });
       armed = -1;

@@ -60,3 +60,17 @@ export interface ModelRef {
   path: string;
   material: string;
 }
+
+/** A click on the model in the 3D view. Position and normal are in the bake's units. */
+export interface Pick {
+  part: string;
+  color?: string;
+  position: number[];
+  normal: number[];
+}
+
+export interface ModelInfo {
+  path: string;
+  materials: string[];
+  material: string;
+}
