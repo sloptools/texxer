@@ -44,3 +44,7 @@ export function fileURL(path: string): string {
 export async function listModels(): Promise<ModelInfo[]> {
   return (await request('/api/models')).json();
 }
+
+export async function putFile(path: string, data: Blob): Promise<void> {
+  await request(`/api/file?path=${encodeURIComponent(path)}`, { method: 'PUT', body: data });
+}

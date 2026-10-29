@@ -1,9 +1,12 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
+  import * as api from '../../lib/api';
+  import { Painter } from '../../lib/brush';
   import { editor } from '../../lib/editor.svelte';
   import type { TexNode } from '../../lib/graph';
   import { replace, stackOf, type Effect, type Layer } from '../../lib/layers';
   import { renderer } from '../../lib/renderer.svelte';
-  import type { ModelRef, Pick } from '../../lib/types';
+  import type { Graph, ModelRef, Pick } from '../../lib/types';
   import ParamField from '../ParamField.svelte';
   import Preview3D from '../Preview3D.svelte';
   import LayerList from './LayerList.svelte';
@@ -12,12 +15,18 @@
   let {
     node,
     model,
+    graph,
+    project,
     selected = $bindable(),
     showMask = $bindable(),
     onparams,
   }: {
     node: TexNode;
     model?: ModelRef;
+    /** The current graph, for rendering the maps the brush needs. */
+    graph: Graph;
+    /** The project's graph name, used to name painted mask files. */
+    project: string;
     selected: string;
     showMask: boolean;
     onparams: (params: Record<string, unknown>) => void;
@@ -37,6 +46,68 @@
     selected;
     armed = -1;
   });
+
+  // The brush is active while a painted mask step is armed.
+  const paintStep = $derived(armed >= 0 && layer?.mask?.[armed]?.kind === 'paint' ? armed : -1);
+  let painter = $state.raw<Painter | undefined>();
+  let overlayVersion = $state(0);
+  let saving = Promise.resolve();
+
+  $effect(() => {
+    const i = paintStep;
+    if (i < 0) {
+      painter = undefined;
+      return;
+    }
+
+    let cancelled = false;
+    const file = untrack(() => layer?.mask?.[i]?.file);
+    Painter.load(untrack(() => graph), node.id, editor.size, file)
+      .then((p) => {
+        if (cancelled) return;
+        painter = p;
+        overlayVersion++;
+      })
+      .catch((e) => (hint = `Pinsel: ${(e as Error).message}`));
+    return () => (cancelled = true);
+  });
+
+  function paint(hit: Pick, _first: boolean, erase: boolean) {
+    if (!painter) return;
+    painter.stamp(hit.position, hit.normal, { ...editor.brush, erase: erase || editor.brush.erase });
+    overlayVersion++;
+  }
+
+  /** Saves the mask after a stroke and bumps its revision, so the stack re-renders with it. */
+  function paintEnd() {
+    const i = paintStep;
+    const p = painter;
+    if (i < 0 || !p || !layer) return;
+
+    const step = layer.mask![i];
+    const file = step.file ?? `paint/${project}_${Math.random().toString(36).slice(2, 8)}.png`;
+    saving = saving.then(async () => {
+      try {
+        await api.putFile(file, await p.png());
+        const current = untrack(() => layer);
+        if (!current?.mask?.[i]) return;
+        setLayer({ ...current, mask: replace(current.mask, i, { ...current.mask[i], file, rev: (current.mask[i].rev ?? 0) + 1 }) });
+      } catch (e) {
+        hint = `Speichern: ${(e as Error).message}`;
+      }
+    });
+  }
+
+  function clearPaint(i: number) {
+    if (paintStep === i && painter) {
+      painter.clear();
+      overlayVersion++;
+      paintEnd();
+      return;
+    }
+    const step = layer?.mask?.[i];
+    if (step?.file) setLayer({ ...layer!, mask: replace(layer!.mask!, i, { kind: 'paint' }) });
+  }
 
   function save(layers: Layer[], effects: Effect[]) {
     onparams({ ...node.data.params, layers, effects });
@@ -84,7 +155,16 @@
 
   <main class="relative min-w-0 flex-1 bg-panel">
     {#if preview.url}
-      <Preview3D url={preview.url} {model} onpick={pick} autoRotate={false} />
+      <Preview3D
+        url={preview.url}
+        {model}
+        onpick={pick}
+        autoRotate={false}
+        brush={painter ? { radius: editor.brush.radius } : undefined}
+        onpaint={paint}
+        onpaintend={paintEnd}
+        overlay={painter ? { canvas: painter.canvas, version: overlayVersion } : undefined}
+      />
     {/if}
     <div class="pointer-events-none absolute inset-x-3 top-2 flex items-center gap-2 text-[11px] text-fg-dim">
       <span>{showMask && layer ? `Maske: ${layer.name}` : node.id}</span>
@@ -102,7 +182,7 @@
   <aside class="w-80 shrink-0 overflow-y-auto border-l border-line-soft bg-panel">
     {#if layer}
       {#key layerIndex}
-        <LayerProps {layer} {armed} bind:showMask onchange={setLayer} onarm={(i) => (armed = i)} />
+        <LayerProps {layer} {armed} bind:showMask onchange={setLayer} onarm={(i) => (armed = i)} onclear={clearPaint} />
       {/key}
     {:else if fx}
       <div class="flex flex-col gap-3 p-3">

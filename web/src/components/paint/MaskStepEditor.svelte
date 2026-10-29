@@ -11,6 +11,7 @@
     onchange,
     onremove,
     onarm,
+    onclear,
   }: {
     step: MaskStep;
     first: boolean;
@@ -19,6 +20,8 @@
     onchange: (s: MaskStep) => void;
     onremove: () => void;
     onarm: () => void;
+    /** Erases a painted mask. */
+    onclear?: () => void;
   } = $props();
 
   const labels: Record<string, string> = {
@@ -27,6 +30,7 @@
     noise: 'Noise',
     color: 'Farbe aus Textur',
     decal: 'Decal',
+    paint: 'Gemalt',
     graph: 'Masken-Graph',
   };
 
@@ -90,6 +94,23 @@
     </div>
     <ParamField param={slider('tolerance', 0.05, 0.5)} value={step.tolerance} onchange={(v) => set({ tolerance: v as number })} onreset={() => unset('tolerance')} />
     <ParamField param={{ ...slider('grow', 0, 32), px: true }} value={step.grow} onchange={(v) => set({ grow: v as number })} onreset={() => unset('grow')} />
+  {:else if step.kind === 'paint'}
+    <div class="flex items-center gap-2">
+      <button class="rounded border px-2 py-0.5 text-[11px] {armed ? 'border-accent text-accent' : 'border-line hover:border-accent'}" onclick={onarm}>
+        {armed ? 'malen beenden' : 'malen'}
+      </button>
+      <label class="flex items-center gap-1 text-[11px] text-fg-muted">
+        <input type="checkbox" class="accent-(--color-accent)" bind:checked={editor.brush.erase} />
+        radieren <span class="text-fg-faint">(⌥)</span>
+      </label>
+      {#if onclear}<button class="ml-auto text-[11px] text-fg-dim hover:text-danger" onclick={onclear}>leeren</button>{/if}
+    </div>
+    {#if armed}
+      <p class="text-[11px] text-fg-dim">Ziehen malt, Leertaste halten dreht die Ansicht.</p>
+    {/if}
+    <ParamField param={{ ...slider('radius', 0.03, 0.2), min: 0.003 }} value={editor.brush.radius} onchange={(v) => (editor.brush.radius = v as number)} onreset={() => (editor.brush.radius = 0.03)} />
+    <ParamField param={slider('hardness', 0.5)} value={editor.brush.hardness} onchange={(v) => (editor.brush.hardness = v as number)} onreset={() => (editor.brush.hardness = 0.5)} />
+    <ParamField param={slider('strength', 0.6)} value={editor.brush.strength} onchange={(v) => (editor.brush.strength = v as number)} onreset={() => (editor.brush.strength = 0.6)} />
   {:else if step.kind === 'decal'}
     <select class={field} value={step.type} onchange={(e) => set({ type: e.currentTarget.value, params: {} })}>
       {#each motifs(editor.catalog) as t}<option value={t}>{t.replace(/^decal_/, '')}</option>{/each}

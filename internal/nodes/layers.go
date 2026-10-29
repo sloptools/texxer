@@ -1,7 +1,10 @@
 package nodes
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"slices"
 
 	"texxer/internal/graph"
@@ -52,6 +55,11 @@ type maskPart struct {
 	Breakup *float64 `json:"breakup,omitempty"`
 	// Grow widens color picks by px, e.g. to take the stripes between picked ones.
 	Grow *float64 `json:"grow,omitempty"`
+
+	// File is a painted mask, a gray PNG in the model's UV layout. Rev changes
+	// with every save, so cached renders of the old strokes are not reused.
+	File string `json:"file,omitempty"`
+	Rev  int    `json:"rev,omitempty"`
 
 	// Decals project the motif node Type at Center along Direction.
 	Center    []float64 `json:"center,omitempty"`
@@ -109,6 +117,11 @@ func layersNode(e *graph.Env) (*img.Buffer, error) {
 
 	refs := []string{out}
 	var names []string
+	// Painting needs to know where each texel is on the model.
+	if b.hasMesh {
+		refs = append(refs, "mesh.position", "mesh.normal")
+		names = append(names, "position", "normal")
+	}
 	for i := range stack {
 		if ref, ok := b.masks[i]; ok {
 			refs = append(refs, ref)
@@ -296,7 +309,7 @@ func (b *layerBuilder) mask(steps []maskPart) (string, error) {
 }
 
 func (b *layerBuilder) maskStep(s maskPart) (string, error) {
-	if !b.hasMesh && (s.Kind == "parts" || s.Kind == "mesh" || s.Kind == "color" || s.Kind == "decal") {
+	if !b.hasMesh && (s.Kind == "parts" || s.Kind == "mesh" || s.Kind == "color" || s.Kind == "decal" || s.Kind == "paint") {
 		return "", fmt.Errorf("%s masks need a model path", s.Kind)
 	}
 	level := func(def float64) float64 { return deref(s.Level, def) }
@@ -362,6 +375,16 @@ func (b *layerBuilder) maskStep(s maskPart) (string, error) {
 		}
 		blurred := b.add("pick", "blur", graph.Params{"radius": radius}, map[string]string{"in": raw})
 		return b.add("pick", "scan", graph.Params{"position": pos, "contrast": 0.85}, map[string]string{"in": blurred}), nil
+
+	case "paint":
+		if s.File == "" {
+			return b.add("empty", "color", graph.Params{"color": "#000000"}, nil), nil
+		}
+		if _, err := os.Stat(b.env.Path(s.File)); errors.Is(err, fs.ErrNotExist) {
+			// Nothing painted yet.
+			return b.add("empty", "color", graph.Params{"color": "#000000"}, nil), nil
+		}
+		return b.add("paint", "image", graph.Params{"path": s.File, "gray": true, "rev": float64(s.Rev)}, nil), nil
 
 	case "decal":
 		params := graph.Params{

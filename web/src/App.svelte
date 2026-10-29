@@ -451,6 +451,8 @@
     <PaintView
       node={paintNode!}
       {model}
+      graph={renderGraph}
+      project={name}
       bind:selected={paintSelected}
       bind:showMask
       onparams={(p) => setParams(paintNode!.id, p)}

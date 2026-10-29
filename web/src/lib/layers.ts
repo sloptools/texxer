@@ -6,7 +6,7 @@ export interface LayerFill {
   params?: Record<string, unknown>;
 }
 
-export type MaskKind = 'parts' | 'mesh' | 'noise' | 'color' | 'decal' | 'graph';
+export type MaskKind = 'parts' | 'mesh' | 'noise' | 'color' | 'decal' | 'paint' | 'graph';
 
 export interface MaskStep {
   kind: MaskKind;
@@ -28,6 +28,8 @@ export interface MaskStep {
   aspect?: number;
   rotation?: number;
   depth?: number;
+  file?: string;
+  rev?: number;
 }
 
 export interface Layer {
@@ -90,6 +92,8 @@ export function newStep(kind: MaskKind): MaskStep {
       return { kind, color: '#808080', tolerance: 0.05 };
     case 'decal':
       return { kind, type: 'decal_solid', params: {}, size: 0.15, aspect: 1, rotation: 0, depth: 0.08 };
+    case 'paint':
+      return { kind };
     case 'graph':
       return { kind, type: '', params: {} };
   }

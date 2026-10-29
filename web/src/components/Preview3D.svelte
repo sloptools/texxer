@@ -15,12 +15,22 @@
     model,
     onpick,
     autoRotate = true,
+    brush,
+    onpaint,
+    onpaintend,
+    overlay,
   }: {
     url: string;
     model?: ModelRef;
     /** Called on a click (not a drag) on the model with the part and the original texture color there. */
     onpick?: (hit: Pick) => void;
     autoRotate?: boolean;
+    /** Set while painting: dragging paints, Space held orbits. Radius is in model diagonals. */
+    brush?: { radius: number };
+    onpaint?: (hit: Pick, first: boolean, erase: boolean) => void;
+    onpaintend?: () => void;
+    /** A gray mask drawn tinted over the texture, updated whenever version changes. */
+    overlay?: { canvas: HTMLCanvasElement; version: number };
   } = $props();
 
   let container: HTMLDivElement;
@@ -29,11 +39,16 @@
 
   // Materials showing the rendered texture; emissive ones keep their own color.
   let textured: THREE.MeshBasicMaterial[] = [];
-  let texture: THREE.Texture | undefined;
+  // State, so the paint overlay recomposes when a new render arrives.
+  let texture = $state.raw<THREE.Texture | undefined>();
   let root: THREE.Object3D | undefined;
   let camera: THREE.PerspectiveCamera | undefined;
   // The model's own texture, for picking colors.
   let original: CanvasRenderingContext2D | undefined;
+  let controlsRef: OrbitControls | undefined;
+  let ring: THREE.Mesh | undefined;
+  let spaceDown = false;
+  let composite: THREE.CanvasTexture | undefined;
 
   // Baked lighting is in the texture, so unlit materials show it as in a Quake-style engine.
   $effect(() => {
@@ -48,6 +63,15 @@
     camera = cam;
 
     const controls = new OrbitControls(cam, renderer.domElement);
+    controlsRef = controls;
+
+    ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.9, 1, 48),
+      new THREE.MeshBasicMaterial({ color: 0xff9a3c, depthTest: false, transparent: true, opacity: 0.9, side: THREE.DoubleSide }),
+    );
+    ring.renderOrder = 10;
+    ring.visible = false;
+    scene.add(ring);
     controls.enableDamping = true;
     controls.autoRotate = autoRotate;
     controls.autoRotateSpeed = 1;
@@ -86,20 +110,59 @@
       composer.render();
     });
 
-    // A click picks, a drag orbits.
+    // A click picks, a drag orbits; with a brush a drag paints instead.
     let down: { x: number; y: number } | undefined;
-    const onDown = (e: PointerEvent) => (down = { x: e.clientX, y: e.clientY });
+    let painting = false;
+    const onDown = (e: PointerEvent) => {
+      down = { x: e.clientX, y: e.clientY };
+      if (brush && !spaceDown && e.button === 0) {
+        const hit = raycast(e);
+        if (hit) {
+          painting = true;
+          renderer.domElement.setPointerCapture(e.pointerId);
+          onpaint?.(hit, true, e.altKey);
+        }
+      }
+    };
+    const onMove = (e: PointerEvent) => {
+      const hit = brush ? raycast(e) : undefined;
+      showRing(hit);
+      if (painting && hit) onpaint?.(hit, false, e.altKey);
+    };
     const onUp = (e: PointerEvent) => {
-      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 4) pick(e);
+      if (painting) {
+        painting = false;
+        onpaintend?.();
+      } else if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 4) {
+        const hit = raycast(e);
+        if (hit) onpick?.(hit);
+      }
       down = undefined;
     };
+    const onLeave = () => showRing(undefined);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || (e.target as HTMLElement).closest('input, textarea, select')) return;
+      spaceDown = e.type === 'keydown';
+      if (brush) e.preventDefault();
+      syncControls();
+    };
+
     renderer.domElement.addEventListener('pointerdown', onDown);
+    renderer.domElement.addEventListener('pointermove', onMove);
     renderer.domElement.addEventListener('pointerup', onUp);
+    renderer.domElement.addEventListener('pointerleave', onLeave);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
 
     return () => {
       renderer.setAnimationLoop(null);
       renderer.domElement.removeEventListener('pointerdown', onDown);
+      renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('pointerup', onUp);
+      renderer.domElement.removeEventListener('pointerleave', onLeave);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
+      composite?.dispose();
       resize.disconnect();
       controls.dispose();
       texture?.dispose();
@@ -172,15 +235,78 @@
     });
   });
 
-  function pick(e: PointerEvent) {
-    if (!onpick || !root || !camera) return;
+  $effect(() => {
+    brush;
+    syncControls();
+    if (!brush) showRing(undefined);
+  });
+
+  // The painted mask over the texture, tinted, so strokes show before the render catches up.
+  $effect(() => {
+    const o = overlay;
+    o?.version;
+    if (!o) {
+      composite?.dispose();
+      composite = undefined;
+      applyTexture();
+      return;
+    }
+
+    const base = texture?.image as CanvasImageSource | undefined;
+    const { width: w, height: h } = o.canvas;
+    const out = document.createElement('canvas');
+    out.width = w;
+    out.height = h;
+    const ctx = out.getContext('2d', { willReadFrequently: true })!;
+    if (base) ctx.drawImage(base, 0, 0, w, h);
+
+    const img = ctx.getImageData(0, 0, w, h);
+    const mask = o.canvas.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, w, h).data;
+    for (let i = 0; i < img.data.length; i += 4) {
+      const m = (mask[i] / 255) * 0.6;
+      img.data[i] += (255 - img.data[i]) * m;
+      img.data[i + 1] += (150 - img.data[i + 1]) * m;
+      img.data[i + 2] += (60 - img.data[i + 2]) * m;
+    }
+    ctx.putImageData(img, 0, 0);
+
+    composite?.dispose();
+    composite = new THREE.CanvasTexture(out);
+    composite.magFilter = THREE.NearestFilter;
+    composite.colorSpace = THREE.SRGBColorSpace;
+    composite.flipY = false;
+    applyTexture();
+  });
+
+  function syncControls() {
+    if (controlsRef) controlsRef.enabled = !brush || spaceDown;
+  }
+
+  function showRing(hit: Pick | undefined) {
+    if (!ring || !root) return;
+    ring.visible = !!hit && !!brush;
+    if (!hit || !brush) return;
+
+    const box = new THREE.Box3().setFromObject(root, true);
+    const diag = box.getSize(new THREE.Vector3()).length() || 1;
+    const p = new THREE.Vector3(...hit.position).multiplyScalar(diag).add(box.min);
+    const n = new THREE.Vector3(...hit.normal);
+
+    ring.position.copy(p).addScaledVector(n, diag * 0.002);
+    ring.lookAt(p.clone().add(n));
+    ring.scale.setScalar(brush.radius * diag);
+  }
+
+  /** The model point under the pointer, in the bake's units, or undefined. */
+  function raycast(e: PointerEvent): Pick | undefined {
+    if (!root || !camera) return;
 
     const rect = container.getBoundingClientRect();
     const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     const ray = new THREE.Raycaster();
     ray.setFromCamera(ndc, camera);
 
-    const hit = ray.intersectObject(root, true)[0];
+    const hit = ray.intersectObject(root, true).find((h) => h.object !== ring);
     if (!hit) return;
 
     // Parts are the model's top-level nodes, as the bake names them.
@@ -204,12 +330,12 @@
     if (n.dot(ray.ray.direction) > 0) n.negate();
 
     const round = (v: number) => Math.round(v * 1000) / 1000;
-    onpick({ part: part.name, color, position: p.toArray().map(round), normal: n.toArray().map(round) });
+    return { part: part.name, color, position: p.toArray().map(round), normal: n.toArray().map(round) };
   }
 
   function applyTexture() {
     for (const m of textured) {
-      m.map = texture ?? null;
+      m.map = composite ?? texture ?? null;
       m.needsUpdate = true;
     }
   }

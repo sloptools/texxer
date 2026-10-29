@@ -21,6 +21,7 @@ export const editor = $state({
   exposed: {} as Record<string, Exposed>,
   theme: initialTheme(),
   openGraph: undefined as ((name: string) => void) | undefined,
+  brush: { radius: 0.03, hardness: 0.5, strength: 0.6, erase: false },
 });
 
 /** Everything of the open graph that isn't nodes and edges. */
