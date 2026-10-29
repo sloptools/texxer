@@ -17,6 +17,9 @@ type BakeOptions struct {
 	EdgeWidth   float64
 	CavityWidth float64
 	EdgeAngle   float64
+	// FixNormals turns normals around that point into the solid, for models
+	// with flipped faces. It can misjudge real interiors, so it is opt-in.
+	FixNormals bool
 	// Select names the parts that make up the Selected map.
 	Select  []string
 	Padding int
@@ -71,7 +74,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	results := make([][3]float64, len(samples))
 	parallel(len(samples), func(i int) {
 		s := samples[i]
-		ao, flipped := occlusion(bvh, s, o.AORays, o.AODist*diag)
+		ao, flipped := occlusion(bvh, s, o.AORays, o.AODist*diag, o.FixNormals)
 		if flipped {
 			samples[i].n = s.n.Scale(-1)
 		}
@@ -179,16 +182,16 @@ func rasterize(m *Model, o BakeOptions) []sample {
 }
 
 // occlusion is the fraction of cosine-weighted rays that escape, 1 fully
-// open. Mostly occluded surfaces are tested from their other side too: when
+// open. With fix, mostly occluded surfaces are tested from their other side: when
 // that side is much more open, the normal points into the solid, as with
 // flipped faces, and flipped reports it so lighting can turn it around.
-func occlusion(b *BVH, s sample, rays int, dist float64) (open float64, flipped bool) {
+func occlusion(b *BVH, s sample, rays int, dist float64, fix bool) (open float64, flipped bool) {
 	if rays <= 0 || dist <= 0 {
 		return 1, false
 	}
 
 	open = hemisphere(b, s, s.n, rays, dist)
-	if open < 0.5 {
+	if fix && open < 0.5 {
 		if back := hemisphere(b, s, s.n.Scale(-1), rays, dist); back > open+0.3 {
 			return back, true
 		}

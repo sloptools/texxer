@@ -35,6 +35,7 @@ var meshParams = []Param{
 	num("edge_angle", 30, 1, 90),
 	enum("filter", "nearest", "nearest", "linear"),
 	integer("padding", 8, 0, 64),
+	flag("fix_normals", false),
 }
 
 // meshNode bakes a glTF model's geometry into maps in its UV layout:
@@ -72,6 +73,7 @@ func meshNode(e *graph.Env) (*img.Buffer, error) {
 		EdgeAngle:   p.Float("edge_angle", 30),
 		Select:      sel,
 		Padding:     p.Int("padding", 8),
+		FixNormals:  p.Bool("fix_normals", false),
 	}
 
 	model, err := loadModel(path)
