@@ -18,20 +18,22 @@ var floodFillDef = Def{
 	Category: "filter",
 	Inputs:   []string{"in"},
 	Params: []Param{
-		enum("mode", "random", "random", "gradient", "facets"),
+		enum("mode", "random", "random", "gradient", "facets", "solid"),
 		num("threshold", 0.5, 0, 1),
 		num("angle", 0, -180, 180),
 		num("spread", 360, 0, 360),
 		num("variation", 0, 0, 1),
 		integer("layers", 5, 2, 12),
+		px("min_size", 0, 0, 64),
 		seedParam,
 	},
 }
 
 // floodFillNode finds connected islands in a mask and fills each with a random
-// value, a random linear gradient, or facets: several gradients at random
-// angles combined into a chunky, flat-sided shape like a cut stone. Islands
-// continue across tiled edges.
+// value, a random linear gradient, facets (several gradients at random
+// angles combined into a chunky, flat-sided shape like a cut stone) or solid
+// white. Islands smaller than min_size px across are dropped, which cleans
+// slivers out of warped masks. Islands continue across tiled edges.
 func floodFillNode(e *graph.Env) (*img.Buffer, error) {
 	src, err := e.Required("in")
 	if err != nil {
@@ -40,7 +42,7 @@ func floodFillNode(e *graph.Env) (*img.Buffer, error) {
 
 	p := e.Params
 	mode := p.String("mode", "random")
-	if mode != "random" && mode != "gradient" && mode != "facets" {
+	if mode != "random" && mode != "gradient" && mode != "facets" && mode != "solid" {
 		return nil, fmt.Errorf("unknown flood fill mode %q", mode)
 	}
 	seed := e.Seed()
@@ -48,11 +50,25 @@ func floodFillNode(e *graph.Env) (*img.Buffer, error) {
 	spread := p.Float("spread", 360) * math.Pi / 180
 	variation := p.Float("variation", 0)
 
+	minSize := e.Px("min_size", 0)
+	minArea := int(minSize * minSize)
+
 	out := img.New(src.W, src.H, 1, src.Tiling)
 
 	for id, isl := range findIslands(src, float32(p.Float("threshold", 0.5))) {
+		if len(isl) < minArea {
+			continue
+		}
+
 		r := func(k int) float64 { return noise.Rand01(id, k, seed) }
 		strength := 1 - variation*r(1)
+
+		if mode == "solid" {
+			for _, pt := range isl {
+				out.Pix[pt.i] = 1
+			}
+			continue
+		}
 
 		if mode == "random" {
 			for _, pt := range isl {
