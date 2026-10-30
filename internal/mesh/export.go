@@ -16,8 +16,8 @@ const (
 
 // WithTexture returns a copy of a binary glTF whose material uses png as its
 // base color texture. An empty material picks every material that already
-// has a base color texture. Other materials, like emissive ones, are left
-// alone. The binary chunk is rebuilt, so replaced images don't linger in the file.
+// has a base color texture, or every non-emissive one if none has. Other
+// materials are left alone. The binary chunk is rebuilt, so replaced images don't linger in the file.
 func WithTexture(glb, png []byte, material string) ([]byte, error) {
 	doc, bin, err := rawGLB(glb)
 	if err != nil {
@@ -48,6 +48,7 @@ func WithTexture(glb, png []byte, material string) ([]byte, error) {
 	textures = append(textures, map[string]any{"source": float64(len(images) - 1), "sampler": float64(len(samplers) - 1)})
 	tex := float64(len(textures) - 1)
 
+	textured := hasBaseTexture(materials)
 	used := 0
 	for _, m := range materials {
 		mat, ok := m.(map[string]any)
@@ -56,7 +57,10 @@ func WithTexture(glb, png []byte, material string) ([]byte, error) {
 		}
 		pbr, _ := mat["pbrMetallicRoughness"].(map[string]any)
 		if material == "" {
-			if pbr == nil || pbr["baseColorTexture"] == nil {
+			if textured && (pbr == nil || pbr["baseColorTexture"] == nil) {
+				continue
+			}
+			if !textured && emissive(mat) {
 				continue
 			}
 		} else if mat["name"] != material {
@@ -77,7 +81,7 @@ func WithTexture(glb, png []byte, material string) ([]byte, error) {
 	}
 	if used == 0 {
 		if material == "" {
-			return nil, errors.New("no material has a base color texture; name the material to texture")
+			return nil, errors.New("model has no material to texture")
 		}
 		return nil, fmt.Errorf("model has no material %q", material)
 	}
@@ -242,4 +246,25 @@ func intField(v any, key string) int {
 	m, _ := v.(map[string]any)
 	f, _ := m[key].(float64)
 	return int(f)
+}
+
+func hasBaseTexture(materials []any) bool {
+	for _, m := range materials {
+		mat, _ := m.(map[string]any)
+		pbr, _ := mat["pbrMetallicRoughness"].(map[string]any)
+		if pbr != nil && pbr["baseColorTexture"] != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func emissive(mat map[string]any) bool {
+	f, _ := mat["emissiveFactor"].([]any)
+	for _, v := range f {
+		if x, _ := v.(float64); x > 0 {
+			return true
+		}
+	}
+	return false
 }

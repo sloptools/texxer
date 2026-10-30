@@ -1,6 +1,6 @@
 .DS_Store
-*.png
-/texxer
-web/node_modules/
-web/dist/*
-!web/dist/.gitkeep
+/bin
+build/bin
+node_modules
+frontend/dist
+frontend/package.json.md5

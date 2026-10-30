@@ -1,30 +1,31 @@
-.PHONY: run build web test dev dev-server dev-web
+WAILS ?= $(shell command -v wails 2>/dev/null || echo $(HOME)/go/bin/wails)
+APP := texxer.app
 
-# Builds everything and starts the editor on http://localhost:7777.
-run: build
-	./texxer serve -dir examples
+.PHONY: build dev install deps test clean
 
-build: web
-	go build -o texxer ./cmd/texxer
+build: deps
+	$(WAILS) build -clean
+	mkdir -p bin
+	rm -rf bin/$(APP)
+	cp -R build/bin/$(APP) bin/
 
-web: web/node_modules
-	cd web && npm run build
+dev: deps
+	$(WAILS) dev
 
-web/node_modules: web/package.json web/package-lock.json
-	cd web && npm install
-	touch web/node_modules
+install: build
+	rm -rf /Applications/$(APP)
+	cp -R bin/$(APP) /Applications/
 
-test: web/node_modules
+# main.go embeds frontend/dist, which must not be empty before the first frontend build.
+deps:
+	@test -x $(WAILS) || go install github.com/wailsapp/wails/v2/cmd/wails@latest
+	@test -d frontend/node_modules || (cd frontend && npm install)
+	@mkdir -p frontend/dist && touch frontend/dist/.keep
+
+test: deps
 	go vet ./...
 	go test ./...
-	cd web && npm run check
+	cd frontend && npm run check
 
-# Go server plus Vite with hot reload on http://localhost:5173.
-dev: web/node_modules
-	$(MAKE) -j2 dev-server dev-web
-
-dev-server:
-	go run ./cmd/texxer serve -dir examples
-
-dev-web:
-	cd web && npm run dev
+clean:
+	rm -rf bin build/bin frontend/dist

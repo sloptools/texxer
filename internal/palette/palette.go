@@ -2,6 +2,7 @@ package palette
 
 import (
 	"cmp"
+	_ "embed"
 	"fmt"
 	"image"
 	_ "image/png"
@@ -84,11 +85,15 @@ func loadLmp(path string) ([]Color, error) {
 		return nil, fmt.Errorf("%s: palette too short", path)
 	}
 
+	return parseLmp(data), nil
+}
+
+func parseLmp(data []byte) []Color {
 	pal := make([]Color, 256)
 	for i := range pal {
 		pal[i] = Color{float32(data[i*3]) / 255, float32(data[i*3+1]) / 255, float32(data[i*3+2]) / 255}
 	}
-	return pal, nil
+	return pal
 }
 
 func Nearest(pal []Color, c Color) Color {
@@ -141,4 +146,12 @@ func mean(b []Color) Color {
 
 	n := float64(len(b))
 	return Color{float32(sum[0] / n), float32(sum[1] / n), float32(sum[2] / n)}
+}
+
+//go:embed quake.lmp
+var quakeLmp []byte
+
+// Quake returns the 256 colors of Quake's palette.
+func Quake() []Color {
+	return parseLmp(quakeLmp)
 }

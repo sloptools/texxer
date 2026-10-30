@@ -1,8 +1,0 @@
-{
-  "size": 512,
-  "output": "out",
-  "nodes": {
-    "white": { "type": "color", "params": { "color": "#ffffff" } },
-    "out":   { "type": "output", "inputs": { "in": "white" } }
-  }
-}

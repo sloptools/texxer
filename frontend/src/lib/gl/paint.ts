@@ -1,0 +1,225 @@
+import * as THREE from 'three'
+import { fetchBlob } from '../assets'
+import type { Bake } from './compositor'
+import { quadVertex } from './shaders'
+
+// A brush dab: a sphere in model space, painted into every texel whose
+// position lies inside it and whose surface faces the camera.
+const dabFragment = /* glsl */ `
+precision highp float;
+
+uniform sampler2D uPos;
+uniform sampler2D uNrm;
+uniform vec3 uCenter;
+uniform vec3 uView;
+uniform float uRadius;
+uniform float uHard;
+uniform int uErase;
+
+out vec4 outColor;
+
+void main() {
+  ivec2 t = ivec2(gl_FragCoord.xy);
+  vec3 p = texelFetch(uPos, t, 0).xyz;
+  vec3 n = texelFetch(uNrm, t, 0).xyz;
+
+  float v = 1.0 - smoothstep(uHard * uRadius * 0.999, uRadius, distance(p, uCenter));
+  v *= step(0.05, dot(n, uView));
+  outColor = vec4(uErase == 1 ? 1.0 - v : v);
+}
+`
+
+const copyFragment = /* glsl */ `
+precision highp float;
+uniform sampler2D uSrc;
+out vec4 outColor;
+void main() {
+  outColor = texelFetch(uSrc, ivec2(gl_FragCoord.xy), 0);
+}
+`
+
+export type Dab = { center: THREE.Vector3; view: THREE.Vector3; radius: number; hard: number; erase: boolean }
+
+// Painted masks, one render target each, kept at the bake's size.
+export class PaintStore {
+  private targets = new Map<string, THREE.WebGLRenderTarget>()
+  private dirty = new Set<string>()
+  private scene = new THREE.Scene()
+  private camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+  private quad: THREE.Mesh
+  private dabMat: THREE.ShaderMaterial
+  private copyMat: THREE.ShaderMaterial
+  private saveTimer = 0
+
+  onChange: () => void = () => {}
+
+  constructor(
+    private renderer: THREE.WebGLRenderer,
+    private bake: Bake,
+    private url: (id: string) => string,
+    private save: (id: string, png: string) => void,
+  ) {
+    this.dabMat = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: quadVertex,
+      fragmentShader: dabFragment,
+      uniforms: {
+        uPos: { value: bake.pos },
+        uNrm: { value: bake.nrm },
+        uCenter: { value: new THREE.Vector3() },
+        uView: { value: new THREE.Vector3() },
+        uRadius: { value: 0.01 },
+        uHard: { value: 0.8 },
+        uErase: { value: 0 },
+      },
+      blending: THREE.CustomBlending,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneFactor,
+      depthTest: false,
+      depthWrite: false,
+    })
+    this.copyMat = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: quadVertex,
+      fragmentShader: copyFragment,
+      uniforms: { uSrc: { value: null } },
+      blending: THREE.NoBlending,
+      depthTest: false,
+      depthWrite: false,
+    })
+    this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.dabMat)
+    this.quad.frustumCulled = false
+    this.scene.add(this.quad)
+  }
+
+  get size() {
+    return this.bake.size
+  }
+
+  // The mask's texture; new ones start empty and load their PNG if there is one.
+  get(id: string): THREE.Texture {
+    let t = this.targets.get(id)
+    if (!t) {
+      t = this.create(id)
+      this.load(id)
+    }
+    return t.texture
+  }
+
+  private create(id: string) {
+    const size = this.bake.size
+    const t = new THREE.WebGLRenderTarget(size, size, {
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.NearestFilter,
+      generateMipmaps: false,
+      depthBuffer: false,
+    })
+    const prev = this.renderer.getRenderTarget()
+    this.renderer.setRenderTarget(t)
+    this.renderer.setClearColor(0x000000, 0)
+    this.renderer.clear()
+    this.renderer.setRenderTarget(prev)
+    this.targets.set(id, t)
+    return t
+  }
+
+  private async load(id: string) {
+    const blob = await fetchBlob(this.url(id))
+    if (!blob) return
+    const img = await createImageBitmap(blob)
+
+    const size = this.bake.size
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = size
+    const ctx = canvas.getContext('2d')!
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(img, 0, 0, size, size)
+    this.write(id, new Uint8Array(ctx.getImageData(0, 0, size, size).data.buffer), false)
+  }
+
+  dab(id: string, d: Dab) {
+    const t = this.targets.get(id) ?? this.create(id)
+    const u = this.dabMat.uniforms
+    u.uCenter.value.copy(d.center)
+    u.uView.value.copy(d.view)
+    u.uRadius.value = d.radius
+    u.uHard.value = d.hard
+    u.uErase.value = d.erase ? 1 : 0
+    this.dabMat.blendEquation = d.erase ? THREE.MinEquation : THREE.MaxEquation
+    this.draw(this.dabMat, t)
+    this.dirty.add(id)
+  }
+
+  read(id: string): Uint8Array {
+    const size = this.bake.size
+    const data = new Uint8Array(size * size * 4)
+    const t = this.targets.get(id)
+    if (t) this.renderer.readRenderTargetPixels(t, 0, 0, size, size, data)
+    return data
+  }
+
+  write(id: string, data: Uint8Array, save = true) {
+    const size = this.bake.size
+    if (data.length !== size * size * 4) return
+    const t = this.targets.get(id) ?? this.create(id)
+    const src = new THREE.DataTexture(data, size, size, THREE.RGBAFormat)
+    src.needsUpdate = true
+    this.copyMat.uniforms.uSrc.value = src
+    this.draw(this.copyMat, t)
+    src.dispose()
+    if (save) this.changed(id)
+    this.onChange()
+  }
+
+  clone(from: string, to: string) {
+    if (!this.targets.has(from)) return
+    this.write(to, this.read(from))
+  }
+
+  // Saves strokes a moment after they end.
+  changed(id: string) {
+    this.dirty.add(id)
+    clearTimeout(this.saveTimer)
+    this.saveTimer = setTimeout(() => this.flush(), 400)
+  }
+
+  flush() {
+    clearTimeout(this.saveTimer)
+    for (const id of this.dirty) this.save(id, this.png(id))
+    this.dirty.clear()
+  }
+
+  private png(id: string): string {
+    const size = this.bake.size
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = size
+    const ctx = canvas.getContext('2d')!
+    // Opaque, so the canvas doesn't premultiply the values away.
+    const data = this.read(id)
+    for (let i = 3; i < data.length; i += 4) data[i] = 255
+    ctx.putImageData(new ImageData(new Uint8ClampedArray(data), size, size), 0, 0)
+    return canvas.toDataURL('image/png').split(',')[1]
+  }
+
+  private draw(material: THREE.ShaderMaterial, to: THREE.WebGLRenderTarget) {
+    const r = this.renderer
+    const prev = r.getRenderTarget()
+    const autoClear = r.autoClear
+    this.quad.material = material
+    material.uniformsNeedUpdate = true
+    // Dabs build on what is there, so no clear before drawing.
+    r.autoClear = false
+    r.setRenderTarget(to)
+    r.render(this.scene, this.camera)
+    r.setRenderTarget(prev)
+    r.autoClear = autoClear
+  }
+
+  dispose() {
+    this.flush()
+    for (const t of this.targets.values()) t.dispose()
+    this.dabMat.dispose()
+    this.copyMat.dispose()
+    this.quad.geometry.dispose()
+  }
+}
