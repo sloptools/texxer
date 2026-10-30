@@ -55,10 +55,12 @@ func serveCmd(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	addr := fs.String("addr", "localhost:7777", "listen address")
 	dir := fs.String("dir", ".", "directory with graph files")
+	// Layer stacks on models need a few GB to keep every step cached.
+	cache := fs.Int("cache", 3072, "render cache size in MB")
 	fs.Parse(args)
 
 	log.Printf("texxer on http://%s, graphs in %s", *addr, *dir)
-	return http.ListenAndServe(*addr, server.New(*dir, web.Dist()))
+	return http.ListenAndServe(*addr, server.New(*dir, web.Dist(), *cache<<20))
 }
 
 func renderCmd(args []string) error {

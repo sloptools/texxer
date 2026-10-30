@@ -16,11 +16,12 @@ type Server struct {
 	mux   *http.ServeMux
 }
 
-// New serves graphs from dir and the editor from static.
-func New(dir string, static fs.FS) *Server {
+// New serves graphs from dir and the editor from static, keeping up to
+// cacheBytes of rendered results so unchanged parts of a graph don't render again.
+func New(dir string, static fs.FS, cacheBytes int) *Server {
 	s := &Server{
 		dir:   dir,
-		cache: graph.NewCache(1 << 30),
+		cache: graph.NewCache(cacheBytes),
 		mux:   http.NewServeMux(),
 	}
 

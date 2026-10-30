@@ -17,6 +17,9 @@ type BakeOptions struct {
 	EdgeWidth   float64
 	CavityWidth float64
 	EdgeAngle   float64
+	// AORes caps the resolution AO is traced at; it is soft, so a lower
+	// resolution looks the same and is much faster. 0 traces at full size.
+	AORes int
 	// FixNormals turns normals around that point into the solid, for models
 	// with flipped faces. It can misjudge real interiors, so it is opt-in.
 	FixNormals bool
@@ -71,10 +74,12 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	positions := make([]Vec, n)
 	partID := make([]float32, n)
 
+	aos, flips := aoLookup(o, bvh, diag, samples)
+
 	results := make([][3]float64, len(samples))
 	parallel(len(samples), func(i int) {
 		s := samples[i]
-		ao, flipped := occlusion(bvh, s, o.AORays, o.AODist*diag, o.FixNormals)
+		ao, flipped := aos[i], flips[i]
 		if flipped {
 			samples[i].n = s.n.Scale(-1)
 		}
@@ -135,6 +140,50 @@ func Bake(m *Model, o BakeOptions) *Maps {
 
 	maps.pad(o.Padding)
 	return maps
+}
+
+// aoLookup returns AO and the flipped-normal verdict for each sample. Below
+// AORes, rays are traced from one sample per coarse texel and part, and the
+// others take its result; AO is soft, so this looks the same and is much
+// faster. Grouping by part keeps neighbouring islands of different parts apart.
+func aoLookup(o BakeOptions, bvh *BVH, diag float64, samples []sample) (ao []float64, flipped []bool) {
+	dist := o.AODist * diag
+	ao = make([]float64, len(samples))
+	flipped = make([]bool, len(samples))
+
+	scale := 1
+	if o.AORes > 0 {
+		for max(o.W, o.H)/(scale*2) >= o.AORes {
+			scale *= 2
+		}
+	}
+
+	type key struct{ cell, part int }
+	rep := map[key]int{}
+	var reps []int
+	owner := make([]int, len(samples))
+	for i, s := range samples {
+		x, y := s.texel%o.W/scale, s.texel/o.W/scale
+		k := key{y*o.W + x, s.part}
+		r, ok := rep[k]
+		if !ok {
+			r = len(reps)
+			rep[k] = r
+			reps = append(reps, i)
+		}
+		owner[i] = r
+	}
+
+	traced := make([]float64, len(reps))
+	flips := make([]bool, len(reps))
+	parallel(len(reps), func(r int) {
+		traced[r], flips[r] = occlusion(bvh, samples[reps[r]], o.AORays, dist, o.FixNormals)
+	})
+
+	for i, r := range owner {
+		ao[i], flipped[i] = traced[r], flips[r]
+	}
+	return ao, flipped
 }
 
 // rasterize finds the texels whose centers lie inside each triangle's UVs.

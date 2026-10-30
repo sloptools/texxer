@@ -1,11 +1,15 @@
 package nodes
 
 import (
+	"crypto/sha256"
+	"encoding/gob"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	stdcolor "image/color"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -29,6 +33,7 @@ var meshParams = []Param{
 	text("material", ""),
 	text("select", ""),
 	integer("ao_rays", 32, 0, 256),
+	integer("ao_res", 512, 0, 4096),
 	num("ao_dist", 0.15, 0.001, 1),
 	num("edge_width", 0.01, 0.0005, 0.2),
 	num("cavity_width", 0.015, 0.0005, 0.2),
@@ -67,6 +72,7 @@ func meshNode(e *graph.Env) (*img.Buffer, error) {
 		W: bw, H: bh,
 		Material:    p.String("material", ""),
 		AORays:      p.Int("ao_rays", 32),
+		AORes:       p.Int("ao_res", 512),
 		AODist:      p.Float("ao_dist", 0.15),
 		EdgeWidth:   p.Float("edge_width", 0.01),
 		CavityWidth: p.Float("cavity_width", 0.015),
@@ -84,6 +90,7 @@ func meshNode(e *graph.Env) (*img.Buffer, error) {
 	if err != nil {
 		return nil, err
 	}
+	bw, bh = maps.W, maps.H
 
 	w, h, t := e.Ctx.W, e.Ctx.H, e.Ctx.Tiling
 	for name, src := range map[string][]float32{
@@ -196,17 +203,32 @@ func modelParts(path string) ([]string, error) {
 	return lm.m.Parts, nil
 }
 
+// bakeCached returns a bake for opts, or a larger one with the same settings
+// if one is cached, since maps shrink cleanly and baking is slow. Bakes are
+// also kept on disk, so restarting the editor doesn't bake again.
 func bakeCached(path string, lm loadedModel, opts mesh.BakeOptions) (*mesh.Maps, error) {
-	key := fmt.Sprintf("%s|%+v", lm.key, opts)
+	sized := opts
+	sized.W, sized.H = 0, 0
+	family := fmt.Sprintf("%s|%+v", lm.key, sized)
+	key := fmt.Sprintf("%s|%dx%d", family, opts.W, opts.H)
 
 	bakesMu.Lock()
-	maps, ok := bakes[key]
+	var best *mesh.Maps
+	for k, m := range bakes {
+		if strings.HasPrefix(k, family+"|") && m.W >= opts.W && m.H >= opts.H && (best == nil || m.W < best.W) {
+			best = m
+		}
+	}
 	bakesMu.Unlock()
-	if ok {
-		return maps, nil
+	if best != nil {
+		return best, nil
 	}
 
-	maps = mesh.Bake(lm.m, opts)
+	maps, err := loadBake(key)
+	if err != nil {
+		maps = mesh.Bake(lm.m, opts)
+		saveBake(key, maps)
+	}
 
 	bakesMu.Lock()
 	defer bakesMu.Unlock()
@@ -217,6 +239,53 @@ func bakeCached(path string, lm loadedModel, opts mesh.BakeOptions) (*mesh.Maps,
 		bakeOrder = bakeOrder[1:]
 	}
 	return maps, nil
+}
+
+func bakeFile(key string) (string, error) {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256([]byte(key))
+	return filepath.Join(dir, "texxer", "bakes", hex.EncodeToString(sum[:16])+".gob"), nil
+}
+
+func loadBake(key string) (*mesh.Maps, error) {
+	path, err := bakeFile(key)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var m mesh.Maps
+	if err := gob.NewDecoder(f).Decode(&m); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// saveBake writes a bake to the cache dir; failing to is fine, it is only a cache.
+func saveBake(key string, m *mesh.Maps) {
+	path, err := bakeFile(key)
+	if err != nil || os.MkdirAll(filepath.Dir(path), 0o755) != nil {
+		return
+	}
+	tmp := path + ".tmp"
+	f, err := os.Create(tmp)
+	if err != nil {
+		return
+	}
+	err = gob.NewEncoder(f).Encode(m)
+	f.Close()
+	if err != nil {
+		os.Remove(tmp)
+		return
+	}
+	os.Rename(tmp, path)
 }
 
 // modelTexture resamples the model's texture to the bake size, nearest by default since such textures are often pixel art.
