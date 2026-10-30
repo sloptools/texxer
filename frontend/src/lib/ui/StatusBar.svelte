@@ -12,7 +12,6 @@
   ]
 
   const hover = $derived(store.hoverPart >= 0 ? store.model?.parts[store.hoverPart] || 'part ' + store.hoverPart : '')
-  const nextTheme = $derived(store.theme === null ? 'dark' : store.theme === 'dark' ? 'light' : null)
 </script>
 
 <footer>
@@ -38,7 +37,6 @@
   <span class="tools">
     <Seg value={store.view} options={views} onchange={(v) => (store.view = v)} />
     <button class:on={store.bloom} title="Bloom (⇧B)" onclick={() => (store.bloom = !store.bloom)}>bloom</button>
-    <button title="Switch theme" onclick={() => store.setTheme(nextTheme)}>theme: {store.theme ?? 'system'}</button>
     <button title="Shortcuts (?)" onclick={() => (store.help = true)}>?</button>
   </span>
 </footer>

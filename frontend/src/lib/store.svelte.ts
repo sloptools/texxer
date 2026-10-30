@@ -19,8 +19,6 @@ function persist(key: string, value: unknown) {
   } catch {}
 }
 
-type Theme = 'light' | 'dark' | null
-
 // Project edits are JSON snapshots; strokes keep the mask's pixels before and after.
 type Entry = { kind: 'project'; before: string; after: string } | { kind: 'paint'; id: string; before: Uint8Array; after: Uint8Array }
 
@@ -34,7 +32,6 @@ class Store {
   hoverPart = $state(-1)
   help = $state(false)
   message = $state('')
-  theme = $state<Theme>(load('theme', null))
   recent = $state<string[]>(load('recent', []))
   grungeMaps = $state<string[]>([])
   stampImages = $state<string[]>([])
@@ -314,13 +311,6 @@ class Store {
     } catch (e) {
       this.say(String(e))
     }
-  }
-
-  setTheme(theme: Theme) {
-    this.theme = theme
-    persist('theme', theme)
-    if (theme) document.documentElement.dataset.theme = theme
-    else delete document.documentElement.dataset.theme
   }
 }
 

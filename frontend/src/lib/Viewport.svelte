@@ -59,14 +59,10 @@
       s.render()
     }
     loop()
-
-    const media = matchMedia('(prefers-color-scheme: dark)')
-    const onScheme = () => background()
-    media.addEventListener('change', onScheme)
+    s.setBackground(getComputedStyle(container).backgroundColor)
 
     return () => {
       cancelAnimationFrame(frame)
-      media.removeEventListener('change', onScheme)
       input.dispose()
       compositor?.dispose()
       store.paint?.dispose()
@@ -85,11 +81,6 @@
       c.pickPalette(project.finish.count)
       c.finish(project)
     }, 150)
-  }
-
-  function background() {
-    // Wait a frame, so a theme switch has applied its CSS.
-    requestAnimationFrame(() => stage?.setBackground(getComputedStyle(container).backgroundColor))
   }
 
   // Model and bake, again when the texture size changes.
@@ -173,11 +164,6 @@
     const p = tools.pickedStamp
     if (!stage || tools.ghost) return
     stage.setOutline(p ? corners($state.snapshot(p)) : null, '#7fc4af')
-  })
-
-  $effect(() => {
-    store.theme
-    if (stage) background()
   })
 
   // Camera keys; layer keys live in the app.

@@ -4,7 +4,7 @@
 
   const cache = new Map<string, string>()
 
-  // The shape as a mask image, so it takes the text color in every theme.
+  // The shape as a mask image, so it takes the text color.
   function maskURL(shape: string): string {
     let url = cache.get(shape)
     if (url) return url

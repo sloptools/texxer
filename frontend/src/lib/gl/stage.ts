@@ -237,7 +237,7 @@ export class Stage {
     const bg = new THREE.Color(css)
     this.background = bg
     if (!this.game) this.scene.background = bg
-    this.gridColor = bg.clone().offsetHSL(0, 0, bg.getHSL({ h: 0, s: 0, l: 0 }).l > 0.5 ? -0.3 : 0.3)
+    this.gridColor = bg.clone().offsetHSL(0, 0, 0.3)
     if (this.grid) (this.grid.material as THREE.LineBasicMaterial).color.copy(this.gridColor)
   }
 
