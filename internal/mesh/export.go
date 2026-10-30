@@ -70,6 +70,9 @@ func WithTexture(glb, png []byte, material string) ([]byte, error) {
 		pbr["baseColorTexture"] = map[string]any{"index": tex}
 		// The baked texture is the full color; a tint would darken it.
 		delete(pbr, "baseColorFactor")
+		// Fully rough and not metallic: the look is in the texture, not in PBR highlights.
+		pbr["metallicFactor"], pbr["roughnessFactor"] = 0.0, 1.0
+		delete(pbr, "metallicRoughnessTexture")
 		used++
 	}
 	if used == 0 {

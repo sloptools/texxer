@@ -46,6 +46,21 @@ func TestWithTexture(t *testing.T) {
 		t.Error("texture pixels differ")
 	}
 
+	var doc map[string]any
+	if d, _, err := rawGLB(out); err == nil {
+		doc = d
+	}
+	for _, m := range doc["materials"].([]any) {
+		mat := m.(map[string]any)
+		if mat["name"] != "albedo" {
+			continue
+		}
+		pbr := mat["pbrMetallicRoughness"].(map[string]any)
+		if pbr["roughnessFactor"] != 1.0 || pbr["metallicFactor"] != 0.0 {
+			t.Errorf("painted material should be rough and not metallic: %v", pbr)
+		}
+	}
+
 	// The old texture's bytes are gone.
 	if len(out) > len(src) {
 		t.Errorf("export grew from %d to %d bytes with a tiny texture", len(src), len(out))

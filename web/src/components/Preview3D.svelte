@@ -8,6 +8,7 @@
   import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
   import { fileURL } from '../lib/api';
   import { editor } from '../lib/editor.svelte';
+  import { Stage } from '../lib/stage';
   import type { ModelRef, Pick } from '../lib/types';
 
   let {
@@ -46,6 +47,8 @@
   // Materials showing the rendered texture; emissive ones keep their own color.
   let textured: (THREE.MeshBasicMaterial | THREE.MeshLambertMaterial)[] = [];
   let lights: THREE.Group | undefined;
+  let stage: Stage | undefined;
+  let themeBackground: THREE.Color | undefined;
   let rendererRef: THREE.WebGLRenderer | undefined;
   let hovered = '';
   // State, so the paint overlay recomposes when a new render arrives.
@@ -69,19 +72,22 @@
     scene = new THREE.Scene();
     rendererRef = renderer;
 
-    // Like Substratum's hangar: teal ambient, a spot from above and a faint headlight from the camera.
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // The scene look (lights, beam, fog, grade) lives in the stage; the headlight rides on the camera.
+    stage = new Stage();
+    stage.apply(scene, undefined, false);
+    scene.add(stage.group);
     lights = new THREE.Group();
-    lights.add(new THREE.AmbientLight(new THREE.Color(0.25, 0.44, 0.51), 1.5));
-    const spot = new THREE.SpotLight(0xd8ecff, 40, 0, Math.PI / 5, 0.6, 1.2);
-    spot.position.set(0, 3, 0.4);
-    lights.add(spot, spot.target);
     lights.visible = false;
     scene.add(lights);
 
     const cam = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
     cam.position.set(2.2, 1.6, 2.2);
     camera = cam;
-    const headlight = new THREE.PointLight(0xfff2dd, 1.5, 0, 1.5);
+    // A faint headlight from the camera, like the ship's own lamp.
+    const headlight = new THREE.PointLight(0xfff2dd, 0.8, 0, 1.5);
     cam.add(headlight);
     lights.add(cam);
 
@@ -105,6 +111,8 @@
     const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.45, 0.4, 1);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
+    // The grade works on display colors, so it runs after the output pass.
+    composer.addPass(stage.grade);
 
     fit = (object) => {
       const box = new THREE.Box3().setFromObject(object);
@@ -116,6 +124,7 @@
       cam.near = radius / 100;
       cam.far = radius * 100;
       cam.updateProjectionMatrix();
+      stage?.fit(box);
     };
 
     const resize = new ResizeObserver(() => {
@@ -128,8 +137,10 @@
     });
     resize.observe(container);
 
+    const clock = new THREE.Clock();
     renderer.setAnimationLoop(() => {
       controls.update();
+      stage?.tick(clock.getElapsedTime());
       composer.render();
     });
 
@@ -212,7 +223,8 @@
       ctx.fillStyle = getComputedStyle(container).backgroundColor;
       ctx.fillRect(0, 0, 1, 1);
       const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-      target.background = new THREE.Color(r / 255, g / 255, b / 255).convertSRGBToLinear();
+      themeBackground = new THREE.Color(r / 255, g / 255, b / 255).convertSRGBToLinear();
+      if (!lit) target.background = themeBackground;
     });
     return () => cancelAnimationFrame(frame);
   });
@@ -309,6 +321,10 @@
   $effect(() => {
     const l = lit;
     if (lights) lights.visible = l;
+    if (scene && stage) {
+      stage.apply(scene, root, l);
+      if (!l && themeBackground) scene.background = themeBackground;
+    }
     if (rendererRef) {
       rendererRef.toneMapping = l ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
       rendererRef.toneMappingExposure = 1.1;
