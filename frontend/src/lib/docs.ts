@@ -7,7 +7,11 @@ const images = import.meta.glob('../../../docs/img/*.png', { query: '?url', impo
 export type Page = { id: string; title: string; html: string }
 
 function render(md: string): string {
-  return (marked.parse(md, { async: false }) as string).replace(/src="img\/([^"]+)"/g, (_, name) => `src="${images['../../../docs/img/' + name] ?? ''}"`)
+  // Decoded right away: WebKit can leave lazily decoded images blank in the scrolling page.
+  return (marked.parse(md, { async: false }) as string).replace(
+    /src="img\/([^"]+)"/g,
+    (_, name) => `loading="eager" decoding="sync" src="${images['../../../docs/img/' + name] ?? ''}"`,
+  )
 }
 
 export const pages: Page[] = Object.keys(files)
