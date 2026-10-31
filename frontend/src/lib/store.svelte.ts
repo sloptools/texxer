@@ -92,6 +92,8 @@ class Store {
     try {
       const info = await api.Open(path)
       this.project = info.project ? normalize(JSON.parse(info.project)) : newProject()
+      // Missing or shared UVs can't hold a painted texture, so new projects lay them out anew.
+      if (!info.project && info.overlap > 0.01) this.project.unwrap = this.project.size
       this.model = info
       // Baked light already shades the texture, like in the game.
       this.view = this.project.shading.on ? 'unlit' : 'lit'
@@ -146,9 +148,30 @@ class Store {
       this.paint?.write(e.id, e[side])
       return
     }
-    this.last = e[side]
-    this.project = JSON.parse(e[side])
+    // The layout stays: switching it moves the paint, which history doesn't.
+    const project = JSON.parse(e[side])
+    project.unwrap = this.project.unwrap
+    this.project = project
+    this.last = JSON.stringify(project)
     this.selected = Math.min(this.selected, this.project.layers.length - 1)
+  }
+
+  // Lays the UVs out for `to` (0: the model's own) and carries the painted masks over.
+  async setLayout(to: number) {
+    const model = this.model
+    const from = this.project.unwrap
+    if (!model || from === to) return
+    try {
+      await this.paint?.flush()
+      await api.MovePaint(model.path, from, to)
+    } catch (e) {
+      this.say(String(e))
+      return
+    }
+    // Strokes in history belong to the old layout.
+    this.past = this.past.filter((e) => e.kind !== 'paint')
+    this.future = this.future.filter((e) => e.kind !== 'paint')
+    this.project.unwrap = to
   }
 
   // Layers
@@ -305,7 +328,7 @@ class Store {
     const target = ask ? '' : load(key, '')
     try {
       const shot = this.snapshot()
-      const path = await api.Export(this.model.path, shot.color, shot.emissive, this.project.finish.glow, target)
+      const path = await api.Export(this.model.path, this.project.unwrap, shot.color, shot.emissive, this.project.finish.glow, target)
       if (!path) return
       persist(key, path)
       this.say('exported ' + path.split('/').pop())

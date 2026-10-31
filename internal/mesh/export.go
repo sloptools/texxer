@@ -117,7 +117,17 @@ func WithTexture(glb []byte, t Textures, material string) ([]byte, error) {
 		t.(map[string]any)["source"] = float64(imgIndex[intField(t, "source")])
 	}
 
+	doc["bufferViews"], doc["images"], doc["textures"], doc["samplers"] = views, images, textures, samplers
+	return writeGLB(doc, packBuffer(doc, data))
+}
+
+// packBuffer lays out the bytes of every buffer view still in use into one buffer,
+// dropping the others and renumbering references to them.
+func packBuffer(doc map[string]any, data [][]byte) []byte {
+	views := sliceArray(doc, "bufferViews")
 	accessors := sliceArray(doc, "accessors")
+	images := sliceArray(doc, "images")
+
 	usedView := map[int]bool{}
 	for _, list := range [][]any{accessors, images} {
 		for _, x := range list {
@@ -155,9 +165,9 @@ func WithTexture(glb []byte, t Textures, material string) ([]byte, error) {
 		out.WriteByte(0)
 	}
 
-	doc["bufferViews"], doc["images"], doc["textures"], doc["samplers"] = views, images, textures, samplers
+	doc["bufferViews"] = views
 	doc["buffers"] = []any{map[string]any{"byteLength": float64(out.Len())}}
-	return writeGLB(doc, out.Bytes())
+	return out.Bytes()
 }
 
 func rawGLB(data []byte) (map[string]any, []byte, error) {

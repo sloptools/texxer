@@ -20,8 +20,8 @@ export type Bake = {
   posData: Float32Array
 }
 
-export async function loadBake(path: string, size: number): Promise<Bake> {
-  const blob = await fetchBlob(`/bake?path=${encodeURIComponent(path)}&size=${size}`, 2)
+export async function loadBake(path: string, size: number, layout: number): Promise<Bake> {
+  const blob = await fetchBlob(`/bake?path=${encodeURIComponent(path)}&size=${size}&unwrap=${layout}`, 2)
   if (!blob) throw new Error('bake failed')
   const buf = await blob.arrayBuffer()
 

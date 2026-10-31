@@ -1,4 +1,6 @@
 <script lang="ts">
+  import * as api from '../../../wailsjs/go/main/App'
+  import type { main } from '../../../wailsjs/go/models'
   import { store } from '../store.svelte'
   import type { Finish } from '../types'
   import ColorField from './ColorField.svelte'
@@ -7,6 +9,16 @@
 
   const p = $derived(store.project)
   const sh = $derived(store.project.shading)
+
+  let stats = $state<main.UnwrapStats | null>(null)
+  $effect(() => {
+    const model = store.model
+    const layout = p.unwrap
+    stats = null
+    if (model && layout) api.Unwrap(model.path, layout).then((s) => (stats = s)).catch((e) => store.say(String(e)))
+  })
+
+  const sizeName = (s: number) => (s === 1024 ? '1k' : String(s))
 
   const palettes: [Finish['palette'], string][] = [
     ['none', 'none'],
@@ -19,6 +31,23 @@
 <div class="section">
   <div class="caps">texture</div>
   <Seg value={p.size} options={[[128, '128'], [256, '256'], [512, '512'], [1024, '1k']]} onchange={(v) => (p.size = v)} />
+  <div class="row">
+    <span>uv</span>
+    <span class="pair">
+      <button class:on={!p.unwrap} title="Paint on the model's own UVs" onclick={() => store.setLayout(0)}>model</button>
+      <button class:on={!!p.unwrap} title="Let texxer lay the UVs out: cut at hard edges, upright, one texel density" onclick={() => store.setLayout(p.unwrap || p.size)}>texxer</button>
+    </span>
+  </div>
+  {#if p.unwrap}
+    <div class="note">
+      {#if stats}{stats.charts} charts · {Math.round(stats.fill * 100)}% filled · {Math.round(stats.density)} px/m{:else}laying out…{/if}
+    </div>
+    {#if p.unwrap !== p.size}
+      <button class="wide" onclick={() => store.setLayout(p.size)}>lay out for {sizeName(p.size)} <span>now {sizeName(p.unwrap)}</span></button>
+    {/if}
+  {:else if store.model && store.model.overlap > 0.01}
+    <div class="note warn">{store.model.overlap >= 1 ? 'the model has no UVs' : `${Math.round(store.model.overlap * 100)}% of the UVs overlap`}</div>
+  {/if}
 </div>
 
 <div class="section">
@@ -105,5 +134,29 @@
   button.on {
     border-color: var(--accent);
     color: var(--accent);
+  }
+
+  .pair {
+    display: flex;
+    gap: 4px;
+  }
+  .note {
+    font: 11px var(--mono);
+    color: var(--faint);
+  }
+  .note.warn {
+    color: var(--accent);
+  }
+  .wide {
+    display: flex;
+    justify-content: space-between;
+    height: 24px;
+    color: var(--dim);
+  }
+  .wide:hover {
+    color: var(--strong);
+  }
+  .wide span {
+    color: var(--faint);
   }
 </style>

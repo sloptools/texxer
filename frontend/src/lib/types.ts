@@ -111,6 +111,8 @@ export type Light = {
 export type Project = {
   version: 1
   size: number
+  // The texture size texxer laid the UVs out for; 0 paints on the model's own UVs.
+  unwrap: number
   layers: Layer[]
   groups: Group[]
   finish: Finish

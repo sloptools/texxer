@@ -44,6 +44,7 @@ export function newProject(): Project {
   return {
     version: 1,
     size: 512,
+    unwrap: 0,
     layers: [
       newLayer('base', '#6b6a62'),
       newLayer('dirt', '#4a4234', [newMask('gradient')], { opacity: 0.8 }),

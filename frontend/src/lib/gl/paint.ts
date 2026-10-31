@@ -57,7 +57,7 @@ export class PaintStore {
     private renderer: THREE.WebGLRenderer,
     private bake: Bake,
     private url: (id: string) => string,
-    private save: (id: string, png: string) => void,
+    private save: (id: string, png: string) => Promise<unknown>,
   ) {
     this.dabMat = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
@@ -183,10 +183,11 @@ export class PaintStore {
     this.saveTimer = setTimeout(() => this.flush(), 400)
   }
 
-  flush() {
+  async flush() {
     clearTimeout(this.saveTimer)
-    for (const id of this.dirty) this.save(id, this.png(id))
+    const saves = [...this.dirty].map((id) => this.save(id, this.png(id)))
     this.dirty.clear()
+    await Promise.all(saves)
   }
 
   private png(id: string): string {

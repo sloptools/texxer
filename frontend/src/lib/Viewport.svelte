@@ -101,11 +101,12 @@
   $effect(() => {
     const s = stage
     const model = store.model
+    const layout = store.project.unwrap
     if (!s || !model) return
 
     let cancelled = false
     store.baking = true
-    Promise.all([s.load(`/model?path=${encodeURIComponent(model.path)}`), loadBake(model.path, size * factor)])
+    Promise.all([s.load(`/model?path=${encodeURIComponent(model.path)}&unwrap=${layout}`), loadBake(model.path, size * factor, layout)])
       .then(([, bake]) => {
         if (cancelled) return
         compositor?.dispose()

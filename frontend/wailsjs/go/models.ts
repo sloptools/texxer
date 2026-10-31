@@ -8,6 +8,7 @@ export namespace main {
 	    min: number[];
 	    diag: number;
 	    project: string;
+	    overlap: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModelInfo(source);
@@ -22,6 +23,23 @@ export namespace main {
 	        this.min = source["min"];
 	        this.diag = source["diag"];
 	        this.project = source["project"];
+	        this.overlap = source["overlap"];
+	    }
+	}
+	export class UnwrapStats {
+	    charts: number;
+	    fill: number;
+	    density: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new UnwrapStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.charts = source["charts"];
+	        this.fill = source["fill"];
+	        this.density = source["density"];
 	    }
 	}
 

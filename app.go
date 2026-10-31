@@ -14,6 +14,7 @@ import (
 	"texxer/internal/grunge"
 	"texxer/internal/mesh"
 	"texxer/internal/palette"
+	"texxer/internal/unwrap"
 )
 
 type App struct {
@@ -45,6 +46,8 @@ type ModelInfo struct {
 	Diag   float64    `json:"diag"`
 	// Project is the saved project JSON next to the model, empty if there is none.
 	Project string `json:"project"`
+	// Overlap is the share of the model's own UV space used more than once; 1 without UVs.
+	Overlap float64 `json:"overlap"`
 }
 
 func (a *App) PickModel() (string, error) {
@@ -63,12 +66,13 @@ func (a *App) Open(path string) (*ModelInfo, error) {
 	size := m.Max.Sub(m.Min)
 	diag := max(size.Len(), 1e-9)
 	info := &ModelInfo{
-		Path:   path,
-		Name:   strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
-		Parts:  m.Parts,
-		Extent: [3]float64{size[0] / diag, size[1] / diag, size[2] / diag},
-		Min:    m.Min,
-		Diag:   diag,
+		Path:    path,
+		Name:    strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
+		Parts:   m.Parts,
+		Extent:  [3]float64{size[0] / diag, size[1] / diag, size[2] / diag},
+		Min:     m.Min,
+		Diag:    diag,
+		Overlap: unwrap.Overlap(m.Tris, 256),
 	}
 
 	data, err := os.ReadFile(projectPath(path))
@@ -202,7 +206,7 @@ func (a *App) Palette(kind string) ([][3]uint8, error) {
 // Export writes the textures as PNGs and the model with them as a GLB. An
 // empty target asks where to put it, an empty emissive leaves it out. It
 // returns the GLB path, empty when cancelled.
-func (a *App) Export(modelPath, pngBase64, emissiveBase64 string, emissiveStrength float64, target string) (string, error) {
+func (a *App) Export(modelPath string, layout int, pngBase64, emissiveBase64 string, emissiveStrength float64, target string) (string, error) {
 	if target == "" {
 		name := strings.TrimSuffix(filepath.Base(modelPath), filepath.Ext(modelPath)) + "_texxer.glb"
 		var err error
@@ -227,7 +231,7 @@ func (a *App) Export(modelPath, pngBase64, emissiveBase64 string, emissiveStreng
 			return "", err
 		}
 	}
-	glb, err := os.ReadFile(modelPath)
+	glb, err := a.models.glb(modelPath, layout)
 	if err != nil {
 		return "", err
 	}
