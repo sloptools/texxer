@@ -11,12 +11,13 @@ import { game, gameDeclarations, gamePatch, gameUniforms, gradePass } from './ga
 import { Flat } from './flat'
 import { Torch, torchDeclarations } from './torch'
 
-export type Hit = { point: THREE.Vector3; normal: THREE.Vector3; part: number }
+export type Hit = { point: THREE.Vector3; normal: THREE.Vector3; part: number; island: number }
 
 // Our textures hold display colors; materials decode them so lighting works in linear.
 const decode = /* glsl */ `
 uniform sampler2D uPosMap;
 uniform float uHover;
+uniform float uHoverIsland;
 uniform sampler2D uEmitMap;
 uniform float uEmit;
 vec3 srgbDecode(vec3 c) {
@@ -28,6 +29,7 @@ const patch = /* glsl */ `
 #include <map_fragment>
 diffuseColor.rgb = srgbDecode(diffuseColor.rgb);
 if (uHover >= 0.0 && abs(texture(uPosMap, vMapUv).w - uHover) < 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 1.0, 0.95), 0.18);
+if (uHoverIsland >= 0.0 && abs(texture(uNrmMap, vMapUv).w - uHoverIsland) < 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 1.0, 0.95), 0.18);
 `
 
 // Glow from the emissive map: the lit material adds it as emission, the
@@ -77,6 +79,7 @@ export class Stage {
   private shared = {
     uPosMap: { value: null as THREE.Texture | null },
     uHover: { value: -1 },
+    uHoverIsland: { value: -1 },
     uEmitMap: { value: null as THREE.Texture | null },
     uEmit: { value: 0 },
   }
@@ -96,6 +99,7 @@ export class Stage {
   )
 
   posData: Float32Array | undefined
+  nrmData: Float32Array | undefined
   posSize = 0
 
   constructor(private container: HTMLElement) {
@@ -309,8 +313,9 @@ export class Stage {
     this.shared.uEmit.value = texture ? strength : 0
   }
 
-  setHover(part: number) {
+  setHover(part: number, island = -1) {
     this.shared.uHover.value = part
+    this.shared.uHoverIsland.value = island
     this.flat.setHover(part)
   }
 
@@ -332,14 +337,16 @@ export class Stage {
     if (!hit) return
 
     let part = -1
+    let island = -1
     if (hit.uv && this.posData && this.textured.includes(hit.object as THREE.Mesh)) {
       const s = this.posSize
       const px = Math.min(s - 1, Math.max(0, Math.floor(hit.uv.x * s)))
       const py = Math.min(s - 1, Math.max(0, Math.floor(hit.uv.y * s)))
       part = this.posData[(py * s + px) * 4 + 3]
+      island = this.nrmData?.[(py * s + px) * 4 + 3] ?? -1
     }
     const normal = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3(0, 1, 0)
-    return { point: hit.point, normal, part }
+    return { point: hit.point, normal, part, island }
   }
 
   // Casts from above p back down along -n, so points off a curved surface land on it.
@@ -352,7 +359,7 @@ export class Stage {
     this.raycaster.far = Infinity
     if (!hit) return
     const normal = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : n.clone()
-    return { point: hit.point, normal, part: -1 }
+    return { point: hit.point, normal, part: -1, island: -1 }
   }
 
   frame() {

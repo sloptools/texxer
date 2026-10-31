@@ -52,6 +52,13 @@
       {/each}
     </div>
     <p class="hint">click parts in the view to add or remove them</p>
+  {:else if mask.kind === 'islands'}
+    <div class="row">
+      <span class="hint">{mask.islands.length} {mask.islands.length === 1 ? 'island' : 'islands'} · click surfaces in the view</span>
+      {#if mask.islands.length}
+        <button class="text" title="Remove all islands" onclick={() => (mask.islands = [])}>clear</button>
+      {/if}
+    </div>
   {:else}
     {#if mask.kind === 'paint'}
       <p class="hint">paint it with the brush (B)</p>
@@ -190,6 +197,11 @@
     image-rendering: pixelated;
   }
 
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
   .hint {
     margin: 0;
     font-size: 11px;

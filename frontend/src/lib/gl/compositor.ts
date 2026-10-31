@@ -6,7 +6,7 @@ import { StampAtlas, atlasGrid, atlasInset } from './atlas'
 import type { PaintStore } from './paint'
 import { fetchBlob, imageURL } from '../assets'
 import { medianCut, type RGB } from './mediancut'
-import { blendIndex, finishFragment, kindIndex, layerFragment, lightFragment, maxMasks, maxStamps, quadVertex, reduceFragment } from './shaders'
+import { blendIndex, finishFragment, kindIndex, layerFragment, lightFragment, maxIslands, maxMasks, maxStamps, quadVertex, reduceFragment } from './shaders'
 
 // Where the model sits: bake positions are (p - min) / diag.
 export type ModelFrame = { min: number[]; diag: number; extent: number[] }
@@ -16,8 +16,9 @@ export type Bake = {
   geo: THREE.DataTexture
   pos: THREE.DataTexture
   nrm: THREE.DataTexture
-  // CPU copy of the position map, for picking parts.
+  // CPU copies of the position and normal maps, for picking parts and islands.
   posData: Float32Array
+  nrmData: Float32Array
 }
 
 export async function loadBake(path: string, size: number, layout: number): Promise<Bake> {
@@ -32,7 +33,7 @@ export async function loadBake(path: string, size: number, layout: number): Prom
     t.needsUpdate = true
     return t
   }
-  return { size, geo: texture(0), pos: texture(1), nrm: texture(2), posData: new Float32Array(buf, n * 4, n) }
+  return { size, geo: texture(0), pos: texture(1), nrm: texture(2), posData: new Float32Array(buf, n * 4, n), nrmData: new Float32Array(buf, 2 * n * 4, n) }
 }
 
 // With mipmaps, the finished texture is sampled like Godot's nearest_mipmap filter,
@@ -77,8 +78,8 @@ export class Compositor {
   private layerMat: THREE.ShaderMaterial
   private finishMat: THREE.ShaderMaterial
 
-  // Row per layer mask: 1 for every part the mask selects.
   private parts = new THREE.DataTexture(new Uint8Array(256 * 256), 256, 256, THREE.RedFormat)
+  private islands = new THREE.DataTexture(new Uint8Array(maxIslands * 256), maxIslands, 256, THREE.RedFormat)
   private palette = new THREE.DataTexture(new Uint8Array(256 * 4), 256, 1, THREE.RGBAFormat)
 
   private atlas = new StampAtlas()
@@ -126,6 +127,7 @@ export class Compositor {
         uPos: { value: bake.pos },
         uNrm: { value: bake.nrm },
         uParts: { value: this.parts },
+        uIslands: { value: this.islands },
         uExtent: { value: new THREE.Vector3(...model.extent) },
         uColor: { value: new THREE.Color() },
         uTone: { value: 0 },
@@ -369,16 +371,21 @@ export class Compositor {
     u.uSN.value[j].set(f.n.x, f.n.y, f.n.z, this.atlas.cell(s.shape))
   }
 
+  // Rows per layer mask: 1 for every part or island the mask selects.
   private fillParts(project: Project) {
-    const data = this.parts.image.data as Uint8Array
-    data.fill(0)
+    const parts = this.parts.image.data as Uint8Array
+    const islands = this.islands.image.data as Uint8Array
+    parts.fill(0)
+    islands.fill(0)
     project.layers.slice(0, 256 / maxMasks).forEach((layer, li) => {
       layer.masks.slice(0, maxMasks).forEach((m, mi) => {
-        const row = (li * maxMasks + mi) * 256
-        for (const p of m.parts) if (p >= 0 && p < 256) data[row + p] = 255
+        const row = li * maxMasks + mi
+        for (const p of m.parts) if (p >= 0 && p < 256) parts[row * 256 + p] = 255
+        for (const p of m.islands) if (p >= 0 && p < maxIslands) islands[row * maxIslands + p] = 255
       })
     })
     this.parts.needsUpdate = true
+    this.islands.needsUpdate = true
   }
 
   private fillPalette(list: RGB[]): number {
@@ -409,6 +416,7 @@ export class Compositor {
     this.reduceMat.dispose()
     this.finishMat.dispose()
     this.parts.dispose()
+    this.islands.dispose()
     this.atlas.dispose()
     for (const t of this.grunges.values()) t.dispose()
     this.palette.dispose()

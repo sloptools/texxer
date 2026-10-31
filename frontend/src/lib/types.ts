@@ -1,4 +1,4 @@
-export type MaskKind = 'parts' | 'paint' | 'stamps' | 'grunge' | 'ao' | 'edges' | 'cavity' | 'gradient' | 'facing' | 'noise'
+export type MaskKind = 'parts' | 'islands' | 'paint' | 'stamps' | 'grunge' | 'ao' | 'edges' | 'cavity' | 'gradient' | 'facing' | 'noise'
 export type Blend = 'normal' | 'multiply' | 'add' | 'overlay' | 'relief'
 export type Axis = 0 | 1 | 2
 
@@ -29,6 +29,8 @@ export type Mask = {
   axis: Axis
   seed: number
   parts: number[]
+  // Surfaces bounded by hard edges, numbered largest first.
+  islands: number[]
   // Painted masks keep their pixels in a PNG under this id.
   paint: string
   stamps: Stamp[]
@@ -133,5 +135,5 @@ export type FlatMap = 'texture' | 'mask' | 'glow' | 'ao' | 'edges' | 'cavity' | 
 
 export type Tool = 'nav' | 'brush' | 'stamp'
 
-export const maskKinds: MaskKind[] = ['parts', 'paint', 'stamps', 'grunge', 'ao', 'edges', 'cavity', 'gradient', 'facing', 'noise']
+export const maskKinds: MaskKind[] = ['parts', 'islands', 'paint', 'stamps', 'grunge', 'ao', 'edges', 'cavity', 'gradient', 'facing', 'noise']
 export const blends: Blend[] = ['normal', 'multiply', 'add', 'overlay', 'relief']

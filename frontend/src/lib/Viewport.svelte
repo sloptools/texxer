@@ -32,7 +32,8 @@
       if (tools.tool !== 'nav') return
       const hit = s.hit(e.clientX, e.clientY)
       if (!hit || hit.part < 0) return
-      if (e.metaKey || store.layer?.masks.some((m) => m.kind === 'parts')) store.togglePart(hit.part)
+      if (store.picksIslands || (e.metaKey && e.shiftKey)) store.toggleIsland(hit.island)
+      else if (e.metaKey || store.layer?.masks.some((m) => m.kind === 'parts')) store.togglePart(hit.part)
     }
 
     const onMove = (e: PointerEvent) => {
@@ -69,6 +70,7 @@
       if (hoverPoint && !store.flat) {
         const hit = s.hit(hoverPoint.x, hoverPoint.y)
         store.hoverPart = hit?.part ?? -1
+        store.hoverIsland = hit?.island ?? -1
         s.torch.aimAt(hit?.point)
       }
       s.render()
@@ -123,6 +125,7 @@
         const c = new Compositor(s.renderer, bake, model, paint, factor)
         c.onLoad = () => (dirty = true)
         s.posData = bake.posData
+        s.nrmData = bake.nrmData
         s.posSize = bake.size
         compositor = c
         store.snapshot = (variant) => {
@@ -195,7 +198,9 @@
   })
 
   $effect(() => {
-    stage?.setHover(tools.tool === 'nav' ? store.hoverPart : -1)
+    const nav = tools.tool === 'nav'
+    const islands = store.picksIslands
+    stage?.setHover(nav && !islands ? store.hoverPart : -1, nav && islands ? store.hoverIsland : -1)
   })
 
   $effect(() => {

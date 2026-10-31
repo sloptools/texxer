@@ -36,6 +36,7 @@ class Store {
   lines = $state(0)
   baking = $state(false)
   hoverPart = $state(-1)
+  hoverIsland = $state(-1)
   // The 2D view of the texture and its UV layout, instead of the model.
   flat = $state(false)
   flatMap = $state<FlatMap>('texture')
@@ -370,6 +371,25 @@ class Store {
     const i = m.parts.indexOf(part)
     if (i >= 0) m.parts.splice(i, 1)
     else m.parts.push(part)
+  }
+
+  // Clicks pick islands while the selected layer has an islands mask.
+  get picksIslands() {
+    return !!this.layer?.masks.some((m) => m.kind === 'islands')
+  }
+
+  // Toggles an island in the selected layer's islands mask, adding the mask if needed.
+  toggleIsland(island: number) {
+    const l = this.layer
+    if (!l || island < 0) return
+    let m = l.masks.find((m) => m.kind === 'islands')
+    if (!m) {
+      l.masks.unshift(newMask('islands'))
+      m = l.masks[0]
+    }
+    const i = m.islands.indexOf(island)
+    if (i >= 0) m.islands.splice(i, 1)
+    else m.islands.push(island)
   }
 
   // Finish and export

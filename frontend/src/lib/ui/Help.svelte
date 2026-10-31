@@ -12,6 +12,7 @@
         ['⌥ two fingers', 'turn key light'],
         ['drag / ⇧ drag', 'orbit / pan'],
         ['⌘ click', 'add part to layer'],
+        ['⇧⌘ click', 'add island (surface up to hard edges)'],
       ],
     ],
     [

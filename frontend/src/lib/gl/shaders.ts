@@ -7,7 +7,10 @@ void main() {
 export const maxMasks = 4
 export const maxStamps = 96
 
-export const kindIndex = { parts: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, facing: 5, noise: 6, paint: 7, stamps: 8, grunge: 9 } as const
+export const kindIndex = { parts: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, facing: 5, noise: 6, paint: 7, stamps: 8, grunge: 9, islands: 10 } as const
+
+// Island ids a mask can select; smaller ones are too small to matter.
+export const maxIslands = 4096
 export const blendIndex = { normal: 0, multiply: 1, add: 2, overlay: 3, relief: 4 } as const
 
 // Light from direction l on normal n: 1 facing it, 0 away. Wrap lights half the
@@ -67,6 +70,7 @@ uniform sampler2D uGeo;
 uniform sampler2D uPos;
 uniform sampler2D uNrm;
 uniform sampler2D uParts;
+uniform sampler2D uIslands;
 uniform vec3 uExtent;
 uniform vec3 uColor;
 uniform float uTone;
@@ -185,6 +189,8 @@ float mask(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   float m;
   if (uKind[i] == 0) {
     m = texelFetch(uParts, ivec2(int(pos.w), int(uB[i].w)), 0).r;
+  } else if (uKind[i] == 10) {
+    m = texelFetch(uIslands, ivec2(int(texelFetch(uNrm, t, 0).w), int(uB[i].w)), 0).r;
   } else {
     float f = field(i, t, geo, pos, n);
     float rough = uA[i].z;

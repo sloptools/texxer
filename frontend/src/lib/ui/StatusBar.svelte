@@ -11,7 +11,13 @@
     ['mask', 'mask'],
   ]
 
-  const hover = $derived(store.hoverPart >= 0 ? store.model?.parts[store.hoverPart] || 'part ' + store.hoverPart : '')
+  const hover = $derived(
+    store.picksIslands && store.hoverIsland >= 0 && !store.flat
+      ? 'island ' + store.hoverIsland
+      : store.hoverPart >= 0
+        ? store.model?.parts[store.hoverPart] || 'part ' + store.hoverPart
+        : '',
+  )
 </script>
 
 <footer>
@@ -33,7 +39,7 @@
       {#if hover}<span>{hover}</span>{/if}
     {:else if hover && tools.tool === 'nav'}
       <span>{hover}</span>
-      <span class="faint">⌘click adds it to the layer</span>
+      <span class="faint">{store.picksIslands ? 'click adds or removes it' : '⌘click adds it to the layer, ⇧⌘click its island'}</span>
     {/if}
   </span>
 

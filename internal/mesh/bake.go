@@ -41,12 +41,14 @@ type Maps struct {
 	Diag     float64
 	// PartID holds (part index + 0.5) / 256 of the face that covers a texel.
 	PartID []float32
+	// Island holds the island of the face that covers a texel.
+	Island []float32
 }
 
 type sample struct {
-	texel    int
-	p, n, ng Vec
-	part     int
+	texel        int
+	p, n, ng     Vec
+	part, island int
 }
 
 // Bake rasterizes the model's UV layout and computes geometry maps per texel.
@@ -73,6 +75,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	normals := make([]Vec, n)
 	positions := make([]Vec, n)
 	partID := make([]float32, n)
+	island := make([]float32, n)
 
 	aos, flips := aoLookup(o, bvh, diag, samples)
 
@@ -104,6 +107,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 		normals[t] = normals[t].Add(s.n)
 		positions[t] = positions[t].Add(s.p)
 		partID[t] = (float32(s.part) + 0.5) / 256
+		island[t] = float32(s.island)
 		sum.count[t]++
 	}
 
@@ -121,6 +125,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	maps.Up, maps.Height, maps.Part, maps.Selected = avg(sum.up), avg(sum.height), avg(sum.part), avg(sum.sel)
 
 	maps.PartID = partID
+	maps.Island = island
 	maps.Mask = make([]float32, n)
 	maps.Normal = make([]float32, n*3)
 	maps.Position = make([]float32, n*3)
@@ -223,7 +228,7 @@ func rasterize(m *Model, o BakeOptions) []sample {
 
 				p := t.P[0].Scale(b0).Add(t.P[1].Scale(b1)).Add(t.P[2].Scale(b2))
 				n := t.N[0].Scale(b0).Add(t.N[1].Scale(b1)).Add(t.N[2].Scale(b2)).Norm()
-				out = append(out, sample{y*o.W + x, p, n, ng, t.Part})
+				out = append(out, sample{y*o.W + x, p, n, ng, t.Part, t.Island})
 			}
 		}
 	}
@@ -309,6 +314,7 @@ func (m *Maps) pad(texels int) {
 
 				// Ids can't be averaged, so padding copies one neighbor.
 				m.PartID[i] = m.PartID[nb[0]]
+				m.Island[i] = m.Island[nb[0]]
 				for _, buf := range gray {
 					var s float32
 					for _, j := range nb {

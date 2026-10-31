@@ -5,6 +5,7 @@ export const uid = () => Date.now().toString(36) + (counter++).toString(36)
 
 const maskDefaults: Record<MaskKind, Partial<Mask>> = {
   parts: { amount: 1 },
+  islands: { amount: 1 },
   paint: { amount: 0.5 },
   stamps: { amount: 0.5 },
   grunge: { amount: 0.4, scale: 3, map: 'grunge_1' },
@@ -27,6 +28,7 @@ export function newMask(kind: MaskKind): Mask {
     axis: 1,
     seed: Math.floor(Math.random() * 1000),
     parts: [],
+    islands: [],
     paint: kind === 'paint' ? uid() : '',
     stamps: [],
     map: '',

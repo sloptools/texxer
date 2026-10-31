@@ -55,6 +55,9 @@ func (c *modelCache) get(path string) (*mesh.Model, error) {
 	if err != nil {
 		return nil, err
 	}
+	for i, id := range unwrap.Islands(m.Tris) {
+		m.Tris[i].Island = id
+	}
 	c.models[path] = cachedModel{st.ModTime().UnixNano(), m}
 	return m, nil
 }
@@ -106,7 +109,7 @@ func (c *modelCache) unwrap(path string, size int) (*unwrapped, error) {
 // bake returns three float32 RGBA maps of size×size texels, back to back:
 // AO, convex edges, concave cavity, coverage;
 // position (p - min) / diagonal, part index;
-// normal, unused.
+// normal, island.
 func (c *modelCache) bake(path string, size, layout int) ([]byte, error) {
 	m, err := c.model(path, layout)
 	if err != nil {
@@ -146,7 +149,7 @@ func (c *modelCache) bake(path string, size, layout int) ([]byte, error) {
 			put(2, i, k, maps.Normal[i*3+k]*2-1)
 		}
 		put(1, i, 3, float32(math.Floor(float64(maps.PartID[i]*256))))
-		put(2, i, 3, 1)
+		put(2, i, 3, maps.Island[i])
 	}
 
 	c.bakes[key] = out

@@ -4,6 +4,7 @@ package unwrap
 
 import (
 	"math"
+	"slices"
 
 	"texxer/internal/mesh"
 )
@@ -103,4 +104,39 @@ func Overlap(tris []mesh.Tri, size int) float64 {
 		return 1
 	}
 	return float64(twice) / float64(covered)
+}
+
+// Islands numbers the model's surfaces bounded by hard edges, per face, largest first.
+func Islands(tris []mesh.Tri) []int {
+	g := newGeometry(tris)
+	all := make([]int, len(tris))
+	for i := range all {
+		all[i] = i
+	}
+	islands := g.charts(all, 180, Defaults(0).Sharp)
+
+	area := func(faces []int) float64 {
+		a := 0.0
+		for _, f := range faces {
+			a += g.area[f]
+		}
+		return a
+	}
+	slices.SortStableFunc(islands, func(a, b []int) int {
+		if area(a) > area(b) {
+			return -1
+		}
+		if area(a) < area(b) {
+			return 1
+		}
+		return 0
+	})
+
+	ids := make([]int, len(tris))
+	for id, faces := range islands {
+		for _, f := range faces {
+			ids[f] = id
+		}
+	}
+	return ids
 }

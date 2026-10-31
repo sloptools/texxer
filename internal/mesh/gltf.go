@@ -22,6 +22,8 @@ type Tri struct {
 	Part int
 	// Material is the glTF material name.
 	Material string
+	// Island numbers the surface the face belongs to, bounded by hard edges.
+	Island int
 }
 
 type Model struct {
