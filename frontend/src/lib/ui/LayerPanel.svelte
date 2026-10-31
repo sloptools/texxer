@@ -5,6 +5,7 @@
   import MaskCard from './MaskCard.svelte'
   import Seg from './Seg.svelte'
   import Slider from './Slider.svelte'
+  import HelpLink from './HelpLink.svelte'
 
   const layer = $derived(store.layer)
   const look = $derived(layer && store.look(layer))
@@ -45,13 +46,13 @@
   </div>
 
   <div class="section">
-    <div class="caps">blend</div>
+    <div class="caps">blend <HelpLink page="layers" /></div>
     <Seg value={layer.blend} options={blends.map((b) => [b, b.slice(0, 4)])} onchange={(v) => (layer.blend = v)} />
     <Slider label="opacity" bind:value={look.opacity} def={1} />
   </div>
 
   <div class="section">
-    <div class="caps">masks</div>
+    <div class="caps">masks <HelpLink page="masks" /></div>
     {#each layer.masks as mask, i (i + mask.kind + layer.id)}
       <MaskCard {mask} parts={store.model?.parts ?? []} onremove={() => layer.masks.splice(i, 1)} />
     {/each}

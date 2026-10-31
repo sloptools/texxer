@@ -6,6 +6,7 @@
   import ColorField from './ColorField.svelte'
   import Seg from './Seg.svelte'
   import Slider from './Slider.svelte'
+  import HelpLink from './HelpLink.svelte'
 
   const p = $derived(store.project)
   const sh = $derived(store.project.shading)
@@ -29,7 +30,7 @@
 </script>
 
 <div class="section">
-  <div class="caps">texture <span class="of">{store.project.name}</span></div>
+  <div class="caps">texture <span class="of">{store.project.name}</span> <HelpLink page="uv" /></div>
   <Seg value={p.size} options={[[128, '128'], [256, '256'], [512, '512'], [1024, '1k']]} onchange={(v) => (p.size = v)} />
   <div class="row">
     <span>uv</span>
@@ -51,7 +52,7 @@
 </div>
 
 <div class="section">
-  <div class="caps">crunch <span class="of">all models</span></div>
+  <div class="caps">crunch <span class="of">all models</span> <HelpLink page="look" /></div>
   <Seg value={p.finish.supersample} options={[[1, '1×'], [2, '2×'], [4, '4×']]} onchange={(v) => (p.finish.supersample = v)} />
   <Slider label="sharpen" bind:value={p.finish.sharpen} max={2} def={0.2} />
   <Seg value={p.finish.palette} options={palettes} onchange={(v) => store.setPalette(v)} />

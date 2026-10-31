@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '../Icon.svelte'
   import { store } from '../store.svelte'
+  import HelpLink from './HelpLink.svelte'
 
   let renaming = $state('')
 
@@ -40,6 +41,7 @@
     {/if}
   {/each}
   <button class="add" title="New variant, like a player color" onclick={() => store.addVariant()}><Icon name="plus" size={11} /></button>
+  <HelpLink page="variants" />
 </div>
 
 <style>

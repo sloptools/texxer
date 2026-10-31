@@ -53,6 +53,8 @@ class Store {
   flatUV = $state(true)
   hoverTexel = $state<[number, number] | null>(null)
   help = $state(false)
+  helpTab = $state<'docs' | 'shortcuts'>('shortcuts')
+  helpPage = $state('')
   message = $state('')
   grungeMaps = $state<string[]>([])
   stampImages = $state<string[]>([])
@@ -89,6 +91,13 @@ class Store {
         this.saveTimer = setTimeout(() => api.SaveProject(path, json).catch((e) => this.say(String(e))), 600)
       })
     })
+  }
+
+  // Opens the docs at a page, from the ? buttons beside panels.
+  openDocs(page: string) {
+    this.helpTab = 'docs'
+    this.helpPage = page
+    this.help = true
   }
 
   say(text: string) {

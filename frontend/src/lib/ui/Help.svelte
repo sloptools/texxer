@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '../Icon.svelte'
   import { store } from '../store.svelte'
+  import Docs from './Docs.svelte'
 
   const groups: [string, [string, string][]][] = [
     [
@@ -77,27 +78,35 @@
         ['⌘E', 'export the model into its files'],
         ['⇧⌘E', 'export every changed model'],
         ['⌘Z ⇧⌘Z', 'undo, redo'],
+        ['? F1', 'shortcuts, docs'],
       ],
     ],
   ]
 </script>
 
 <div class="backdrop" onclick={() => (store.help = false)} role="presentation">
-  <div class="sheet" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Shortcuts" tabindex="-1" onkeydown={() => {}}>
+  <div class="sheet" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Help" tabindex="-1" onkeydown={() => {}}>
     <header>
-      <h2>Shortcuts</h2>
+      <span class="tabs">
+        <button class:on={store.helpTab === 'docs'} onclick={() => (store.helpTab = 'docs')}>docs</button>
+        <button class:on={store.helpTab === 'shortcuts'} onclick={() => (store.helpTab = 'shortcuts')}>shortcuts</button>
+      </span>
       <button class="close" onclick={() => (store.help = false)} aria-label="Close"><Icon name="x" size={11} /></button>
     </header>
-    <div class="grid">
-      {#each groups as [title, rows]}
-        <section>
-          <h3>{title}</h3>
-          {#each rows as [key, what]}
-            <div class="row"><kbd>{key}</kbd><span>{what}</span></div>
-          {/each}
-        </section>
-      {/each}
-    </div>
+    {#if store.helpTab === 'docs'}
+      <div class="body"><Docs /></div>
+    {:else}
+      <div class="grid">
+        {#each groups as [title, rows]}
+          <section>
+            <h3>{title}</h3>
+            {#each rows as [key, what]}
+              <div class="row"><kbd>{key}</kbd><span>{what}</span></div>
+            {/each}
+          </section>
+        {/each}
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -113,7 +122,10 @@
   }
 
   .sheet {
-    width: min(620px, calc(100vw - 32px));
+    display: flex;
+    flex-direction: column;
+    width: min(880px, calc(100vw - 32px));
+    height: min(680px, calc(100vh - 64px));
     border: 1px solid var(--line);
     border-radius: 10px;
     background: var(--panel);
@@ -122,6 +134,7 @@
   }
 
   header {
+    flex: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -129,11 +142,31 @@
     padding: 0 12px 0 20px;
     border-bottom: 1px solid var(--line);
   }
-  h2 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: var(--title-weight);
+  .tabs {
+    display: flex;
+    gap: 2px;
+  }
+  .tabs button {
+    height: 24px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    font: 500 11px var(--mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .tabs button:hover {
     color: var(--strong);
+  }
+  .tabs button.on {
+    background: var(--active);
+    color: var(--fg);
+  }
+  .body {
+    flex: 1;
+    min-height: 0;
   }
   .close {
     display: grid;
@@ -152,6 +185,7 @@
   }
 
   .grid {
+    overflow-y: auto;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 4px 24px;

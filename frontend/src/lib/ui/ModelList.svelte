@@ -2,6 +2,7 @@
   import Icon from '../Icon.svelte'
   import { addFiles, exportChanged, removeModel, selectModel, stateOf } from '../projects.svelte'
   import { store } from '../store.svelte'
+  import HelpLink from './HelpLink.svelte'
   import type { ModelDoc } from '../types'
   import type { ModelState } from '../workspace'
 
@@ -83,6 +84,7 @@
     <button class="wide" disabled={!pending} title="Export every model that was edited or whose files changed (⇧⌘E)" onclick={exportChanged}>
       export changed <span>{pending}</span>
     </button>
+    <HelpLink page="projects" />
   </div>
 {:else}
   <p class="hint">no models yet · add GLBs with + or drop them here</p>
@@ -188,12 +190,15 @@
   }
 
   .foot {
-    padding: 12px 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 8px 0 12px;
   }
   .wide {
     display: flex;
+    flex: 1;
     justify-content: space-between;
-    width: 100%;
     height: 28px;
     padding: 0 10px;
     border: 1px solid var(--line);

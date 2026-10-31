@@ -6,6 +6,7 @@
   import { tools } from '../tools.svelte'
   import ShapeTile from './ShapeTile.svelte'
   import Slider from './Slider.svelte'
+  import HelpLink from './HelpLink.svelte'
 
   // Sliders write here and pass changes on, so a picked stamp follows them.
   let size = $state(tools.stamp.size)
@@ -41,14 +42,14 @@
 
 {#if tools.tool === 'brush'}
   <div class="section">
-    <div class="caps">brush · {store.layer?.name}</div>
+    <div class="caps">brush · {store.layer?.name} <HelpLink page="brush-stamps" /></div>
     <Slider label="size" bind:value={tools.brush.size} min={0.002} max={0.3} step={0.001} digits={3} def={0.03} />
     <Slider label="hardness" bind:value={tools.brush.hard} def={0.7} />
     <p class="hint">paints into the layer's paint mask · [ ] size · ⌥ erases · ⇧click draws a line</p>
   </div>
 {:else if tools.tool === 'stamp'}
   <div class="section">
-    <div class="caps">{tools.picked ? 'stamp' : 'new stamp'} · {store.layer?.name}</div>
+    <div class="caps">{tools.picked ? 'stamp' : 'new stamp'} · {store.layer?.name} <HelpLink page="brush-stamps" /></div>
     <div class="shapes">
       {#each shapes as shape}
         <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={() => tools.setShape(shape)} />

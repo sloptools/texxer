@@ -214,6 +214,9 @@
         case 'PageDown':
           cycleModel(1)
           break
+        case 'F1':
+          store.openDocs(store.helpPage)
+          break
         case '?':
           store.help = true
           break
