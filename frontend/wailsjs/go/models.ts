@@ -2,13 +2,13 @@ export namespace main {
 	
 	export class ModelInfo {
 	    path: string;
-	    name: string;
 	    parts: string[];
 	    extent: number[];
 	    min: number[];
 	    diag: number;
-	    project: string;
 	    overlap: number;
+	    offsets: number[][];
+	    hash: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModelInfo(source);
@@ -17,13 +17,29 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
-	        this.name = source["name"];
 	        this.parts = source["parts"];
 	        this.extent = source["extent"];
 	        this.min = source["min"];
 	        this.diag = source["diag"];
-	        this.project = source["project"];
 	        this.overlap = source["overlap"];
+	        this.offsets = source["offsets"];
+	        this.hash = source["hash"];
+	    }
+	}
+	export class ProjectFile {
+	    path: string;
+	    json: string;
+	    model: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.json = source["json"];
+	        this.model = source["model"];
 	    }
 	}
 	export class UnwrapStats {

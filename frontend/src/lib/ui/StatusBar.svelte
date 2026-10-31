@@ -23,7 +23,7 @@
 <footer>
   <span class="info">
     {#if store.model}
-      <span class="strong">{store.model.name}</span>
+      <span class="strong">{store.project.name}</span>
       <span>{store.project.size}²</span>
       <span>{store.model.parts.length} parts</span>
     {/if}

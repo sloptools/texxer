@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { drawDecal, isDecal } from '../decals'
-import { fetchBlob } from '../assets'
+import { fetchBlob, track } from '../assets'
 import { drawShape } from '../shapes'
 
 const grid = 8
@@ -38,7 +38,7 @@ export class StampAtlas {
     const x = (i % grid) * cell
     const y = Math.floor(i / grid) * cell
     this.ctx.clearRect(x, y, cell, cell)
-    if (shape.startsWith('img:')) this.drawImage(shape.slice(4), x + pad, y + pad, cell - pad * 2)
+    if (shape.startsWith('img:')) track(this.drawImage(shape.slice(4), x + pad, y + pad, cell - pad * 2))
     else if (isDecal(shape)) drawDecal(this.ctx, shape, x + pad, y + pad, cell - pad * 2)
     else drawShape(this.ctx, shape, x + pad, y + pad, cell - pad * 2)
     this.texture.needsUpdate = true

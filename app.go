@@ -36,50 +36,47 @@ func (a *App) domReady(ctx context.Context) {
 }
 
 type ModelInfo struct {
+	// Path is the model key: its files joined by "|".
 	Path  string   `json:"path"`
-	Name  string   `json:"name"`
 	Parts []string `json:"parts"`
 	// Extent is the bounding box size divided by its diagonal. Bake
 	// positions are (p - Min) / Diag.
 	Extent [3]float64 `json:"extent"`
 	Min    [3]float64 `json:"min"`
 	Diag   float64    `json:"diag"`
-	// Project is the saved project JSON next to the model, empty if there is none.
-	Project string `json:"project"`
 	// Overlap is the share of the model's own UV space used more than once; 1 without UVs.
 	Overlap float64 `json:"overlap"`
+	// Offsets move each file into place beside the others.
+	Offsets [][3]float64 `json:"offsets"`
+	// Hash changes whenever one of the files does.
+	Hash string `json:"hash"`
 }
 
-func (a *App) PickModel() (string, error) {
-	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:   "Open model",
-		Filters: []runtime.FileFilter{{DisplayName: "glTF binary (*.glb)", Pattern: "*.glb"}},
-	})
-}
-
-func (a *App) Open(path string) (*ModelInfo, error) {
-	m, err := a.models.get(path)
+// Open loads the files of a model key, see keyPaths.
+func (a *App) Open(key string) (*ModelInfo, error) {
+	l, err := a.models.get(key)
+	if err != nil {
+		return nil, err
+	}
+	hash, err := fileHash(key)
 	if err != nil {
 		return nil, err
 	}
 
+	m := l.model
 	size := m.Max.Sub(m.Min)
 	diag := max(size.Len(), 1e-9)
 	info := &ModelInfo{
-		Path:    path,
-		Name:    strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
+		Path:    key,
 		Parts:   m.Parts,
 		Extent:  [3]float64{size[0] / diag, size[1] / diag, size[2] / diag},
 		Min:     m.Min,
 		Diag:    diag,
 		Overlap: unwrap.Overlap(m.Tris, 256),
+		Hash:    hash,
 	}
-
-	data, err := os.ReadFile(projectPath(path))
-	if err == nil {
-		info.Project = string(data)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
+	for _, o := range l.offsets {
+		info.Offsets = append(info.Offsets, [3]float64(o))
 	}
 	return info, nil
 }
@@ -144,37 +141,6 @@ func (a *App) GrungeMaps() []string {
 	return grunge.Names()
 }
 
-func (a *App) Save(modelPath, project string) error {
-	return os.WriteFile(projectPath(modelPath), []byte(project), 0o644)
-}
-
-func projectPath(model string) string {
-	return strings.TrimSuffix(model, filepath.Ext(model)) + ".texxer"
-}
-
-// Painted masks live as PNGs in a folder next to the project.
-func paintPath(model, id string) (string, error) {
-	if id == "" || strings.ContainsAny(id, `/\.`) {
-		return "", errors.New("bad paint id")
-	}
-	return filepath.Join(projectPath(model)+".paint", id+".png"), nil
-}
-
-func (a *App) SavePaint(modelPath, id, pngBase64 string) error {
-	path, err := paintPath(modelPath, id)
-	if err != nil {
-		return err
-	}
-	png, err := base64.StdEncoding.DecodeString(pngBase64)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, png, 0o644)
-}
-
 // Palette returns colors as 0..255 triplets: Quake's for "quake", otherwise
 // from a palette file the user picks. Empty when the dialog is cancelled.
 func (a *App) Palette(kind string) ([][3]uint8, error) {
@@ -210,24 +176,10 @@ type VariantTextures struct {
 	Emissive string `json:"emissive"`
 }
 
-// Export writes the textures as PNGs and the model with them as a GLB. An
-// empty target asks where to put it, an empty emissive leaves it out. Variants
-// get PNGs of their own beside the base one. It returns the GLB path, empty when cancelled.
-func (a *App) Export(modelPath string, layout int, pngBase64, emissiveBase64 string, variants []VariantTextures, emissiveStrength float64, target string) (string, error) {
-	if target == "" {
-		name := strings.TrimSuffix(filepath.Base(modelPath), filepath.Ext(modelPath)) + "_texxer.glb"
-		var err error
-		target, err = runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-			Title:            "Export model",
-			DefaultDirectory: filepath.Dir(modelPath),
-			DefaultFilename:  name,
-			Filters:          []runtime.FileFilter{{DisplayName: "glTF binary (*.glb)", Pattern: "*.glb"}},
-		})
-		if err != nil || target == "" {
-			return "", err
-		}
-	}
-
+// Export writes the textures into the model's files in place, and as PNGs beside the
+// first one, named after the model; variants get PNGs of their own. An empty emissive
+// leaves it out. It returns the files' new hash.
+func (a *App) Export(key string, layout int, name, pngBase64, emissiveBase64 string, variants []VariantTextures, emissiveStrength float64) (string, error) {
 	t := mesh.Textures{EmissiveStrength: emissiveStrength}
 	var err error
 	if t.Color, err = base64.StdEncoding.DecodeString(pngBase64); err != nil {
@@ -238,16 +190,20 @@ func (a *App) Export(modelPath string, layout int, pngBase64, emissiveBase64 str
 			return "", err
 		}
 	}
-	glb, err := a.models.glb(modelPath, layout)
-	if err != nil {
-		return "", err
-	}
-	out, err := withTexture(glb, t)
-	if err != nil {
-		return "", err
+
+	paths := keyPaths(key)
+	outs := make([][]byte, len(paths))
+	for i := range paths {
+		glb, err := a.models.glb(key, layout, i)
+		if err != nil {
+			return "", err
+		}
+		if outs[i], err = withTexture(glb, t); err != nil {
+			return "", err
+		}
 	}
 
-	base := strings.TrimSuffix(target, filepath.Ext(target))
+	base := filepath.Join(filepath.Dir(paths[0]), fileName(name))
 	if err := writePNGs(base, pngBase64, emissiveBase64); err != nil {
 		return "", err
 	}
@@ -256,7 +212,13 @@ func (a *App) Export(modelPath string, layout int, pngBase64, emissiveBase64 str
 			return "", err
 		}
 	}
-	return target, os.WriteFile(target, out, 0o644)
+	for i, p := range paths {
+		if err := os.WriteFile(p, outs[i], 0o644); err != nil {
+			return "", err
+		}
+	}
+	a.models.touch(key)
+	return fileHash(key)
 }
 
 // writePNGs writes base.png and, if there is one, base_emissive.png.

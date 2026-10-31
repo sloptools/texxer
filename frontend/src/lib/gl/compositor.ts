@@ -4,7 +4,7 @@ import { expand, frame } from '../stamps'
 import type { Layer, Project, Stamp } from '../types'
 import { StampAtlas, atlasGrid, atlasInset } from './atlas'
 import type { PaintStore } from './paint'
-import { fetchBlob, imageURL } from '../assets'
+import { fetchBlob, imageURL, track } from '../assets'
 import { medianCut, type RGB } from './mediancut'
 import { blendIndex, finishFragment, kindIndex, layerFragment, lightFragment, maxIslands, maxMasks, maxStamps, quadVertex, reduceFragment } from './shaders'
 
@@ -345,16 +345,22 @@ export class Compositor {
       const texture = new THREE.Texture()
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping
       texture.colorSpace = THREE.NoColorSpace
-      imageURL(`/grunge?name=${encodeURIComponent(name)}`).then((url) => {
-        if (!url) return
-        const img = new Image()
-        img.onload = () => {
-          texture.image = img
-          texture.needsUpdate = true
-          this.onLoad()
-        }
-        img.src = url
-      })
+      track(
+        imageURL(`/grunge?name=${encodeURIComponent(name)}`).then(
+          (url) =>
+            new Promise<void>((resolve) => {
+              if (!url) return resolve()
+              const img = new Image()
+              img.onload = img.onerror = () => {
+                texture.image = img
+                texture.needsUpdate = true
+                this.onLoad()
+                resolve()
+              }
+              img.src = url
+            }),
+        ),
+      )
       this.grunges.set(name, texture)
       t = texture
     }

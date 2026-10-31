@@ -6,6 +6,10 @@ export function Export(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['Export'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
+export function FileHashes(arg1) {
+  return window['go']['main']['App']['FileHashes'](arg1);
+}
+
 export function GrungeMaps() {
   return window['go']['main']['App']['GrungeMaps']();
 }
@@ -14,8 +18,16 @@ export function ImportStamps() {
   return window['go']['main']['App']['ImportStamps']();
 }
 
-export function MovePaint(arg1, arg2, arg3) {
-  return window['go']['main']['App']['MovePaint'](arg1, arg2, arg3);
+export function LoadProject(arg1) {
+  return window['go']['main']['App']['LoadProject'](arg1);
+}
+
+export function MovePaint(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['MovePaint'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
+export function NewProject() {
+  return window['go']['main']['App']['NewProject']();
 }
 
 export function Open(arg1) {
@@ -26,16 +38,20 @@ export function Palette(arg1) {
   return window['go']['main']['App']['Palette'](arg1);
 }
 
-export function PickModel() {
-  return window['go']['main']['App']['PickModel']();
+export function PickModels() {
+  return window['go']['main']['App']['PickModels']();
 }
 
-export function Save(arg1, arg2) {
-  return window['go']['main']['App']['Save'](arg1, arg2);
+export function PickProject() {
+  return window['go']['main']['App']['PickProject']();
 }
 
 export function SavePaint(arg1, arg2, arg3) {
   return window['go']['main']['App']['SavePaint'](arg1, arg2, arg3);
+}
+
+export function SaveProject(arg1, arg2) {
+  return window['go']['main']['App']['SaveProject'](arg1, arg2);
 }
 
 export function Stamps() {

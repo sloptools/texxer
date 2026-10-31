@@ -1,10 +1,11 @@
 import * as api from '../../wailsjs/go/main/App'
 import type { main } from '../../wailsjs/go/models'
 import type { PaintStore } from './gl/paint'
-import { newLayer, newMask, newProject, normalize, uid } from './project'
-import type { Finish, FlatMap, Group, Layer, LayerLook, MaskKind, Project, Variant, View } from './types'
+import { newLayer, newMask, newProject, uid } from './project'
+import type { Finish, FlatMap, Group, Layer, LayerLook, MaskKind, ModelDoc, Variant, View, Workspace } from './types'
+import { serializeWorkspace } from './workspace'
 
-function load<T>(key: string, fallback: T): T {
+export function load<T>(key: string, fallback: T): T {
   try {
     const v = localStorage.getItem('texxer.' + key)
     return v === null ? fallback : JSON.parse(v)
@@ -13,7 +14,7 @@ function load<T>(key: string, fallback: T): T {
   }
 }
 
-function persist(key: string, value: unknown) {
+export function persist(key: string, value: unknown) {
   try {
     localStorage.setItem('texxer.' + key, JSON.stringify(value))
   } catch {}
@@ -21,10 +22,19 @@ function persist(key: string, value: unknown) {
 
 // Project edits are JSON snapshots; strokes keep the mask's pixels before and after.
 type Entry = { kind: 'project'; before: string; after: string } | { kind: 'paint'; id: string; before: Uint8Array; after: Uint8Array }
+export type History = { past: Entry[]; future: Entry[]; last: string }
 
 class Store {
+  // The project file and what's in it; project is the model being painted.
+  path = $state('')
+  workspace = $state<Workspace | null>(null)
   model = $state<main.ModelInfo | null>(null)
-  project = $state<Project>(newProject())
+  project = $state<ModelDoc>({ ...newProject(), id: '', name: '', files: [] })
+  // Set by the viewport once the model's texture renders.
+  ready = $state(false)
+  // Hashes of each model's files, by model key, to tell which ones changed.
+  fileHashes = $state<Record<string, string>>({})
+  quickOpen = $state(false)
   selected = $state(0)
   // The variant being looked at and edited, '' for the base.
   variant = $state('')
@@ -44,7 +54,6 @@ class Store {
   hoverTexel = $state<[number, number] | null>(null)
   help = $state(false)
   message = $state('')
-  recent = $state<string[]>(load('recent', []))
   grungeMaps = $state<string[]>([])
   stampImages = $state<string[]>([])
 
@@ -52,9 +61,9 @@ class Store {
   snapshot: ((variant: string) => { color: string; emissive: string }) | null = null
   paint: PaintStore | null = null
 
-  private past: Entry[] = []
-  private future: Entry[] = []
-  private last = ''
+  past: Entry[] = []
+  future: Entry[] = []
+  last = ''
   private commitTimer = 0
   private saveTimer = 0
   private messageTimer = 0
@@ -71,11 +80,13 @@ class Store {
         const json = JSON.stringify(this.project)
         clearTimeout(this.commitTimer)
         this.commitTimer = setTimeout(() => this.commit(json), 250)
-
-        if (!this.model) return
+      })
+      $effect(() => {
+        if (!this.workspace || !this.path) return
+        const path = this.path
+        const json = serializeWorkspace(path, this.workspace)
         clearTimeout(this.saveTimer)
-        const path = this.model.path
-        this.saveTimer = setTimeout(() => api.Save(path, JSON.stringify(this.project, null, 2)).catch((e) => this.say(String(e))), 600)
+        this.saveTimer = setTimeout(() => api.SaveProject(path, json).catch((e) => this.say(String(e))), 600)
       })
     })
   }
@@ -84,32 +95,6 @@ class Store {
     this.message = text
     clearTimeout(this.messageTimer)
     this.messageTimer = setTimeout(() => (this.message = ''), 4000)
-  }
-
-  async pickModel() {
-    const path = await api.PickModel()
-    if (path) await this.open(path)
-  }
-
-  async open(path: string) {
-    try {
-      const info = await api.Open(path)
-      this.project = info.project ? normalize(JSON.parse(info.project)) : newProject()
-      // Missing or shared UVs can't hold a painted texture, so new projects lay them out anew.
-      if (!info.project && info.overlap > 0.01) this.project.unwrap = this.project.size
-      this.model = info
-      // Baked light already shades the texture, like in the game.
-      this.view = this.project.shading.on ? 'unlit' : 'lit'
-      this.selected = this.project.layers.length - 1
-      this.variant = ''
-      this.past = []
-      this.future = []
-      this.last = JSON.stringify(this.project)
-      this.recent = [path, ...this.recent.filter((p) => p !== path)].slice(0, 8)
-      persist('recent', this.recent)
-    } catch (e) {
-      this.say(String(e))
-    }
   }
 
   // History
@@ -125,6 +110,18 @@ class Store {
     if (json === this.last) return
     this.push({ kind: 'project', before: this.last, after: json })
     this.last = json
+  }
+
+  // Each model keeps its own history while another one is open.
+  takeHistory(): History {
+    this.commit(JSON.stringify(this.project))
+    return { past: this.past, future: this.future, last: this.last }
+  }
+
+  giveHistory(h: History | undefined) {
+    this.past = h?.past ?? []
+    this.future = h?.future ?? []
+    this.last = h?.last ?? JSON.stringify(this.project)
   }
 
   pushPaint(id: string, before: Uint8Array, after: Uint8Array) {
@@ -153,10 +150,14 @@ class Store {
       return
     }
     // The layout stays: switching it moves the paint, which history doesn't.
-    const project = JSON.parse(e[side])
-    project.unwrap = this.project.unwrap
-    this.project = project
-    this.last = JSON.stringify(project)
+    // Shared settings are changed in place, so every model keeps seeing them.
+    const p = JSON.parse(e[side])
+    const m = this.project
+    Object.assign(m.finish, p.finish)
+    Object.assign(m.shading, p.shading)
+    Object.assign(m.light, p.light)
+    Object.assign(m, { size: p.size, layers: p.layers, groups: p.groups, variants: p.variants })
+    this.last = JSON.stringify(m)
     this.selected = Math.min(this.selected, this.project.layers.length - 1)
   }
 
@@ -167,7 +168,7 @@ class Store {
     if (!model || from === to) return
     try {
       await this.paint?.flush()
-      await api.MovePaint(model.path, from, to)
+      await api.MovePaint(this.path, model.path, from, model.path, to, this.paintIds())
     } catch (e) {
       this.say(String(e))
       return
@@ -176,6 +177,10 @@ class Store {
     this.past = this.past.filter((e) => e.kind !== 'paint')
     this.future = this.future.filter((e) => e.kind !== 'paint')
     this.project.unwrap = to
+  }
+
+  paintIds(): string[] {
+    return this.project.layers.flatMap((l) => l.masks.filter((m) => m.kind === 'paint').map((m) => m.paint))
   }
 
   // Variants
@@ -405,25 +410,6 @@ class Store {
       if (!colors?.length) return
       this.project.finish.palette = kind
       this.project.finish.colors = colors
-    } catch (e) {
-      this.say(String(e))
-    }
-  }
-
-  async export(ask: boolean) {
-    if (!this.model || !this.snapshot) return
-    const key = 'export:' + this.model.path
-    const target = ask ? '' : load(key, '')
-    try {
-      const shot = this.snapshot('')
-      const variants = this.project.variants.map((v) => {
-        const s = this.snapshot!(v.id)
-        return { name: v.name, color: s.color, emissive: s.emissive }
-      })
-      const path = await api.Export(this.model.path, this.project.unwrap, shot.color, shot.emissive, variants, this.project.finish.glow, target)
-      if (!path) return
-      persist(key, path)
-      this.say('exported ' + path.split('/').pop())
     } catch (e) {
       this.say(String(e))
     }

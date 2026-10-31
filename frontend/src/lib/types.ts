@@ -130,6 +130,25 @@ export type Project = {
   light: Light
 }
 
+// A model in a project: its files (several share one texture) and what's painted on it.
+// The project's finish, shading and light are shared by all of its models.
+export type ModelDoc = Project & {
+  id: string
+  name: string
+  // Absolute in memory, relative to the project file on disk.
+  files: string[]
+  // What the last export wrote, to tell whether it needs another.
+  exported?: { doc: string; files: string }
+}
+
+export type Workspace = {
+  version: 2
+  finish: Finish
+  shading: Shading
+  light: Light
+  models: ModelDoc[]
+}
+
 export type View = 'lit' | 'unlit' | 'game' | 'mask'
 export type FlatMap = 'texture' | 'mask' | 'glow' | 'ao' | 'edges' | 'cavity' | 'parts'
 

@@ -183,12 +183,21 @@ export class Stage {
     return m
   }
 
-  async load(url: string) {
-    const gltf = await new GLTFLoader().loadAsync(url)
+  // Loads a model's files, each moved to its place beside the others.
+  async load(files: { url: string; offset: number[] }[]) {
+    const loader = new GLTFLoader()
+    const scenes = await Promise.all(files.map((f) => loader.loadAsync(f.url)))
     this.clear()
 
+    const root = new THREE.Group()
+    scenes.forEach((gltf, i) => {
+      gltf.scene.position.fromArray(files[i].offset)
+      root.add(gltf.scene)
+    })
+    root.updateMatrixWorld(true)
+
     const meshes: THREE.Mesh[] = []
-    gltf.scene.traverse((o) => {
+    root.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh)
     })
 
@@ -212,9 +221,9 @@ export class Stage {
     }
 
     this.flat.setMeshes(this.textured)
-    this.root = gltf.scene
-    this.scene.add(gltf.scene)
-    this.box.setFromObject(gltf.scene)
+    this.root = root
+    this.scene.add(root)
+    this.box.setFromObject(root)
     this.radius = this.box.getBoundingSphere(new THREE.Sphere()).radius
     this.torch.uniforms.uMin.value.copy(this.box.min)
     this.torch.uniforms.uDiag.value = this.box.getSize(new THREE.Vector3()).length()

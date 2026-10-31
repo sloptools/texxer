@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { fetchBlob } from '../assets'
+import { fetchBlob, track } from '../assets'
 import type { Bake } from './compositor'
 import { quadVertex } from './shaders'
 
@@ -101,7 +101,7 @@ export class PaintStore {
     let t = this.targets.get(id)
     if (!t) {
       t = this.create(id)
-      this.load(id)
+      track(this.load(id))
     }
     return t.texture
   }

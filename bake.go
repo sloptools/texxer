@@ -5,106 +5,12 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
-	"sync"
 
 	"texxer/internal/grunge"
 	"texxer/internal/mesh"
-	"texxer/internal/unwrap"
 )
-
-type modelCache struct {
-	mu        sync.Mutex
-	models    map[string]cachedModel
-	unwrapped map[string]*unwrapped
-	bakes     map[string][]byte
-}
-
-// unwrapped is a model laid out by texxer for a texture size, and its GLB.
-type unwrapped struct {
-	model *mesh.Model
-	glb   []byte
-	stats UnwrapStats
-}
-
-type cachedModel struct {
-	mtime int64
-	model *mesh.Model
-}
-
-func newModelCache() *modelCache {
-	return &modelCache{models: map[string]cachedModel{}, unwrapped: map[string]*unwrapped{}, bakes: map[string][]byte{}}
-}
-
-func (c *modelCache) get(path string) (*mesh.Model, error) {
-	st, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if m, ok := c.models[path]; ok && m.mtime == st.ModTime().UnixNano() {
-		return m.model, nil
-	}
-
-	m, err := mesh.LoadGLB(path)
-	if err != nil {
-		return nil, err
-	}
-	for i, id := range unwrap.Islands(m.Tris) {
-		m.Tris[i].Island = id
-	}
-	c.models[path] = cachedModel{st.ModTime().UnixNano(), m}
-	return m, nil
-}
-
-// model is the model with its own UVs for layout 0, else unwrapped for that texture size.
-func (c *modelCache) model(path string, layout int) (*mesh.Model, error) {
-	if layout == 0 {
-		return c.get(path)
-	}
-	u, err := c.unwrap(path, layout)
-	if err != nil {
-		return nil, err
-	}
-	return u.model, nil
-}
-
-func (c *modelCache) unwrap(path string, size int) (*unwrapped, error) {
-	m, err := c.get(path)
-	if err != nil {
-		return nil, err
-	}
-
-	key := fmt.Sprintf("%s|%p|%d", path, m, size)
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if u, ok := c.unwrapped[key]; ok {
-		return u, nil
-	}
-
-	glb, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	res := unwrap.Unwrap(m.Tris, unwrap.Defaults(size))
-	if glb, err = mesh.WithUVs(glb, res.UV); err != nil {
-		return nil, err
-	}
-
-	copied := *m
-	copied.Tris = slices.Clone(m.Tris)
-	for i := range copied.Tris {
-		copied.Tris[i].UV = res.UV[i]
-	}
-	u := &unwrapped{&copied, glb, UnwrapStats{res.Charts, res.Fill, res.Density}}
-	c.unwrapped[key] = u
-	return u, nil
-}
 
 // bake returns three float32 RGBA maps of size×size texels, back to back:
 // AO, convex edges, concave cavity, coverage;
@@ -167,17 +73,14 @@ func (a *App) middleware(next http.Handler) http.Handler {
 		layout, _ := strconv.Atoi(r.URL.Query().Get("unwrap"))
 		switch r.URL.Path {
 		case "/model":
-			w.Header().Set("Content-Type", "model/gltf-binary")
-			if layout == 0 {
-				http.ServeFile(w, r, path)
-				return
-			}
-			u, err := a.models.unwrap(path, layout)
+			file, _ := strconv.Atoi(r.URL.Query().Get("file"))
+			glb, err := a.models.glb(path, layout, file)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			w.Write(u.glb)
+			w.Header().Set("Content-Type", "model/gltf-binary")
+			w.Write(glb)
 
 		case "/grunge":
 			data, err := grunge.PNG(r.URL.Query().Get("name"))
@@ -197,7 +100,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 			http.ServeFile(w, r, filepath.Join(dir, filepath.Base(r.URL.Query().Get("name"))+".png"))
 
 		case "/paint":
-			file, err := paintPath(path, r.URL.Query().Get("id"))
+			file, err := paintPath(r.URL.Query().Get("project"), r.URL.Query().Get("id"))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return

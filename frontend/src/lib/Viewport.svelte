@@ -109,7 +109,11 @@
 
     let cancelled = false
     store.baking = true
-    Promise.all([s.load(`/model?path=${encodeURIComponent(model.path)}&unwrap=${layout}`), loadBake(model.path, size * factor, layout)])
+    store.ready = false
+    const project = store.path
+    const key = encodeURIComponent(model.path)
+    const files = model.offsets.map((offset, i) => ({ url: `/model?path=${key}&unwrap=${layout}&file=${i}`, offset }))
+    Promise.all([s.load(files), loadBake(model.path, size * factor, layout)])
       .then(([, bake]) => {
         if (cancelled) return
         compositor?.dispose()
@@ -117,8 +121,8 @@
         const paint = new PaintStore(
           s.renderer,
           bake,
-          (id) => `/paint?path=${encodeURIComponent(model.path)}&id=${id}`,
-          (id, png) => api.SavePaint(model.path, id, png).catch((e) => store.say(String(e))),
+          (id) => `/paint?project=${encodeURIComponent(project)}&id=${id}`,
+          (id, png) => api.SavePaint(project, id, png).catch((e) => store.say(String(e))),
         )
         paint.onChange = () => (dirty = true)
         store.paint = paint
@@ -138,6 +142,7 @@
           dirty = true
           return { color: c.png(), emissive: c.hasEmission && c.emission ? c.png(c.emission) : '' }
         }
+        store.ready = true
         dirty = true
       })
       .catch((e) => store.say(String(e)))

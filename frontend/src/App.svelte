@@ -14,16 +14,23 @@
   import { tools } from './lib/tools.svelte'
   import Viewport from './lib/Viewport.svelte'
   import VariantBar from './lib/ui/VariantBar.svelte'
+  import ModelList from './lib/ui/ModelList.svelte'
+  import QuickOpen from './lib/ui/QuickOpen.svelte'
+  import { addModels, createProject, cycleModel, exportChanged, exportModel, openProject, pickProject, projectName, recent, refreshHashes } from './lib/projects.svelte'
 
   let headlight = 0.6
-  let side = $state<'layers' | 'settings'>(localStorage.getItem('side') === 'settings' ? 'settings' : 'layers')
+  type Side = 'models' | 'layers' | 'settings'
+  const sides: Side[] = ['models', 'layers', 'settings']
+  let side = $state<Side>(sides.find((s) => s === localStorage.getItem('side')) ?? 'layers')
   $effect(() => localStorage.setItem('side', side))
 
   onMount(() => {
     store.init()
     OnFileDrop((_x, _y, paths) => {
-      const glb = paths.find((p) => p.toLowerCase().endsWith('.glb'))
-      if (glb) store.open(glb)
+      const project = paths.find((p) => p.toLowerCase().endsWith('.texxer'))
+      const glbs = paths.filter((p) => p.toLowerCase().endsWith('.glb'))
+      if (project) openProject(project)
+      else if (glbs.length) addModels(glbs)
     }, false)
     requestAnimationFrame(() => WindowShow())
   })
@@ -102,6 +109,7 @@
       if (e.key === 'Escape') store.help = false
       return
     }
+    if (store.quickOpen) return
     if (!e.metaKey && !e.ctrlKey && toolKey(e)) {
       e.preventDefault()
       return
@@ -115,10 +123,17 @@
     if (cmd) {
       switch (e.key.toLowerCase()) {
         case 'o':
-          store.pickModel()
+          pickProject()
+          break
+        case 'n':
+          createProject()
+          break
+        case 'p':
+          if (store.workspace) store.quickOpen = true
           break
         case 'e':
-          store.export(e.shiftKey)
+          if (e.shiftKey) exportChanged()
+          else exportModel()
           break
         case 'z':
           if (e.shiftKey) store.redo()
@@ -193,6 +208,12 @@
         case 'Tab':
           store.flat = !store.flat
           break
+        case 'PageUp':
+          cycleModel(-1)
+          break
+        case 'PageDown':
+          cycleModel(1)
+          break
         case '?':
           store.help = true
           break
@@ -204,31 +225,41 @@
   }
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} onfocus={refreshHashes} />
 
 <div class="app">
   <header class="top">
-    <span class="title">texxer</span>
+    <span class="title">texxer{#if store.path}<span class="project">{projectName()}</span>{/if}</span>
     <span class="actions">
-      <button title="Open model (⌘O)" onclick={() => store.pickModel()}><Icon name="dir" size={11} />open</button>
-      <button title="Export GLB and PNG (⌘E, ⇧⌘E asks where)" disabled={!store.model} onclick={() => store.export(false)}><Icon name="export" size={11} />export</button>
+      <button title="New project (⌘N)" onclick={createProject}><Icon name="plus" size={11} />new</button>
+      <button title="Open a project or a model (⌘O)" onclick={pickProject}><Icon name="dir" size={11} />open</button>
+      <button title="Export the model into its files, PNGs beside them (⌘E; ⇧⌘E all changed)" disabled={!store.model} onclick={exportModel}><Icon name="export" size={11} />export</button>
     </span>
   </header>
 
   <aside class="left">
-    {#if store.model}
+    {#if store.workspace}
       <div class="tabs">
-        <button class="caps" class:on={side === 'layers'} onclick={() => (side = 'layers')}>layers</button>
-        <button class="caps" class:on={side === 'settings'} onclick={() => (side = 'settings')}>settings</button>
-        {#if side === 'layers'}
+        {#each sides as s}
+          <button class="caps" class:on={side === s} onclick={() => (side = s)}>{s}</button>
+        {/each}
+        {#if side === 'layers' && store.model}
           <span class="icons">
             <button class="icon" title="Put the layer in a new folder (⌘G)" onclick={() => store.groupLayer()}><Icon name="dir" size={11} /></button>
             <button class="icon" title="New layer (N)" onclick={() => store.addLayer(tools.layerMask)}><Icon name="plus" size={11} /></button>
           </span>
+        {:else if side === 'models'}
+          <span class="icons">
+            <button class="icon" title="Add models (each file its own model)" onclick={() => addModels()}><Icon name="plus" size={11} /></button>
+          </span>
         {/if}
       </div>
       <div class="scroll">
-        {#if side === 'layers'}
+        {#if side === 'models'}
+          <ModelList />
+        {:else if !store.model}
+          <p class="note">pick a model first</p>
+        {:else if side === 'layers'}
           <VariantBar />
           <LayerList />
         {:else}
@@ -247,18 +278,26 @@
         <Toolbar />
       {/if}
     {/if}
-    {#if !store.model}
+    {#if !store.workspace}
       <div class="empty">
-        <p>Open a model to paint it. Drop a .glb here or</p>
-        <button class="primary" onclick={() => store.pickModel()}>open model <kbd>⌘O</kbd></button>
-        {#if store.recent.length}
+        <p>Open a project, or a model to paint it right away. Drop files here or</p>
+        <div class="buttons">
+          <button class="primary" onclick={pickProject}>open <kbd>⌘O</kbd></button>
+          <button class="primary" onclick={createProject}>new project <kbd>⌘N</kbd></button>
+        </div>
+        {#if recent.list.length}
           <div class="recent">
             <div class="caps">recent</div>
-            {#each store.recent as path}
-              <button onclick={() => store.open(path)} title={path}>{path.split('/').pop()}<span>{path.split('/').slice(-3, -1).join('/')}</span></button>
+            {#each recent.list as path}
+              <button onclick={() => openProject(path)} title={path}>{path.split('/').pop()}<span>{path.split('/').slice(-3, -1).join('/')}</span></button>
             {/each}
           </div>
         {/if}
+      </div>
+    {:else if !store.workspace.models.length}
+      <div class="empty">
+        <p>Add the models this project paints. Drop GLBs here or</p>
+        <button class="primary" onclick={() => addModels()}>add models</button>
       </div>
     {/if}
   </main>
@@ -277,6 +316,9 @@
 
 {#if store.help}
   <Help />
+{/if}
+{#if store.quickOpen}
+  <QuickOpen />
 {/if}
 
 <style>
@@ -301,6 +343,20 @@
     font-size: 13px;
     font-weight: var(--title-weight);
     color: var(--strong);
+  }
+  .project {
+    margin-left: 10px;
+    font: 12px var(--mono);
+    color: var(--dim);
+  }
+  .note {
+    margin: 4px 16px;
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .buttons {
+    display: flex;
+    gap: 8px;
   }
   .actions {
     display: flex;

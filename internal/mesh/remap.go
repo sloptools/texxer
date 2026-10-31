@@ -8,14 +8,15 @@ import (
 
 // Remap carries an image laid out by one set of UVs over to another: each texel of the
 // result takes the color img had where the same surface point sat before. Faces
-// correspond by index. Uncovered texels within padding copy a covered neighbor.
+// correspond by index; faces only one side has stay empty. Uncovered texels within
+// padding copy a covered neighbor.
 func Remap(img image.Image, from, to []Tri, padding int) *image.NRGBA {
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
 	out := image.NewNRGBA(image.Rect(0, 0, w, h))
 	covered := make([]bool, w*h)
 
-	for i, t := range to {
+	for i, t := range to[:min(len(to), len(from))] {
 		var u, v [3]float64
 		for c := range 3 {
 			u[c], v[c] = t.UV[c][0]*float64(w), t.UV[c][1]*float64(h)

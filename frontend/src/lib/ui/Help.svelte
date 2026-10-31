@@ -71,8 +71,11 @@
     [
       'file',
       [
-        ['⌘O', 'open model'],
-        ['⌘E', 'export (⇧ asks where)'],
+        ['⌘O ⌘N', 'open a project or model, new project'],
+        ['⌘P', 'switch model'],
+        ['PgUp PgDn', 'previous, next model'],
+        ['⌘E', 'export the model into its files'],
+        ['⇧⌘E', 'export every changed model'],
         ['⌘Z ⇧⌘Z', 'undo, redo'],
       ],
     ],

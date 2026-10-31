@@ -38,3 +38,15 @@ export function imageURL(url: string): Promise<string | undefined> {
   }
   return p
 }
+
+// Loads still on their way into textures, so an export can wait for them.
+export const loading = { count: 0 }
+
+export async function track<T>(p: Promise<T>): Promise<T> {
+  loading.count++
+  try {
+    return await p
+  } finally {
+    loading.count--
+  }
+}
