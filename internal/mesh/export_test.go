@@ -39,10 +39,11 @@ func TestWithTexture(t *testing.T) {
 	if len(after.Tris) != len(before.Tris) || after.Tris[100].P != before.Tris[100].P {
 		t.Error("geometry changed")
 	}
-	if b := after.Texture.Bounds(); b.Dx() != 4 {
+	got := baseColor(t, out, "albedo")
+	if b := got.Bounds(); b.Dx() != 4 {
 		t.Errorf("texture is %v, want the 4x4 replacement", b)
 	}
-	if r, _, _, _ := after.Texture.At(0, 0).RGBA(); r>>8 != 255 {
+	if r, _, _, _ := got.At(0, 0).RGBA(); r>>8 != 255 {
 		t.Error("texture pixels differ")
 	}
 
@@ -92,4 +93,32 @@ func TestWithTexture(t *testing.T) {
 	if len(sliceArray(doc, "images")) < 2 {
 		t.Error("emissive image missing")
 	}
+}
+
+// baseColor decodes the base color texture of a material in a GLB.
+func baseColor(t *testing.T, glb []byte, material string) image.Image {
+	t.Helper()
+	doc, bin, err := rawGLB(glb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range sliceArray(doc, "materials") {
+		mat := m.(map[string]any)
+		pbr, _ := mat["pbrMetallicRoughness"].(map[string]any)
+		ref, _ := pbr["baseColorTexture"].(map[string]any)
+		if mat["name"] != material || ref == nil {
+			continue
+		}
+		tex := sliceArray(doc, "textures")[intField(ref, "index")]
+		img := sliceArray(doc, "images")[intField(tex, "source")]
+		view := sliceArray(doc, "bufferViews")[intField(img, "bufferView")]
+		off := intField(view, "byteOffset")
+		decoded, _, err := image.Decode(bytes.NewReader(bin[off : off+intField(view, "byteLength")]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return decoded
+	}
+	t.Fatalf("no base color texture on %s", material)
+	return nil
 }

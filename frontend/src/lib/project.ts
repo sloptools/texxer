@@ -47,6 +47,7 @@ export function newProject(): Project {
     version: 1,
     size: 512,
     unwrap: 0,
+    bake: { edges: 0.03, cavity: 0.03, detail: 1 },
     layers: [
       newLayer('base', '#6b6a62'),
       newLayer('dirt', '#4a4234', [newMask('gradient')], { opacity: 0.8 }),
@@ -78,6 +79,7 @@ export function normalize(p: Partial<Project>): Project {
   return {
     ...base,
     ...p,
+    bake: { ...base.bake, ...p.bake },
     finish: { ...base.finish, ...p.finish },
     shading: { ...base.shading, ...p.shading },
     light: { ...base.light, ...p.light },

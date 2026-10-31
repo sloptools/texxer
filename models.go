@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"slices"
@@ -42,6 +45,8 @@ type modelCache struct {
 	models    map[string]*loaded
 	unwrapped map[string]*unwrapped
 	bakes     map[string][]byte
+	// bakeOrder is oldest first; only the last few bakes stay, as each can be hundreds of MB.
+	bakeOrder []string
 }
 
 func newModelCache() *modelCache {
@@ -204,4 +209,46 @@ func (a *App) Unwrap(key string, size int) (UnwrapStats, error) {
 		return UnwrapStats{}, err
 	}
 	return u.stats, nil
+}
+
+// details are file i's normal and occlusion maps moved into texxer's layout for a
+// size, as PNGs; nil when it has none.
+func (c *modelCache) details(key string, layout, i int) (normal, occlusion []byte, err error) {
+	l, err := c.get(key)
+	if err != nil {
+		return nil, nil, err
+	}
+	u, err := c.unwrap(key, layout)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	start := 0
+	for j := range i {
+		start += l.faces[j]
+	}
+	from := l.model.Tris[start : start+l.faces[i]]
+	to := u.model.Tris[start : start+l.faces[i]]
+
+	size := layout
+	for _, d := range l.model.Details {
+		if d.Normal != nil {
+			size = max(size, d.Normal.Bounds().Dx())
+		}
+	}
+	n, o := mesh.RemapDetails(l.model.Details, from, to, size)
+	if normal, err = encodePNG(n); err != nil {
+		return nil, nil, err
+	}
+	occlusion, err = encodePNG(o)
+	return normal, occlusion, err
+}
+
+func encodePNG(img *image.NRGBA) ([]byte, error) {
+	if img == nil {
+		return nil, nil
+	}
+	var buf bytes.Buffer
+	err := png.Encode(&buf, img)
+	return buf.Bytes(), err
 }

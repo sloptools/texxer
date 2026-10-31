@@ -24,15 +24,23 @@ type Tri struct {
 	Material string
 	// Island numbers the surface the face belongs to, bounded by hard edges.
 	Island int
+	// Src keeps the model's own UVs, which its detail maps follow; Detail indexes
+	// Model.Details, -1 without.
+	Src    [3][2]float64
+	Detail int
 }
 
 type Model struct {
 	Tris []Tri
 	// Parts are node names, indexed by Tri.Part.
 	Parts []string
-	// Texture is the first base color texture, if any.
-	Texture  image.Image
+	// Details are the normal and occlusion maps of the model's materials.
+	Details  []*Detail
 	Min, Max Vec
+}
+
+type textureRef struct {
+	Index int `json:"index"`
 }
 
 type gltfDoc struct {
@@ -58,12 +66,9 @@ type gltfDoc struct {
 		} `json:"primitives"`
 	} `json:"meshes"`
 	Materials []struct {
-		Name string `json:"name"`
-		PBR  struct {
-			BaseColorTexture *struct {
-				Index int `json:"index"`
-			} `json:"baseColorTexture"`
-		} `json:"pbrMetallicRoughness"`
+		Name             string      `json:"name"`
+		NormalTexture    *textureRef `json:"normalTexture"`
+		OcclusionTexture *textureRef `json:"occlusionTexture"`
 	} `json:"materials"`
 	Textures []struct {
 		Source int `json:"source"`
@@ -100,7 +105,8 @@ func LoadGLB(path string) (*Model, error) {
 	}
 
 	m := &Model{Min: Vec{math.Inf(1), math.Inf(1), math.Inf(1)}, Max: Vec{math.Inf(-1), math.Inf(-1), math.Inf(-1)}}
-	if err := m.addTexture(doc, bin); err != nil {
+	details, err := m.addDetails(doc, bin)
+	if err != nil {
 		return nil, err
 	}
 
@@ -113,7 +119,7 @@ func LoadGLB(path string) (*Model, error) {
 		}
 	}
 	for _, n := range roots {
-		if err := m.addNode(doc, bin, n, identity()); err != nil {
+		if err := m.addNode(doc, bin, details, n, identity()); err != nil {
 			return nil, err
 		}
 	}
@@ -149,29 +155,47 @@ func parseGLB(data []byte) (*gltfDoc, []byte, error) {
 	return &doc, bin, nil
 }
 
-func (m *Model) addTexture(doc *gltfDoc, bin []byte) error {
-	for _, mat := range doc.Materials {
-		tex := mat.PBR.BaseColorTexture
-		if tex == nil || tex.Index >= len(doc.Textures) {
+// addDetails reads each material's normal and occlusion maps and returns, per
+// material, its index in m.Details or -1.
+func (m *Model) addDetails(doc *gltfDoc, bin []byte) ([]int, error) {
+	out := make([]int, len(doc.Materials))
+	for i, mat := range doc.Materials {
+		out[i] = -1
+		if mat.NormalTexture == nil && mat.OcclusionTexture == nil {
 			continue
 		}
-		img := doc.Images[doc.Textures[tex.Index].Source]
-		if img.BufferView == nil {
-			return errors.New("external texture files are not supported yet")
+		d := &Detail{}
+		var err error
+		if mat.NormalTexture != nil {
+			if d.Normal, err = decodeTexture(doc, bin, mat.NormalTexture.Index); err != nil {
+				return nil, fmt.Errorf("normal map: %w", err)
+			}
 		}
-
-		bv := doc.BufferViews[*img.BufferView]
-		decoded, _, err := image.Decode(bytes.NewReader(bin[bv.ByteOffset : bv.ByteOffset+bv.ByteLength]))
-		if err != nil {
-			return fmt.Errorf("texture: %w", err)
+		if mat.OcclusionTexture != nil {
+			if d.Occlusion, err = decodeTexture(doc, bin, mat.OcclusionTexture.Index); err != nil {
+				return nil, fmt.Errorf("occlusion map: %w", err)
+			}
 		}
-		m.Texture = decoded
-		return nil
+		out[i] = len(m.Details)
+		m.Details = append(m.Details, d)
 	}
-	return nil
+	return out, nil
 }
 
-func (m *Model) addNode(doc *gltfDoc, bin []byte, index int, parent mat4) error {
+func decodeTexture(doc *gltfDoc, bin []byte, index int) (image.Image, error) {
+	if index >= len(doc.Textures) {
+		return nil, errors.New("missing texture")
+	}
+	img := doc.Images[doc.Textures[index].Source]
+	if img.BufferView == nil {
+		return nil, errors.New("external texture files are not supported yet")
+	}
+	bv := doc.BufferViews[*img.BufferView]
+	decoded, _, err := image.Decode(bytes.NewReader(bin[bv.ByteOffset : bv.ByteOffset+bv.ByteLength]))
+	return decoded, err
+}
+
+func (m *Model) addNode(doc *gltfDoc, bin []byte, details []int, index int, parent mat4) error {
 	node := doc.Nodes[index]
 	world := parent.mul(localMatrix(node.Matrix, node.Translation, node.Rotation, node.Scale))
 
@@ -184,21 +208,21 @@ func (m *Model) addNode(doc *gltfDoc, bin []byte, index int, parent mat4) error 
 			if prim.Mode != nil && *prim.Mode != 4 {
 				continue
 			}
-			if err := m.addPrimitive(doc, bin, prim.Attributes, prim.Indices, prim.Material, world, normalMat, part); err != nil {
+			if err := m.addPrimitive(doc, bin, details, prim.Attributes, prim.Indices, prim.Material, world, normalMat, part); err != nil {
 				return err
 			}
 		}
 	}
 
 	for _, c := range node.Children {
-		if err := m.addNode(doc, bin, c, world); err != nil {
+		if err := m.addNode(doc, bin, details, c, world); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *Model) addPrimitive(doc *gltfDoc, bin []byte, attrs map[string]int, indices, material *int, world mat4, normalMat [9]float64, part int) error {
+func (m *Model) addPrimitive(doc *gltfDoc, bin []byte, details []int, attrs map[string]int, indices, material *int, world mat4, normalMat [9]float64, part int) error {
 	pi, ok := attrs["POSITION"]
 	if !ok {
 		return nil
@@ -232,12 +256,14 @@ func (m *Model) addPrimitive(doc *gltfDoc, bin []byte, attrs map[string]int, ind
 	}
 
 	matName := ""
+	detail := -1
 	if material != nil && *material < len(doc.Materials) {
 		matName = doc.Materials[*material].Name
+		detail = details[*material]
 	}
 
 	for k := 0; k+2 < len(idx); k += 3 {
-		t := Tri{Part: part, Material: matName}
+		t := Tri{Part: part, Material: matName, Detail: detail}
 		for c := range 3 {
 			v := idx[k+c]
 			p := world.point(Vec{pos[v][0], pos[v][1], pos[v][2]})
@@ -251,6 +277,7 @@ func (m *Model) addPrimitive(doc *gltfDoc, bin []byte, attrs map[string]int, ind
 				t.UV[c] = [2]float64{uv[v][0], uv[v][1]}
 			}
 		}
+		t.Src = t.UV
 		if nor == nil {
 			n := t.P[1].Sub(t.P[0]).Cross(t.P[2].Sub(t.P[0])).Norm()
 			t.N = [3]Vec{n, n, n}

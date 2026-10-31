@@ -110,6 +110,10 @@ export type Light = {
   torch: number
 }
 
+// How a model's maps are baked: widths of the edge and cavity masks as fractions of
+// the model's size, and how much its own normal and occlusion maps count.
+export type BakeSettings = { edges: number; cavity: number; detail: number }
+
 // What a variant changes about a layer.
 export type LayerLook = { color?: string; visible?: boolean; opacity?: number }
 
@@ -122,6 +126,7 @@ export type Project = {
   size: number
   // The texture size texxer laid the UVs out for; 0 paints on the model's own UVs.
   unwrap: number
+  bake: BakeSettings
   layers: Layer[]
   groups: Group[]
   variants: Variant[]

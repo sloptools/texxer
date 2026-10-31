@@ -9,6 +9,7 @@ export namespace main {
 	    overlap: number;
 	    offsets: number[][];
 	    hash: string;
+	    details: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModelInfo(source);
@@ -24,6 +25,7 @@ export namespace main {
 	        this.overlap = source["overlap"];
 	        this.offsets = source["offsets"];
 	        this.hash = source["hash"];
+	        this.details = source["details"];
 	    }
 	}
 	export class ProjectFile {

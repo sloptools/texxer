@@ -16,13 +16,19 @@ import (
 // AO, convex edges, concave cavity, coverage;
 // position (p - min) / diagonal, part index;
 // normal, island.
-func (c *modelCache) bake(path string, size, layout int) ([]byte, error) {
+// bakeOptions are what a model may tune about its bake: the widths of edges and
+// cavities, as fractions of the model's size, and how much its detail maps count.
+type bakeOptions struct {
+	edges, cavity, detail float64
+}
+
+func (c *modelCache) bake(path string, size, layout int, b bakeOptions) ([]byte, error) {
 	m, err := c.model(path, layout)
 	if err != nil {
 		return nil, err
 	}
 
-	key := fmt.Sprintf("%s|%p|%d", path, m, size)
+	key := fmt.Sprintf("%s|%p|%d|%v", path, m, size, b)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if b, ok := c.bakes[key]; ok {
@@ -34,10 +40,11 @@ func (c *modelCache) bake(path string, size, layout int) ([]byte, error) {
 		AORays:      48,
 		AORes:       min(size, 512),
 		AODist:      0.15,
-		EdgeWidth:   0.03,
-		CavityWidth: 0.03,
+		EdgeWidth:   b.edges,
+		CavityWidth: b.cavity,
 		EdgeAngle:   30,
 		Padding:     max(4, size/64),
+		Detail:      b.detail,
 	})
 
 	n := size * size
@@ -59,6 +66,11 @@ func (c *modelCache) bake(path string, size, layout int) ([]byte, error) {
 	}
 
 	c.bakes[key] = out
+	c.bakeOrder = append(c.bakeOrder, key)
+	if len(c.bakeOrder) > 4 {
+		delete(c.bakes, c.bakeOrder[0])
+		c.bakeOrder = c.bakeOrder[1:]
+	}
 	return out, nil
 }
 
@@ -114,7 +126,16 @@ func (a *App) middleware(next http.Handler) http.Handler {
 				http.Error(w, "bad size", http.StatusBadRequest)
 				return
 			}
-			data, err := a.models.bake(path, size, layout)
+			q := r.URL.Query()
+			number := func(name string, def float64) float64 {
+				v, err := strconv.ParseFloat(q.Get(name), 64)
+				if err != nil {
+					return def
+				}
+				return v
+			}
+			opts := bakeOptions{number("edges", 0.03), number("cavity", 0.03), number("detail", 1)}
+			data, err := a.models.bake(path, size, layout, opts)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return

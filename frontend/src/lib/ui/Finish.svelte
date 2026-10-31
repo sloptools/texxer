@@ -39,6 +39,11 @@
       <button class:on={!!p.unwrap} title="Let texxer lay the UVs out: cut at hard edges, upright, one texel density" onclick={() => store.setLayout(p.unwrap || p.size)}>texxer</button>
     </span>
   </div>
+  <Slider label="edge width" bind:value={p.bake.edges} min={0.002} max={0.08} step={0.001} digits={3} def={0.03} />
+  <Slider label="cavity width" bind:value={p.bake.cavity} min={0.002} max={0.08} step={0.001} digits={3} def={0.03} />
+  {#if store.model?.details}
+    <Slider label="detail maps" bind:value={p.bake.detail} min={0} max={2} step={0.05} def={1} />
+  {/if}
   {#if p.unwrap}
     <div class="note">
       {#if stats}{stats.charts} charts · {Math.round(stats.fill * 100)}% filled · {Math.round(stats.density)} px/m{:else}laying out…{/if}

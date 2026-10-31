@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { newMask } from '../project'
 import { expand, frame } from '../stamps'
-import type { Layer, Project, Stamp } from '../types'
+import type { BakeSettings, Layer, Project, Stamp } from '../types'
 import { StampAtlas, atlasGrid, atlasInset } from './atlas'
 import type { PaintStore } from './paint'
 import { fetchBlob, imageURL, track } from '../assets'
@@ -21,8 +21,8 @@ export type Bake = {
   nrmData: Float32Array
 }
 
-export async function loadBake(path: string, size: number, layout: number): Promise<Bake> {
-  const blob = await fetchBlob(`/bake?path=${encodeURIComponent(path)}&size=${size}&unwrap=${layout}`, 2)
+export async function loadBake(path: string, size: number, layout: number, b: BakeSettings): Promise<Bake> {
+  const blob = await fetchBlob(`/bake?path=${encodeURIComponent(path)}&size=${size}&unwrap=${layout}&edges=${b.edges}&cavity=${b.cavity}&detail=${b.detail}`, 2)
   if (!blob) throw new Error('bake failed')
   const buf = await blob.arrayBuffer()
 

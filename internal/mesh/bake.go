@@ -26,6 +26,9 @@ type BakeOptions struct {
 	// Select names the parts that make up the Selected map.
 	Select  []string
 	Padding int
+	// Detail is how strongly the model's normal and occlusion maps shape normals, AO,
+	// edges and cavities; 0 ignores them.
+	Detail float64
 }
 
 // Maps are baked per texel. Gray maps hold one value per texel, Normal three.
@@ -49,6 +52,10 @@ type sample struct {
 	texel        int
 	p, n, ng     Vec
 	part, island int
+	// Where the texel sits in the model's own UVs, and that face's tangents, for its detail maps.
+	src      [2]float64
+	detail   int
+	tan, bit Vec
 }
 
 // Bake rasterizes the model's UV layout and computes geometry maps per texel.
@@ -89,6 +96,9 @@ func Bake(m *Model, o BakeOptions) *Maps {
 		convex, concave := grid.near(s.p, o.EdgeWidth*diag)
 		if o.CavityWidth != o.EdgeWidth {
 			_, concave = grid.near(s.p, o.CavityWidth*diag)
+		}
+		if s.detail >= 0 {
+			ao, convex, concave, samples[i].n = m.Details[s.detail].apply(samples[i], o.Detail, ao, convex, concave)
 		}
 		results[i] = [3]float64{ao, convex, concave}
 	})
@@ -210,6 +220,12 @@ func rasterize(m *Model, o BakeOptions) []sample {
 			continue
 		}
 		ng := t.P[1].Sub(t.P[0]).Cross(t.P[2].Sub(t.P[0])).Norm()
+		detail := -1
+		var tan, bit Vec
+		if o.Detail > 0 && t.Detail >= 0 && t.Detail < len(m.Details) {
+			detail = t.Detail
+			tan, bit = tangents(t)
+		}
 
 		x0 := max(0, int(math.Floor(min(u[0], u[1], u[2]))))
 		x1 := min(o.W-1, int(math.Ceil(max(u[0], u[1], u[2]))))
@@ -228,7 +244,11 @@ func rasterize(m *Model, o BakeOptions) []sample {
 
 				p := t.P[0].Scale(b0).Add(t.P[1].Scale(b1)).Add(t.P[2].Scale(b2))
 				n := t.N[0].Scale(b0).Add(t.N[1].Scale(b1)).Add(t.N[2].Scale(b2)).Norm()
-				out = append(out, sample{y*o.W + x, p, n, ng, t.Part, t.Island})
+				src := [2]float64{
+					t.Src[0][0]*b0 + t.Src[1][0]*b1 + t.Src[2][0]*b2,
+					t.Src[0][1]*b0 + t.Src[1][1]*b1 + t.Src[2][1]*b2,
+				}
+				out = append(out, sample{y*o.W + x, p, n, ng, t.Part, t.Island, src, detail, tan, bit})
 			}
 		}
 	}

@@ -20,6 +20,8 @@ type Textures struct {
 	Color            []byte
 	Emissive         []byte
 	EmissiveStrength float64
+	// Normal and Occlusion replace the material's detail maps when set, for a new UV layout.
+	Normal, Occlusion []byte
 }
 
 // WithTexture returns a copy of a binary glTF whose material uses the
@@ -62,6 +64,13 @@ func WithTexture(glb []byte, t Textures, material string) ([]byte, error) {
 	if t.Emissive != nil {
 		emit = add(t.Emissive, "texxer_emissive")
 	}
+	normal, occlusion := -1.0, -1.0
+	if t.Normal != nil {
+		normal = add(t.Normal, "texxer_normal")
+	}
+	if t.Occlusion != nil {
+		occlusion = add(t.Occlusion, "texxer_occlusion")
+	}
 
 	textured := hasBaseTexture(materials)
 	used := 0
@@ -94,6 +103,12 @@ func WithTexture(glb []byte, t Textures, material string) ([]byte, error) {
 		delete(pbr, "metallicRoughnessTexture")
 		if emit >= 0 {
 			setEmissive(doc, mat, emit, t.EmissiveStrength)
+		}
+		if normal >= 0 {
+			mat["normalTexture"] = map[string]any{"index": normal}
+		}
+		if occlusion >= 0 {
+			mat["occlusionTexture"] = map[string]any{"index": occlusion}
 		}
 		used++
 	}

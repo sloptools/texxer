@@ -100,11 +100,22 @@
     }, 150)
   }
 
-  // Model and bake, again when the texture size changes.
+  // Bake settings reach the bake once the sliders rest, as each bake takes a moment.
+  let bakeSettings = $state(store.project.bake)
+  $effect(() => {
+    const b = $state.snapshot(store.project.bake)
+    const t = setTimeout(() => {
+      if (JSON.stringify(b) !== JSON.stringify(bakeSettings)) bakeSettings = b
+    }, 400)
+    return () => clearTimeout(t)
+  })
+
+  // Model and bake, again when the texture size or bake settings change.
   $effect(() => {
     const s = stage
     const model = store.model
     const layout = store.project.unwrap
+    const settings = bakeSettings
     if (!s || !model) return
 
     let cancelled = false
@@ -113,7 +124,8 @@
     const project = store.path
     const key = encodeURIComponent(model.path)
     const files = model.offsets.map((offset, i) => ({ url: `/model?path=${key}&unwrap=${layout}&file=${i}`, offset }))
-    Promise.all([s.load(files), loadBake(model.path, size * factor, layout)])
+    // Strokes in flight are saved first, so the new paint store loads them.
+    Promise.all([s.load(files), loadBake(model.path, size * factor, layout, settings), store.paint?.flush()])
       .then(([, bake]) => {
         if (cancelled) return
         compositor?.dispose()

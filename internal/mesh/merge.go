@@ -24,6 +24,8 @@ func Merge(models []*Model, names []string) (*Model, []Vec) {
 		x += m.Max[0] - m.Min[0] + gap
 
 		parts := len(out.Parts)
+		details := len(out.Details)
+		out.Details = append(out.Details, m.Details...)
 		for _, p := range m.Parts {
 			out.Parts = append(out.Parts, names[i]+"/"+p)
 		}
@@ -32,12 +34,12 @@ func Merge(models []*Model, names []string) (*Model, []Vec) {
 				t.P[c] = t.P[c].Add(off)
 			}
 			t.Part += parts
+			if t.Detail >= 0 {
+				t.Detail += details
+			}
 			out.Tris = append(out.Tris, t)
 		}
 		out.Min, out.Max = out.Min.Min(m.Min.Add(off)), out.Max.Max(m.Max.Add(off))
-		if out.Texture == nil {
-			out.Texture = m.Texture
-		}
 	}
 	return out, offsets
 }
