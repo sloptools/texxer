@@ -8,6 +8,7 @@
   import { store } from './store.svelte'
   import { ToolInput } from './toolInput'
   import { tools } from './tools.svelte'
+  import type { FlatMap } from './types'
 
   let container: HTMLDivElement
   let stage = $state<Stage>()
@@ -40,6 +41,14 @@
       hoverPoint = undefined
       store.hoverPart = -1
     }
+    s.flat.onHover = (texel, part) => {
+      store.hoverTexel = texel
+      store.hoverPart = part
+    }
+    s.flat.onClick = (e, part) => {
+      if (part >= 0 && tools.tool === 'nav' && (e.metaKey || store.layer?.masks.some((m) => m.kind === 'parts'))) store.togglePart(part)
+    }
+
     s.renderer.domElement.addEventListener('pointermove', onMove)
     s.renderer.domElement.addEventListener('pointerleave', onLeave)
 
@@ -56,7 +65,7 @@
         const glow = compositor.hasEmission && store.view !== 'mask' ? compositor.emission!.texture : null
         s.setEmission(glow, store.project.finish.glow)
       }
-      if (hoverPoint) {
+      if (hoverPoint && !store.flat) {
         const hit = s.hit(hoverPoint.x, hoverPoint.y)
         store.hoverPart = hit?.part ?? -1
         s.torch.aimAt(hit?.point)
@@ -150,6 +159,25 @@
   })
 
   $effect(() => {
+    if (!stage || !compositor) return
+    const c = compositor
+    stage.flat.setSources(
+      { color: c.out.texture, mask: c.mask.texture, glow: () => (c.hasEmission && c.emission ? c.emission.texture : null), geo: c.bake.geo, pos: c.bake.pos, size: store.project.size },
+      c.bake.posData,
+    )
+  })
+
+  $effect(() => {
+    if (!stage) return
+    const on = store.flat
+    if (on && !stage.flat.active) stage.flat.fit()
+    stage.setFlat(on)
+    stage.flat.map = store.flatMap
+    stage.flat.showUV = store.flatUV
+    store.hoverTexel = null
+  })
+
+  $effect(() => {
     if (!stage) return
     stage.setLight({ ...store.project.light })
     stage.setBloom(store.bloom)
@@ -177,9 +205,19 @@
     stage.setOutline(p ? corners($state.snapshot(p)) : null, '#7fc4af')
   })
 
+  const flatKeys: Record<string, FlatMap> = { '1': 'texture', '2': 'mask', '3': 'glow', '4': 'ao', '5': 'edges', '6': 'cavity', '7': 'parts' }
+
   // Camera keys; layer keys live in the app.
   function onkeydown(e: KeyboardEvent) {
     if (!stage || e.metaKey || (e.target as HTMLElement).closest('input, textarea')) return
+    if (store.flat) {
+      if (flatKeys[e.key]) store.flatMap = flatKeys[e.key]
+      else if (e.key === '0' || e.key === 'f') stage.flat.fit()
+      else if (e.key === 'w') store.flatUV = !store.flatUV
+      else return
+      e.preventDefault()
+      return
+    }
     const c = stage.controls
     const back = e.ctrlKey ? Math.PI : 0
     switch (e.key) {

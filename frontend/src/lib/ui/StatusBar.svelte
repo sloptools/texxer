@@ -28,6 +28,9 @@
       <span class="accent">baking…</span>
     {:else if store.message}
       <span>{store.message}</span>
+    {:else if store.flat && store.hoverTexel}
+      <span>{store.hoverTexel[0]}, {store.hoverTexel[1]}</span>
+      {#if hover}<span>{hover}</span>{/if}
     {:else if hover && tools.tool === 'nav'}
       <span>{hover}</span>
       <span class="faint">⌘click adds it to the layer</span>
@@ -35,6 +38,7 @@
   </span>
 
   <span class="tools">
+    <button class:on={store.flat} title="Flat texture and UVs (tab)" onclick={() => (store.flat = !store.flat)}>2d</button>
     <Seg value={store.view} options={views} onchange={(v) => (store.view = v)} />
     <button title="Render at game resolution (P)" class:on={store.lines > 0} onclick={() => store.cycleLines()}>{store.lines ? store.lines + 'p' : 'full res'}</button>
     <button class:on={store.torch} title="Flashlight at the cursor (T)" onclick={() => (store.torch = !store.torch)}>torch</button>

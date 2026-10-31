@@ -28,6 +28,17 @@
       ],
     ],
     [
+      '2d',
+      [
+        ['tab', 'flat texture and UVs, back to 3D'],
+        ['1 – 7', 'texture, mask, glow, ao, edges, cavity, parts'],
+        ['W', 'UV layout: cuts, unused space, overlaps in red'],
+        ['two fingers / drag', 'pan'],
+        ['pinch', 'zoom to cursor'],
+        ['0 F', 'fit'],
+      ],
+    ],
+    [
       'tools',
       [
         ['B S esc', 'brush, stamp, view'],

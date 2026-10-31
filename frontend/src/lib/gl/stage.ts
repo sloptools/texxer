@@ -8,6 +8,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import type { Light, View } from '../types'
 import { TrackpadControls } from './controls'
 import { game, gameDeclarations, gamePatch, gameUniforms, gradePass } from './gamelook'
+import { Flat } from './flat'
 import { Torch, torchDeclarations } from './torch'
 
 export type Hit = { point: THREE.Vector3; normal: THREE.Vector3; part: number }
@@ -59,6 +60,7 @@ export class Stage {
   // Vertical resolution to render at, like a game would; 0 renders at full size.
   private lines = 0
   readonly torch = new Torch()
+  readonly flat: Flat
 
   private hemi = new THREE.HemisphereLight(0xfff1e0, 0x2c3038, 1)
   private key = new THREE.DirectionalLight(0xfff6ea, 2)
@@ -123,6 +125,7 @@ export class Stage {
     this.composer.addPass(this.grade)
 
     this.controls = new TrackpadControls(this.camera, renderer.domElement, (x, y) => this.hit(x, y)?.point)
+    this.flat = new Flat(renderer, renderer.domElement)
 
     this.resize = new ResizeObserver(() => this.applySize())
     this.resize.observe(container)
@@ -130,18 +133,30 @@ export class Stage {
 
   private applySize() {
     const { clientWidth: w, clientHeight: h } = this.container
-    const ratio = this.lines ? this.lines / Math.max(h, 1) : window.devicePixelRatio
+    const lines = this.flat.active ? 0 : this.lines
+    const ratio = lines ? lines / Math.max(h, 1) : window.devicePixelRatio
     this.renderer.setPixelRatio(ratio)
     this.renderer.setSize(w, h)
     this.composer.setPixelRatio(ratio)
     this.composer.setSize(w, h)
-    this.renderer.domElement.style.imageRendering = this.lines ? 'pixelated' : ''
+    this.renderer.domElement.style.imageRendering = lines ? 'pixelated' : ''
+    this.flat.resize(w, h)
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
   }
 
   setResolution(lines: number) {
     this.lines = lines
+    this.applySize()
+  }
+
+  // Switches between the model and the flat texture; tools and the camera rest in 2D.
+  setFlat(on: boolean) {
+    if (this.flat.active === on) return
+    this.flat.active = on
+    this.controls.enabled = !on
+    if (on) this.setRing(null)
+    this.outline.visible &&= !on
     this.applySize()
   }
 
@@ -188,6 +203,7 @@ export class Stage {
       }
     }
 
+    this.flat.setMeshes(this.textured)
     this.root = gltf.scene
     this.scene.add(gltf.scene)
     this.box.setFromObject(gltf.scene)
@@ -291,18 +307,20 @@ export class Stage {
 
   setHover(part: number) {
     this.shared.uHover.value = part
+    this.flat.setHover(part)
   }
 
   setBackground(css: string) {
     const bg = new THREE.Color(css)
     this.background = bg
     if (!this.game) this.scene.background = bg
+    this.flat.setBackground(bg)
     this.gridColor = bg.clone().offsetHSL(0, 0, 0.3)
     if (this.grid) (this.grid.material as THREE.LineBasicMaterial).color.copy(this.gridColor)
   }
 
   hit(x: number, y: number): Hit | undefined {
-    if (!this.root) return
+    if (!this.root || this.flat.active) return
     const rect = this.renderer.domElement.getBoundingClientRect()
     const ndc = new THREE.Vector2(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1)
     this.raycaster.setFromCamera(ndc, this.camera)
@@ -343,12 +361,14 @@ export class Stage {
     this.controls.update(dt, this.snap)
     this.snap = false
     this.torch.update(this.camera, this.radius)
-    this.composer.render()
+    if (this.flat.active) this.flat.render()
+    else this.composer.render()
   }
 
   dispose() {
     this.resize.disconnect()
     this.controls.dispose()
+    this.flat.dispose()
     this.composer.dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()

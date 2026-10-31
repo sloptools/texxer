@@ -2,7 +2,7 @@ import * as api from '../../wailsjs/go/main/App'
 import type { main } from '../../wailsjs/go/models'
 import type { PaintStore } from './gl/paint'
 import { newLayer, newMask, newProject, normalize, uid } from './project'
-import type { Finish, Group, Layer, MaskKind, Project, View } from './types'
+import type { Finish, Group, Layer, MaskKind, Project, View, FlatMap } from './types'
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -34,6 +34,11 @@ class Store {
   lines = $state(0)
   baking = $state(false)
   hoverPart = $state(-1)
+  // The 2D view of the texture and its UV layout, instead of the model.
+  flat = $state(false)
+  flatMap = $state<FlatMap>('texture')
+  flatUV = $state(true)
+  hoverTexel = $state<[number, number] | null>(null)
   help = $state(false)
   message = $state('')
   recent = $state<string[]>(load('recent', []))

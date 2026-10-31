@@ -119,6 +119,7 @@ export type Project = {
 }
 
 export type View = 'lit' | 'unlit' | 'game' | 'mask'
+export type FlatMap = 'texture' | 'mask' | 'glow' | 'ao' | 'edges' | 'cavity' | 'parts'
 
 export type Tool = 'nav' | 'brush' | 'stamp'
 

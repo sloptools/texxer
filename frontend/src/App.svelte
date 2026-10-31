@@ -4,6 +4,7 @@
   import Icon from './lib/Icon.svelte'
   import { store } from './lib/store.svelte'
   import Finish from './lib/ui/Finish.svelte'
+  import FlatBar from './lib/ui/FlatBar.svelte'
   import Help from './lib/ui/Help.svelte'
   import LayerList from './lib/ui/LayerList.svelte'
   import LayerPanel from './lib/ui/LayerPanel.svelte'
@@ -180,6 +181,9 @@
         case 't':
           store.torch = !store.torch
           break
+        case 'Tab':
+          store.flat = !store.flat
+          break
         case '?':
           store.help = true
           break
@@ -215,7 +219,11 @@
   <main>
     <Viewport />
     {#if store.model}
-      <Toolbar />
+      {#if store.flat}
+        <FlatBar />
+      {:else}
+        <Toolbar />
+      {/if}
     {/if}
     {#if !store.model}
       <div class="empty">

@@ -25,6 +25,7 @@ export class TrackpadControls {
 
   // Off while a tool owns the left button; the trackpad still orbits.
   leftDrag = true
+  enabled = true
   onLight: (delta: number) => void = () => {}
   onClick: (e: PointerEvent) => void = () => {}
 
@@ -35,8 +36,9 @@ export class TrackpadControls {
   ) {
     const opts = { passive: false }
     const listen = <K extends string>(type: K, fn: (e: any) => void) => {
-      el.addEventListener(type, fn, opts)
-      return () => el.removeEventListener(type, fn)
+      const guarded = (e: Event) => this.enabled && fn(e)
+      el.addEventListener(type, guarded, opts)
+      return () => el.removeEventListener(type, guarded)
     }
     const offs = [
       listen('wheel', (e: WheelEvent) => this.wheel(e)),
