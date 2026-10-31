@@ -203,10 +203,17 @@ func (a *App) Palette(kind string) ([][3]uint8, error) {
 	return out, nil
 }
 
+// VariantTextures are a variant's finished textures as base64 PNGs.
+type VariantTextures struct {
+	Name     string `json:"name"`
+	Color    string `json:"color"`
+	Emissive string `json:"emissive"`
+}
+
 // Export writes the textures as PNGs and the model with them as a GLB. An
-// empty target asks where to put it, an empty emissive leaves it out. It
-// returns the GLB path, empty when cancelled.
-func (a *App) Export(modelPath string, layout int, pngBase64, emissiveBase64 string, emissiveStrength float64, target string) (string, error) {
+// empty target asks where to put it, an empty emissive leaves it out. Variants
+// get PNGs of their own beside the base one. It returns the GLB path, empty when cancelled.
+func (a *App) Export(modelPath string, layout int, pngBase64, emissiveBase64 string, variants []VariantTextures, emissiveStrength float64, target string) (string, error) {
 	if target == "" {
 		name := strings.TrimSuffix(filepath.Base(modelPath), filepath.Ext(modelPath)) + "_texxer.glb"
 		var err error
@@ -241,13 +248,47 @@ func (a *App) Export(modelPath string, layout int, pngBase64, emissiveBase64 str
 	}
 
 	base := strings.TrimSuffix(target, filepath.Ext(target))
-	if err := os.WriteFile(base+".png", t.Color, 0o644); err != nil {
+	if err := writePNGs(base, pngBase64, emissiveBase64); err != nil {
 		return "", err
 	}
-	if t.Emissive != nil {
-		if err := os.WriteFile(base+"_emissive.png", t.Emissive, 0o644); err != nil {
+	for _, v := range variants {
+		if err := writePNGs(base+"_"+fileName(v.Name), v.Color, v.Emissive); err != nil {
 			return "", err
 		}
 	}
 	return target, os.WriteFile(target, out, 0o644)
+}
+
+// writePNGs writes base.png and, if there is one, base_emissive.png.
+func writePNGs(base, color, emissive string) error {
+	for _, f := range []struct{ path, data string }{{base + ".png", color}, {base + "_emissive.png", emissive}} {
+		if f.data == "" {
+			continue
+		}
+		png, err := base64.StdEncoding.DecodeString(f.data)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(f.path, png, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// fileName makes a name safe for a file: lower case, words joined by underscores.
+func fileName(name string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(strings.TrimSpace(name)) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
+			b.WriteRune(r)
+		case b.Len() > 0 && !strings.HasSuffix(b.String(), "_"):
+			b.WriteByte('_')
+		}
+	}
+	if s := strings.TrimSuffix(b.String(), "_"); s != "" {
+		return s
+	}
+	return "variant"
 }

@@ -63,6 +63,7 @@
         ['⌥↑ ⌥↓', 'move'],
         ['V', 'show / hide'],
         ['⌘G ⇧⌘G', 'into a new folder, dissolve folder'],
+        ['C', 'next variant (color, visibility, opacity per layer)'],
         ['drag', 'reorder, drop on a folder to put it in'],
       ],
     ],

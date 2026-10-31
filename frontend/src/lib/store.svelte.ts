@@ -2,7 +2,7 @@ import * as api from '../../wailsjs/go/main/App'
 import type { main } from '../../wailsjs/go/models'
 import type { PaintStore } from './gl/paint'
 import { newLayer, newMask, newProject, normalize, uid } from './project'
-import type { Finish, Group, Layer, MaskKind, Project, View, FlatMap } from './types'
+import type { Finish, FlatMap, Group, Layer, LayerLook, MaskKind, Project, Variant, View } from './types'
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -26,6 +26,8 @@ class Store {
   model = $state<main.ModelInfo | null>(null)
   project = $state<Project>(newProject())
   selected = $state(0)
+  // The variant being looked at and edited, '' for the base.
+  variant = $state('')
   view = $state<View>('lit')
   bloom = $state(true)
   grid = $state(false)
@@ -45,8 +47,8 @@ class Store {
   grungeMaps = $state<string[]>([])
   stampImages = $state<string[]>([])
 
-  // Set by the viewport: renders the finished textures as base64 PNGs; emissive is empty when nothing glows.
-  snapshot: (() => { color: string; emissive: string }) | null = null
+  // Set by the viewport: renders a variant's ('' for the base) finished textures as base64 PNGs; emissive is empty when nothing glows.
+  snapshot: ((variant: string) => { color: string; emissive: string }) | null = null
   paint: PaintStore | null = null
 
   private past: Entry[] = []
@@ -98,6 +100,7 @@ class Store {
       // Baked light already shades the texture, like in the game.
       this.view = this.project.shading.on ? 'unlit' : 'lit'
       this.selected = this.project.layers.length - 1
+      this.variant = ''
       this.past = []
       this.future = []
       this.last = JSON.stringify(this.project)
@@ -172,6 +175,71 @@ class Store {
     this.past = this.past.filter((e) => e.kind !== 'paint')
     this.future = this.future.filter((e) => e.kind !== 'paint')
     this.project.unwrap = to
+  }
+
+  // Variants
+
+  get activeVariant(): Variant | undefined {
+    return this.project.variants.find((v) => v.id === this.variant)
+  }
+
+  addVariant() {
+    const v: Variant = { id: uid(), name: 'variant ' + (this.project.variants.length + 1), layers: {} }
+    this.project.variants.push(v)
+    this.variant = v.id
+  }
+
+  deleteVariant(id: string) {
+    this.project.variants = this.project.variants.filter((v) => v.id !== id)
+    if (this.variant === id) this.variant = ''
+  }
+
+  // Base, then each variant, round and round.
+  cycleVariant() {
+    const ids = ['', ...this.project.variants.map((v) => v.id)]
+    this.variant = ids[(ids.indexOf(this.variant) + 1) % ids.length]
+  }
+
+  // The layer as the active variant shows it. Color, visibility and opacity read and
+  // write the variant's changes; a value back at the base drops the change.
+  look(l: Layer) {
+    const variant = () => this.activeVariant
+    const get = <K extends keyof LayerLook>(k: K) => (variant()?.layers[l.id]?.[k] ?? l[k]) as Layer[K]
+    const set = <K extends keyof LayerLook>(k: K, value: Layer[K]) => {
+      const v = variant()
+      if (!v) {
+        l[k] = value
+        return
+      }
+      const look = { ...v.layers[l.id], [k]: value }
+      if (value === l[k]) delete look[k]
+      if (Object.keys(look).length) v.layers[l.id] = look
+      else delete v.layers[l.id]
+    }
+    return {
+      get color() {
+        return get('color')
+      },
+      set color(c: string) {
+        set('color', c)
+      },
+      get visible() {
+        return get('visible')
+      },
+      set visible(on: boolean) {
+        set('visible', on)
+      },
+      get opacity() {
+        return get('opacity')
+      },
+      set opacity(o: number) {
+        set('opacity', o)
+      },
+      // Whether the active variant changes this layer.
+      get changed() {
+        return !!variant()?.layers[l.id]
+      },
+    }
   }
 
   // Layers
@@ -327,8 +395,12 @@ class Store {
     const key = 'export:' + this.model.path
     const target = ask ? '' : load(key, '')
     try {
-      const shot = this.snapshot()
-      const path = await api.Export(this.model.path, this.project.unwrap, shot.color, shot.emissive, this.project.finish.glow, target)
+      const shot = this.snapshot('')
+      const variants = this.project.variants.map((v) => {
+        const s = this.snapshot!(v.id)
+        return { name: v.name, color: s.color, emissive: s.emissive }
+      })
+      const path = await api.Export(this.model.path, this.project.unwrap, shot.color, shot.emissive, variants, this.project.finish.glow, target)
       if (!path) return
       persist(key, path)
       this.say('exported ' + path.split('/').pop())

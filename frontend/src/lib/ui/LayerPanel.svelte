@@ -7,22 +7,29 @@
   import Slider from './Slider.svelte'
 
   const layer = $derived(store.layer)
+  const look = $derived(layer && store.look(layer))
 
-  // Colors of the other layers, for quick reuse.
-  const used = $derived([...new Set(store.project.layers.map((l) => l.color.toLowerCase()))])
+  // Colors of the other layers and variants, for quick reuse.
+  const used = $derived([
+    ...new Set(
+      [...store.project.layers.map((l) => l.color), ...store.project.variants.flatMap((v) => Object.values(v.layers).map((l) => l.color ?? ''))]
+        .filter(Boolean)
+        .map((c) => c.toLowerCase()),
+    ),
+  ])
 </script>
 
-{#if layer}
+{#if layer && look}
   <div class="section">
-    <div class="caps">color</div>
-    <ColorField bind:value={layer.color} />
+    <div class="caps">color{#if store.activeVariant}<span class="variant">{store.activeVariant.name}</span>{/if}</div>
+    <ColorField bind:value={look.color} />
     <label class="check"><input type="checkbox" bind:checked={layer.glow} /> glows (emissive)</label>
     {#if layer.masks.some((m) => m.kind === 'stamps')}
       <label class="check"><input type="checkbox" bind:checked={layer.stampColors} /> colors from image stamps</label>
     {/if}
     <div class="swatches">
       {#each used as c}
-        <button class="sw" class:on={c === layer.color.toLowerCase()} style:background={c} title={c} aria-label={c} onclick={() => (layer.color = c)}></button>
+        <button class="sw" class:on={c === look.color.toLowerCase()} style:background={c} title={c} aria-label={c} onclick={() => (look.color = c)}></button>
       {/each}
     </div>
   </div>
@@ -40,7 +47,7 @@
   <div class="section">
     <div class="caps">blend</div>
     <Seg value={layer.blend} options={blends.map((b) => [b, b.slice(0, 4)])} onchange={(v) => (layer.blend = v)} />
-    <Slider label="opacity" bind:value={layer.opacity} def={1} />
+    <Slider label="opacity" bind:value={look.opacity} def={1} />
   </div>
 
   <div class="section">
@@ -69,6 +76,11 @@
     flex-direction: column;
     gap: 6px;
     padding: 12px 14px 14px;
+  }
+  .variant {
+    margin-left: 8px;
+    color: var(--accent);
+    text-transform: none;
   }
   .section + .section {
     border-top: 1px solid var(--line);

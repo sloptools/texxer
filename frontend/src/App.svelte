@@ -13,6 +13,7 @@
   import ToolPanel from './lib/ui/ToolPanel.svelte'
   import { tools } from './lib/tools.svelte'
   import Viewport from './lib/Viewport.svelte'
+  import VariantBar from './lib/ui/VariantBar.svelte'
 
   let headlight = 0.6
   let side = $state<'layers' | 'settings'>(localStorage.getItem('side') === 'settings' ? 'settings' : 'layers')
@@ -151,7 +152,10 @@
           else store.select(-1)
           break
         case 'v':
-          if (l) l.visible = !l.visible
+          if (l) {
+            const look = store.look(l)
+            look.visible = !look.visible
+          }
           break
         case 'l':
           store.view = 'lit'
@@ -182,6 +186,9 @@
           break
         case 't':
           store.torch = !store.torch
+          break
+        case 'c':
+          store.cycleVariant()
           break
         case 'Tab':
           store.flat = !store.flat
@@ -222,6 +229,7 @@
       </div>
       <div class="scroll">
         {#if side === 'layers'}
+          <VariantBar />
           <LayerList />
         {:else}
           <Finish />

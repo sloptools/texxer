@@ -108,6 +108,13 @@ export type Light = {
   torch: number
 }
 
+// What a variant changes about a layer.
+export type LayerLook = { color?: string; visible?: boolean; opacity?: number }
+
+// A variant of the texture, like a player color: the base project with some layers
+// looking different. The export writes a texture per variant.
+export type Variant = { id: string; name: string; layers: Record<string, LayerLook> }
+
 export type Project = {
   version: 1
   size: number
@@ -115,6 +122,7 @@ export type Project = {
   unwrap: number
   layers: Layer[]
   groups: Group[]
+  variants: Variant[]
   finish: Finish
   shading: Shading
   light: Light

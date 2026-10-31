@@ -4,6 +4,7 @@
   import { Compositor, loadBake } from './gl/compositor'
   import { PaintStore } from './gl/paint'
   import { Stage } from './gl/stage'
+  import { withVariant } from './project'
   import { corners } from './stamps'
   import { store } from './store.svelte'
   import { ToolInput } from './toolInput'
@@ -56,7 +57,7 @@
     const loop = () => {
       frame = requestAnimationFrame(loop)
       if (compositor && dirty) {
-        const project = $state.snapshot(store.project)
+        const project = withVariant($state.snapshot(store.project), store.variant)
         compositor.render(project, store.selected, tools.ghost && $state.snapshot(tools.ghost))
         if (project.finish.palette === 'auto') schedulePalette(compositor)
         dirty = false
@@ -91,7 +92,7 @@
     clearTimeout(paletteTimer)
     paletteTimer = setTimeout(() => {
       if (c !== compositor) return
-      const project = $state.snapshot(store.project)
+      const project = withVariant($state.snapshot(store.project), store.variant)
       c.pickPalette(project.finish.count)
       c.finish(project)
     }, 150)
@@ -124,13 +125,14 @@
         s.posData = bake.posData
         s.posSize = bake.size
         compositor = c
-        store.snapshot = () => {
-          const project = $state.snapshot(store.project)
+        store.snapshot = (variant) => {
+          const project = withVariant($state.snapshot(store.project), variant)
           c.render(project, store.selected)
           if (project.finish.palette === 'auto') {
             c.pickPalette(project.finish.count)
             c.finish(project)
           }
+          dirty = true
           return { color: c.png(), emissive: c.hasEmission && c.emission ? c.png(c.emission) : '' }
         }
         dirty = true
@@ -149,6 +151,8 @@
     JSON.stringify(store.project.finish)
     JSON.stringify(store.project.shading)
     JSON.stringify(store.project.groups)
+    JSON.stringify(store.project.variants)
+    store.variant
     store.selected
     dirty = true
   })

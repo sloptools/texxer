@@ -51,6 +51,7 @@ export function newProject(): Project {
       newLayer('wear', '#a8a59a', [newMask('edges')]),
     ],
     groups: [],
+    variants: [],
     finish: { supersample: 2, sharpen: 0.2, palette: 'auto', count: 48, colors: [], dither: 0, glow: 3 },
     shading: {
       on: true,
@@ -84,4 +85,11 @@ export function normalize(p: Partial<Project>): Project {
       masks: l.masks.map((m) => ({ ...newMask(m.kind), ...m })),
     })),
   }
+}
+
+// The project as a variant shows it; an unknown id is the base.
+export function withVariant(p: Project, id: string): Project {
+  const v = p.variants.find((v) => v.id === id)
+  if (!v) return p
+  return { ...p, layers: p.layers.map((l) => ({ ...l, ...v.layers[l.id] })) }
 }

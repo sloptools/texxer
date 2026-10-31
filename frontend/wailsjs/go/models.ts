@@ -42,6 +42,22 @@ export namespace main {
 	        this.density = source["density"];
 	    }
 	}
+	export class VariantTextures {
+	    name: string;
+	    color: string;
+	    emissive: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VariantTextures(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.color = source["color"];
+	        this.emissive = source["emissive"];
+	    }
+	}
 
 }
 

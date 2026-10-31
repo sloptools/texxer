@@ -122,11 +122,12 @@
         <span class="meta">{row.count}</span>
       </div>
     {:else}
+      {@const look = store.look(row.l)}
       <div
         class="row"
         class:nested={row.nested}
         class:on={row.i === store.selected}
-        class:hidden={!row.l.visible || store.group(row.l.group)?.visible === false}
+        class:hidden={!look.visible || store.group(row.l.group)?.visible === false}
         class:lifted={drag?.active && drag.key === row.key}
         class:drop-above={dropWhere === 'above'}
         class:drop-below={dropWhere === 'below'}
@@ -139,8 +140,8 @@
         ondblclick={() => (renaming = row.key)}
         onkeydown={() => {}}
       >
-        <button class="eye" title="Show or hide (V)" onclick={() => (row.l.visible = !row.l.visible)}><Icon name="eye" size={11} /></button>
-        <span class="swatch" style:background={row.l.color}></span>
+        <button class="eye" title="Show or hide (V)" onclick={() => (look.visible = !look.visible)}><Icon name="eye" size={11} /></button>
+        <span class="swatch" class:changed={look.changed} style:background={look.color}></span>
         {#if renaming === row.key}
           {@render nameInput(row.l)}
         {:else}
@@ -281,6 +282,10 @@
     height: 14px;
     border-radius: 3px;
     box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25);
+  }
+  .swatch.changed {
+    outline: 1px solid var(--accent);
+    outline-offset: 1px;
   }
 
   .name {
