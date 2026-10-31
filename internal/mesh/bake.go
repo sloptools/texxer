@@ -286,8 +286,8 @@ func basis(n Vec) (Vec, Vec) {
 	return t, n.Cross(t)
 }
 
-// pad grows the maps a few texels past their UV islands, so filtering and
-// mipmaps don't pull in the empty background at seams.
+// pad grows the maps a few texels past their UV islands, blending neighbors, then
+// fills the rest of the texture.
 func (m *Maps) pad(texels int) {
 	covered := slices.Clone(m.Mask)
 	gray := [][]float32{m.AO, m.Edges, m.Cavity, m.Up, m.Height, m.Part, m.Selected}
@@ -335,6 +335,41 @@ func (m *Maps) pad(texels int) {
 			}
 		}
 		covered = next
+	}
+	m.fill(covered)
+}
+
+// fill gives every texel past the padding the values of the nearest one inside, so
+// smaller mipmaps average the surface instead of the dark empty background.
+func (m *Maps) fill(covered []float32) {
+	gray := [][]float32{m.AO, m.Edges, m.Cavity, m.Up, m.Height, m.Part, m.Selected, m.PartID, m.Island}
+	done := make([]bool, len(covered))
+	var queue []int
+	for i, c := range covered {
+		if c > 0 {
+			done[i] = true
+			queue = append(queue, i)
+		}
+	}
+
+	for len(queue) > 0 {
+		i := queue[0]
+		queue = queue[1:]
+		x, y := i%m.W, i/m.W
+		for _, d := range [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+			nx, ny := x+d[0], y+d[1]
+			if nx < 0 || nx >= m.W || ny < 0 || ny >= m.H || done[ny*m.W+nx] {
+				continue
+			}
+			j := ny*m.W + nx
+			for _, buf := range gray {
+				buf[j] = buf[i]
+			}
+			copy(m.Normal[j*3:j*3+3], m.Normal[i*3:i*3+3])
+			copy(m.Position[j*3:j*3+3], m.Position[i*3:i*3+3])
+			done[j] = true
+			queue = append(queue, j)
+		}
 	}
 }
 

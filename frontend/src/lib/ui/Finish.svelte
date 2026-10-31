@@ -95,7 +95,7 @@
 <div class="section">
   <div class="caps">game light</div>
   <ColorField label="ambient" bind:value={p.light.gameAmbient} />
-  <Slider label="energy" bind:value={p.light.gameEnergy} max={4} def={1.5} />
+  <Slider label="energy" bind:value={p.light.gameEnergy} max={4} def={1} />
   <Slider label="top light" bind:value={p.light.gameTop} max={3} def={0.6} />
   <Slider label="torch" bind:value={p.light.torch} max={4} def={1} />
 </div>
