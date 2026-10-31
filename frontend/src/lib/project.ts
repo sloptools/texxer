@@ -87,7 +87,7 @@ export function normalize(p: Partial<Project>): Project {
     layers: (p.layers ?? base.layers).map((l) => ({
       ...newLayer(l.name, l.color),
       ...l,
-      masks: l.masks.map((m) => ({ ...newMask(m.kind), ...m })),
+      masks: (l.masks ?? []).map((m) => ({ ...newMask(m.kind), ...m })),
     })),
   }
 }
