@@ -6,6 +6,7 @@
   import Seg from './Seg.svelte'
   import Slider from './Slider.svelte'
   import HelpLink from './HelpLink.svelte'
+  import FolderPanel from './FolderPanel.svelte'
 
   const layer = $derived(store.layer)
   const look = $derived(layer && store.look(layer))
@@ -20,7 +21,9 @@
   ])
 </script>
 
-{#if layer && look}
+{#if store.selectedGroup}
+  <FolderPanel />
+{:else if layer && look}
   <div class="section">
     <div class="caps">color{#if store.activeVariant}<span class="variant">{store.activeVariant.name}</span>{/if}</div>
     <ColorField bind:value={look.color} />

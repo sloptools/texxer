@@ -65,6 +65,7 @@
         ['⌥↑ ⌥↓', 'move'],
         ['V', 'show / hide'],
         ['⌘G ⇧⌘G', 'into a new folder, dissolve folder'],
+        ['⇧M', 'add a material (a folder of layers)'],
         ['C', 'next variant (color, visibility, opacity per layer)'],
         ['drag', 'reorder, drop on a folder to put it in'],
       ],

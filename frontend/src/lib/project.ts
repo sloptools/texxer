@@ -83,6 +83,7 @@ export function normalize(p: Partial<Project>): Project {
     finish: { ...base.finish, ...p.finish },
     shading: { ...base.shading, ...p.shading },
     light: { ...base.light, ...p.light },
+    groups: (p.groups ?? []).map((g) => ({ ...g, zone: g.zone ?? { parts: [], islands: [] } })),
     layers: (p.layers ?? base.layers).map((l) => ({
       ...newLayer(l.name, l.color),
       ...l,

@@ -32,7 +32,8 @@
       if (tools.tool !== 'nav') return
       const hit = s.hit(e.clientX, e.clientY)
       if (!hit || hit.part < 0) return
-      if (store.picksIslands || (e.metaKey && e.shiftKey)) store.toggleIsland(hit.island)
+      if (store.selectedGroup) store.toggleZone(e.metaKey ? 'parts' : 'islands', e.metaKey ? hit.part : hit.island)
+      else if (store.picksIslands || (e.metaKey && e.shiftKey)) store.toggleIsland(hit.island)
       else if (e.metaKey || store.layer?.masks.some((m) => m.kind === 'parts')) store.togglePart(hit.part)
     }
 

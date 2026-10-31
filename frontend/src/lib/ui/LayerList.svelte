@@ -99,6 +99,8 @@
     {#if row.kind === 'group'}
       <div
         class="row group"
+        class:on={store.selectedGroup === row.g.id}
+        class:zoned={row.g.zone.parts.length + row.g.zone.islands.length > 0}
         class:hidden={!row.g.visible}
         class:lifted={drag?.active && drag.key === row.key}
         class:drop-above={dropWhere === 'above'}
@@ -106,9 +108,11 @@
         data-row={row.key}
         role="treeitem"
         aria-expanded={row.g.open}
-        aria-selected="false"
+        aria-selected={store.selectedGroup === row.g.id}
         tabindex="-1"
         onpointerdown={(e) => down(e, row)}
+        onclick={() => (store.selectedGroup = row.g.id)}
+        onkeydown={() => {}}
         ondblclick={() => (renaming = row.key)}
       >
         <button class="eye" title="Show or hide the folder" onclick={() => (row.g.visible = !row.g.visible)}><Icon name="eye" size={11} /></button>
@@ -136,7 +140,7 @@
         aria-selected={row.i === store.selected}
         tabindex="-1"
         onpointerdown={(e) => down(e, row)}
-        onclick={() => (store.selected = row.i)}
+        onclick={() => ((store.selected = row.i), (store.selectedGroup = ''))}
         ondblclick={() => (renaming = row.key)}
         onkeydown={() => {}}
       >
@@ -195,6 +199,9 @@
   }
   .row.nested {
     padding-left: 18px;
+  }
+  .row.group.zoned .folder {
+    color: var(--accent);
   }
   .row.on {
     background: var(--active);

@@ -16,9 +16,11 @@
   import VariantBar from './lib/ui/VariantBar.svelte'
   import ModelList from './lib/ui/ModelList.svelte'
   import QuickOpen from './lib/ui/QuickOpen.svelte'
+  import MaterialMenu from './lib/ui/MaterialMenu.svelte'
   import { addModels, createProject, cycleModel, exportChanged, exportModel, openProject, pickProject, projectName, recent, refreshHashes } from './lib/projects.svelte'
 
   let headlight = 0.6
+  let materials = $state(false)
   type Side = 'models' | 'layers' | 'settings'
   const sides: Side[] = ['models', 'layers', 'settings']
   let side = $state<Side>(sides.find((s) => s === localStorage.getItem('side')) ?? 'layers')
@@ -184,6 +186,10 @@
         case 'm':
           store.view = store.view === 'mask' ? 'lit' : 'mask'
           break
+        case 'M':
+          side = 'layers'
+          materials = true
+          break
         case 'h':
           if (light.headlight > 0) {
             headlight = light.headlight
@@ -248,6 +254,7 @@
         {/each}
         {#if side === 'layers' && store.model}
           <span class="icons">
+            <button class="icon" title="Add a material: a folder of layers (⇧M)" onclick={() => (materials = !materials)}><Icon name="ball" size={11} /></button>
             <button class="icon" title="Put the layer in a new folder (⌘G)" onclick={() => store.groupLayer()}><Icon name="dir" size={11} /></button>
             <button class="icon" title="New layer (N)" onclick={() => store.addLayer(tools.layerMask)}><Icon name="plus" size={11} /></button>
           </span>
@@ -257,6 +264,9 @@
           </span>
         {/if}
       </div>
+      {#if materials && side === 'layers'}
+        <MaterialMenu onclose={() => (materials = false)} />
+      {/if}
       <div class="scroll">
         {#if side === 'models'}
           <ModelList />
@@ -387,6 +397,7 @@
   }
 
   aside {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -406,13 +417,13 @@
   .tabs {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 1px;
     height: 38px;
-    padding: 0 8px 0 6px;
+    padding: 0 4px 0 6px;
   }
   .tabs .caps {
     height: 24px;
-    padding: 0 8px;
+    padding: 0 6px;
     border: 0;
     border-radius: 6px;
     background: none;
@@ -427,7 +438,7 @@
   }
   .icons {
     display: flex;
-    gap: 2px;
+    gap: 0;
     margin-left: auto;
   }
   .icon {

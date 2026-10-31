@@ -11,6 +11,9 @@ export const kindIndex = { parts: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, fa
 
 // Island ids a mask can select; smaller ones are too small to matter.
 export const maxIslands = 4096
+
+// Folders that can have a zone.
+export const maxGroups = 64
 export const blendIndex = { normal: 0, multiply: 1, add: 2, overlay: 3, relief: 4 } as const
 
 // Light from direction l on normal n: 1 facing it, 0 away. Wrap lights half the
@@ -71,6 +74,9 @@ uniform sampler2D uPos;
 uniform sampler2D uNrm;
 uniform sampler2D uParts;
 uniform sampler2D uIslands;
+uniform sampler2D uZoneParts;
+uniform sampler2D uZoneIslands;
+uniform int uZone;
 uniform vec3 uExtent;
 uniform vec3 uColor;
 uniform float uTone;
@@ -213,13 +219,21 @@ vec3 blend(vec3 a, vec3 b) {
   return b;
 }
 
+// The folder's zone: its parts and islands, or everywhere without one.
+float zone(ivec2 t, vec4 pos) {
+  if (uZone < 0) return 1.0;
+  float p = texelFetch(uZoneParts, ivec2(int(pos.w), uZone), 0).r;
+  float i = texelFetch(uZoneIslands, ivec2(int(texelFetch(uNrm, t, 0).w), uZone), 0).r;
+  return max(p, i);
+}
+
 void main() {
   ivec2 t = ivec2(gl_FragCoord.xy);
   vec4 geo = texelFetch(uGeo, t, 0);
   vec4 pos = texelFetch(uPos, t, 0);
   vec3 n = texelFetch(uNrm, t, 0).xyz;
 
-  float m = 1.0;
+  float m = zone(t, pos);
   for (int i = 0; i < ${maxMasks}; i++) {
     if (i >= uCount) break;
     m *= mask(i, t, geo, pos, n);

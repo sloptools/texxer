@@ -36,6 +36,8 @@ class Store {
   fileHashes = $state<Record<string, string>>({})
   quickOpen = $state(false)
   selected = $state(0)
+  // A folder picked in the list shows its panel instead of the layer's.
+  selectedGroup = $state('')
   // The variant being looked at and edited, '' for the base.
   variant = $state('')
   view = $state<View>('lit')
@@ -310,7 +312,7 @@ class Store {
   groupLayer() {
     const l = this.layer
     if (!l) return
-    const g: Group = { id: uid(), name: 'folder ' + (this.project.groups.length + 1), open: true, visible: true }
+    const g: Group = { id: uid(), name: 'folder ' + (this.project.groups.length + 1), open: true, visible: true, zone: { parts: [], islands: [] } }
     this.project.groups.push(g)
     l.group = g.id
     this.dropEmptyGroups()
@@ -345,6 +347,7 @@ class Store {
 
   select(delta: number) {
     this.selected = Math.max(0, Math.min(this.project.layers.length - 1, this.selected + delta))
+    this.selectedGroup = ''
   }
 
   addMask(kind: MaskKind) {
@@ -387,9 +390,19 @@ class Store {
     else m.parts.push(part)
   }
 
-  // Clicks pick islands while the selected layer has an islands mask.
+  // Clicks pick islands while a folder is picked or the layer has an islands mask.
   get picksIslands() {
-    return !!this.layer?.masks.some((m) => m.kind === 'islands')
+    return !!this.selectedGroup || !!this.layer?.masks.some((m) => m.kind === 'islands')
+  }
+
+  // Toggles a part or an island in the picked folder's zone.
+  toggleZone(kind: 'parts' | 'islands', id: number) {
+    const g = this.group(this.selectedGroup)
+    if (!g || id < 0) return
+    const list = g.zone[kind]
+    const i = list.indexOf(id)
+    if (i >= 0) list.splice(i, 1)
+    else list.push(id)
   }
 
   // Toggles an island in the selected layer's islands mask, adding the mask if needed.

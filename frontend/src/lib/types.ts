@@ -45,6 +45,8 @@ export type Group = {
   name: string
   open: boolean
   visible: boolean
+  // Where the folder's layers may show: these parts and islands. Empty, everywhere.
+  zone: { parts: number[]; islands: number[] }
 }
 
 export type Layer = {
