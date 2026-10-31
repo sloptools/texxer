@@ -52,9 +52,14 @@
         if (project.finish.palette === 'auto') schedulePalette(compositor)
         dirty = false
       }
+      if (compositor) {
+        const glow = compositor.hasEmission && store.view !== 'mask' ? compositor.emission!.texture : null
+        s.setEmission(glow, store.project.finish.glow)
+      }
       if (hoverPoint) {
         const hit = s.hit(hoverPoint.x, hoverPoint.y)
         store.hoverPart = hit?.part ?? -1
+        s.torch.aimAt(hit?.point)
       }
       s.render()
     }
@@ -116,7 +121,7 @@
             c.pickPalette(project.finish.count)
             c.finish(project)
           }
-          return c.png()
+          return { color: c.png(), emissive: c.hasEmission && c.emission ? c.png(c.emission) : '' }
         }
         dirty = true
       })
@@ -148,6 +153,12 @@
     if (!stage) return
     stage.setLight({ ...store.project.light })
     stage.setBloom(store.bloom)
+    stage.setGrid(store.grid)
+    stage.torch.set(store.torch, store.project.light.torch)
+  })
+
+  $effect(() => {
+    stage?.setResolution(store.lines)
   })
 
   $effect(() => {

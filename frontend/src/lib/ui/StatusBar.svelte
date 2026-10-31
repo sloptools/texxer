@@ -36,6 +36,9 @@
 
   <span class="tools">
     <Seg value={store.view} options={views} onchange={(v) => (store.view = v)} />
+    <button title="Render at game resolution (P)" class:on={store.lines > 0} onclick={() => store.cycleLines()}>{store.lines ? store.lines + 'p' : 'full res'}</button>
+    <button class:on={store.torch} title="Flashlight at the cursor (T)" onclick={() => (store.torch = !store.torch)}>torch</button>
+    <button class:on={store.grid} title="Grid (⇧G)" onclick={() => (store.grid = !store.grid)}>grid</button>
     <button class:on={store.bloom} title="Bloom (⇧B)" onclick={() => (store.bloom = !store.bloom)}>bloom</button>
     <button title="Shortcuts (?)" onclick={() => (store.help = true)}>?</button>
   </span>

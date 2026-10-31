@@ -35,7 +35,7 @@ export function newMask(kind: MaskKind): Mask {
 }
 
 export function newLayer(name: string, color: string, masks: Mask[] = [], extra: Partial<Layer> = {}): Layer {
-  return { id: uid(), name, group: '', color, tone: 0.25, toneScale: 12, grain: 0.06, shine: 0, stampColors: false, opacity: 1, blend: 'normal', visible: true, masks, ...extra }
+  return { id: uid(), name, group: '', color, tone: 0.25, toneScale: 12, grain: 0.06, shine: 0, stampColors: false, glow: false, opacity: 1, blend: 'normal', visible: true, masks, ...extra }
 }
 
 // A starter stack that already reads as worn metal, so a fresh model looks like something.
@@ -50,7 +50,7 @@ export function newProject(): Project {
       newLayer('wear', '#a8a59a', [newMask('edges')]),
     ],
     groups: [],
-    finish: { supersample: 2, sharpen: 0.2, palette: 'auto', count: 48, colors: [], dither: 0 },
+    finish: { supersample: 2, sharpen: 0.2, palette: 'auto', count: 48, colors: [], dither: 0, glow: 3 },
     shading: {
       on: true,
       azimuth: 60,
@@ -64,7 +64,7 @@ export function newProject(): Project {
       rim: 0.3,
       bothSides: true,
     },
-    light: { key: 2.2, ambient: 1, headlight: 0.6, angle: 35, gameAmbient: '#40717f', gameEnergy: 1.5, gameTop: 0.6 },
+    light: { key: 2.2, ambient: 1, headlight: 0.6, angle: 35, gameAmbient: '#40717f', gameEnergy: 1.5, gameTop: 0.6, torch: 1 },
   }
 }
 

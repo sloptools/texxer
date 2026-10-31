@@ -16,6 +16,7 @@
   <div class="section">
     <div class="caps">color</div>
     <ColorField bind:value={layer.color} />
+    <label class="check"><input type="checkbox" bind:checked={layer.glow} /> glows (emissive)</label>
     {#if layer.masks.some((m) => m.kind === 'stamps')}
       <label class="check"><input type="checkbox" bind:checked={layer.stampColors} /> colors from image stamps</label>
     {/if}

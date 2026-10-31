@@ -12,6 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"texxer/internal/grunge"
+	"texxer/internal/mesh"
 	"texxer/internal/palette"
 )
 
@@ -198,9 +199,10 @@ func (a *App) Palette(kind string) ([][3]uint8, error) {
 	return out, nil
 }
 
-// Export writes the texture as a PNG and the model with it as a GLB. An empty
-// target asks where to put it. It returns the GLB path, empty when cancelled.
-func (a *App) Export(modelPath, pngBase64, target string) (string, error) {
+// Export writes the textures as PNGs and the model with them as a GLB. An
+// empty target asks where to put it, an empty emissive leaves it out. It
+// returns the GLB path, empty when cancelled.
+func (a *App) Export(modelPath, pngBase64, emissiveBase64 string, emissiveStrength float64, target string) (string, error) {
 	if target == "" {
 		name := strings.TrimSuffix(filepath.Base(modelPath), filepath.Ext(modelPath)) + "_texxer.glb"
 		var err error
@@ -215,21 +217,33 @@ func (a *App) Export(modelPath, pngBase64, target string) (string, error) {
 		}
 	}
 
-	png, err := base64.StdEncoding.DecodeString(pngBase64)
-	if err != nil {
+	t := mesh.Textures{EmissiveStrength: emissiveStrength}
+	var err error
+	if t.Color, err = base64.StdEncoding.DecodeString(pngBase64); err != nil {
 		return "", err
+	}
+	if emissiveBase64 != "" {
+		if t.Emissive, err = base64.StdEncoding.DecodeString(emissiveBase64); err != nil {
+			return "", err
+		}
 	}
 	glb, err := os.ReadFile(modelPath)
 	if err != nil {
 		return "", err
 	}
-	out, err := withTexture(glb, png)
+	out, err := withTexture(glb, t)
 	if err != nil {
 		return "", err
 	}
 
-	if err := os.WriteFile(strings.TrimSuffix(target, filepath.Ext(target))+".png", png, 0o644); err != nil {
+	base := strings.TrimSuffix(target, filepath.Ext(target))
+	if err := os.WriteFile(base+".png", t.Color, 0o644); err != nil {
 		return "", err
+	}
+	if t.Emissive != nil {
+		if err := os.WriteFile(base+"_emissive.png", t.Emissive, 0o644); err != nil {
+			return "", err
+		}
 	}
 	return target, os.WriteFile(target, out, 0o644)
 }

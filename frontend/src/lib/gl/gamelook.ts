@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
+import { torchPatch } from './torch'
 
 // Substratum's world: a flat teal ambient, SSAO, ACES, then brightness,
 // contrast and saturation adjustments (scenes/world/world.tscn).
@@ -12,12 +13,14 @@ export const game = {
 }
 
 // Lit from baked maps, so it matches the game's flat ambient: AO stands in for SSAO,
-// and an optional light from above for the hangar spot.
+// plus an optional light from above for the hangar spot, and the torch.
 export const gamePatch = /* glsl */ `
 if (uGame == 1) {
   float ao = mix(1.0, texture(uGeoMap, vMapUv).r, uAoStrength);
   vec3 n = texture(uNrmMap, vMapUv).xyz;
-  diffuseColor.rgb *= (uAmbient + uTop * max(n.y, 0.0)) * ao;
+  vec3 light = (uAmbient + uTop * max(n.y, 0.0)) * ao;
+  ${torchPatch}
+  diffuseColor.rgb *= light;
 }
 `
 

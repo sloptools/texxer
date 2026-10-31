@@ -22,7 +22,9 @@
         ['F', 'focus point under cursor'],
         ['L U I M', 'lit, unlit, in game, mask'],
         ['H', 'headlight on/off'],
-        ['⇧B', 'bloom'],
+        ['⇧B ⇧G', 'bloom, grid'],
+        ['P', 'game resolution: full, 480, 360, 240'],
+        ['T', 'flashlight at the cursor'],
       ],
     ],
     [

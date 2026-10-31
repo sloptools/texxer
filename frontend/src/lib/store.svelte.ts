@@ -28,6 +28,10 @@ class Store {
   selected = $state(0)
   view = $state<View>('lit')
   bloom = $state(true)
+  grid = $state(false)
+  torch = $state(false)
+  // Vertical resolution of the view, 0 for full; lets you judge the texture at game size.
+  lines = $state(0)
   baking = $state(false)
   hoverPart = $state(-1)
   help = $state(false)
@@ -36,8 +40,8 @@ class Store {
   grungeMaps = $state<string[]>([])
   stampImages = $state<string[]>([])
 
-  // Set by the viewport: renders the finished texture as a base64 PNG.
-  snapshot: (() => string) | null = null
+  // Set by the viewport: renders the finished textures as base64 PNGs; emissive is empty when nothing glows.
+  snapshot: (() => { color: string; emissive: string }) | null = null
   paint: PaintStore | null = null
 
   private past: Entry[] = []
@@ -295,13 +299,19 @@ class Store {
     const key = 'export:' + this.model.path
     const target = ask ? '' : load(key, '')
     try {
-      const path = await api.Export(this.model.path, this.snapshot(), target)
+      const shot = this.snapshot()
+      const path = await api.Export(this.model.path, shot.color, shot.emissive, this.project.finish.glow, target)
       if (!path) return
       persist(key, path)
       this.say('exported ' + path.split('/').pop())
     } catch (e) {
       this.say(String(e))
     }
+  }
+
+  cycleLines() {
+    const steps = [0, 480, 360, 240]
+    this.lines = steps[(steps.indexOf(this.lines) + 1) % steps.length]
   }
 
   async importStamps() {

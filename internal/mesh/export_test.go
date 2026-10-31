@@ -23,7 +23,7 @@ func TestWithTexture(t *testing.T) {
 	var buf bytes.Buffer
 	png.Encode(&buf, tex)
 
-	out, err := WithTexture(src, buf.Bytes(), "albedo")
+	out, err := WithTexture(src, Textures{Color: buf.Bytes()}, "albedo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,30 @@ func TestWithTexture(t *testing.T) {
 		t.Errorf("export grew from %d to %d bytes with a tiny texture", len(src), len(out))
 	}
 
-	if _, err := WithTexture(src, buf.Bytes(), "nope"); err == nil {
+	if _, err := WithTexture(src, Textures{Color: buf.Bytes()}, "nope"); err == nil {
 		t.Error("expected an error for a missing material")
+	}
+
+	// An emissive texture comes with its strength as an extension.
+	glow, err := WithTexture(src, Textures{Color: buf.Bytes(), Emissive: buf.Bytes(), EmissiveStrength: 3}, "albedo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, _, err = rawGLB(glow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range sliceArray(doc, "materials") {
+		mat := m.(map[string]any)
+		if mat["name"] != "albedo" {
+			continue
+		}
+		ext, _ := mat["extensions"].(map[string]any)
+		if mat["emissiveTexture"] == nil || ext["KHR_materials_emissive_strength"] == nil {
+			t.Errorf("albedo should glow: %v", mat)
+		}
+	}
+	if len(sliceArray(doc, "images")) < 2 {
+		t.Error("emissive image missing")
 	}
 }

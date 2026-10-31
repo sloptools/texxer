@@ -171,6 +171,15 @@
         case 'B':
           store.bloom = !store.bloom
           break
+        case 'G':
+          store.grid = !store.grid
+          break
+        case 'p':
+          store.cycleLines()
+          break
+        case 't':
+          store.torch = !store.torch
+          break
         case '?':
           store.help = true
           break

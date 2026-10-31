@@ -99,8 +99,8 @@ func (c *modelCache) bake(path string, size int) ([]byte, error) {
 	return out, nil
 }
 
-func withTexture(glb, png []byte) ([]byte, error) {
-	return mesh.WithTexture(glb, png, "")
+func withTexture(glb []byte, t mesh.Textures) ([]byte, error) {
+	return mesh.WithTexture(glb, t, "")
 }
 
 // middleware serves model files and bakes, which are too large for bindings.

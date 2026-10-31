@@ -14,11 +14,19 @@ const (
 	filterNearestMipNearest = 9984
 )
 
-// WithTexture returns a copy of a binary glTF whose material uses png as its
-// base color texture. An empty material picks every material that already
+// Textures to put on a model. Emissive is optional; its strength above 1
+// goes into KHR_materials_emissive_strength, so engines can make it bloom.
+type Textures struct {
+	Color            []byte
+	Emissive         []byte
+	EmissiveStrength float64
+}
+
+// WithTexture returns a copy of a binary glTF whose material uses the
+// textures. An empty material picks every material that already
 // has a base color texture, or every non-emissive one if none has. Other
 // materials are left alone. The binary chunk is rebuilt, so replaced images don't linger in the file.
-func WithTexture(glb, png []byte, material string) ([]byte, error) {
+func WithTexture(glb []byte, t Textures, material string) ([]byte, error) {
 	doc, bin, err := rawGLB(glb)
 	if err != nil {
 		return nil, err
@@ -40,13 +48,20 @@ func WithTexture(glb, png []byte, material string) ([]byte, error) {
 		data[i] = bin[off : off+length]
 	}
 
-	// The new image, texture and pixel art sampler.
-	data = append(data, png)
-	views = append(views, map[string]any{"buffer": 0.0})
-	images = append(images, map[string]any{"bufferView": float64(len(views) - 1), "mimeType": "image/png", "name": "texxer"})
+	// The new images and textures, with one pixel art sampler.
 	samplers = append(samplers, map[string]any{"magFilter": float64(filterNearest), "minFilter": float64(filterNearestMipNearest)})
-	textures = append(textures, map[string]any{"source": float64(len(images) - 1), "sampler": float64(len(samplers) - 1)})
-	tex := float64(len(textures) - 1)
+	add := func(png []byte, name string) float64 {
+		data = append(data, png)
+		views = append(views, map[string]any{"buffer": 0.0})
+		images = append(images, map[string]any{"bufferView": float64(len(views) - 1), "mimeType": "image/png", "name": name})
+		textures = append(textures, map[string]any{"source": float64(len(images) - 1), "sampler": float64(len(samplers) - 1)})
+		return float64(len(textures) - 1)
+	}
+	tex := add(t.Color, "texxer")
+	emit := -1.0
+	if t.Emissive != nil {
+		emit = add(t.Emissive, "texxer_emissive")
+	}
 
 	textured := hasBaseTexture(materials)
 	used := 0
@@ -77,6 +92,9 @@ func WithTexture(glb, png []byte, material string) ([]byte, error) {
 		// Fully rough and not metallic: the look is in the texture, not in PBR highlights.
 		pbr["metallicFactor"], pbr["roughnessFactor"] = 0.0, 1.0
 		delete(pbr, "metallicRoughnessTexture")
+		if emit >= 0 {
+			setEmissive(doc, mat, emit, t.EmissiveStrength)
+		}
 		used++
 	}
 	if used == 0 {
@@ -267,4 +285,26 @@ func emissive(mat map[string]any) bool {
 		}
 	}
 	return false
+}
+
+func setEmissive(doc, mat map[string]any, tex, strength float64) {
+	mat["emissiveTexture"] = map[string]any{"index": tex}
+	mat["emissiveFactor"] = []any{1.0, 1.0, 1.0}
+	if strength <= 1 {
+		return
+	}
+	ext, _ := mat["extensions"].(map[string]any)
+	if ext == nil {
+		ext = map[string]any{}
+		mat["extensions"] = ext
+	}
+	ext["KHR_materials_emissive_strength"] = map[string]any{"emissiveStrength": strength}
+
+	used, _ := doc["extensionsUsed"].([]any)
+	for _, u := range used {
+		if u == "KHR_materials_emissive_strength" {
+			return
+		}
+	}
+	doc["extensionsUsed"] = append(used, "KHR_materials_emissive_strength")
 }

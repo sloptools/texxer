@@ -35,11 +35,13 @@ export async function loadBake(path: string, size: number): Promise<Bake> {
   return { size, geo: texture(0), pos: texture(1), nrm: texture(2), posData: new Float32Array(buf, n * 4, n) }
 }
 
-function target(size: number) {
+// With mipmaps, the finished texture is sampled like Godot's nearest_mipmap filter,
+// so the view at a distance or at game resolution matches the game.
+function target(size: number, mipmaps = false) {
   return new THREE.WebGLRenderTarget(size, size, {
-    minFilter: THREE.NearestFilter,
+    minFilter: mipmaps ? THREE.NearestMipmapLinearFilter : THREE.NearestFilter,
     magFilter: THREE.NearestFilter,
-    generateMipmaps: false,
+    generateMipmaps: mipmaps,
     depthBuffer: false,
   })
 }
@@ -61,6 +63,9 @@ export class Compositor {
   readonly mask: THREE.WebGLRenderTarget
   private ping: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget]
   private reduced: THREE.WebGLRenderTarget
+  // The emissive map and its stack, made when a layer first glows.
+  private emitPing: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] | undefined
+  emission: THREE.WebGLRenderTarget | undefined
   private lightMat: THREE.ShaderMaterial
   private reduceMat: THREE.ShaderMaterial
   // The auto palette, picked from the texture a moment after it changes.
@@ -89,7 +94,7 @@ export class Compositor {
   ) {
     const vec4s = (n: number) => Array.from({ length: n }, () => new THREE.Vector4())
     const size = bake.size
-    this.out = target(size / factor)
+    this.out = target(size / factor, true)
     this.reduced = target(size / factor)
     this.mask = target(size)
     this.ping = [target(size), target(size)]
@@ -129,6 +134,8 @@ export class Compositor {
         uShine: { value: 0 },
         uSeed: { value: 0 },
         uStampColors: { value: 0 },
+        uEmitPass: { value: 0 },
+        uGlow: { value: 0 },
         uL: { value: new THREE.Vector3() },
         uL2: { value: new THREE.Vector3() },
         uBoth: { value: 1 },
@@ -200,6 +207,14 @@ export class Compositor {
     r.clear()
 
     const hidden = new Set(project.groups.filter((g) => !g.visible).map((g) => g.id))
+    const glowing = project.layers.some((l) => l.glow && l.visible && !hidden.has(l.group))
+    let esrc = 0
+    if (glowing) {
+      this.ensureEmission()
+      r.setRenderTarget(this.emitPing![0])
+      r.clear()
+    }
+
     project.layers.forEach((layer, i) => {
       this.setLayer(layer, i)
       u.uColor.value.set(layer.color).convertLinearToSRGB()
@@ -222,6 +237,16 @@ export class Compositor {
       u.uPrev.value = this.ping[src].texture
       this.draw(this.layerMat, this.ping[1 - src])
       src = 1 - src
+
+      if (glowing && (layer.glow || layer.blend === 'normal')) {
+        const e = this.emitPing!
+        u.uEmitPass.value = 1
+        u.uGlow.value = layer.glow ? 1 : 0
+        u.uPrev.value = e[esrc].texture
+        this.draw(this.layerMat, e[1 - esrc])
+        u.uEmitPass.value = 0
+        esrc = 1 - esrc
+      }
     })
 
     if (sh.on) {
@@ -243,9 +268,25 @@ export class Compositor {
     this.reduceMat.uniforms.uSrc.value = this.ping[src].texture
     this.reduceMat.uniforms.uSharpen.value = project.finish.sharpen
     this.draw(this.reduceMat, this.reduced)
+
+    this.hasEmission = glowing
+    if (glowing) {
+      this.reduceMat.uniforms.uSrc.value = this.emitPing![esrc].texture
+      this.reduceMat.uniforms.uSharpen.value = 0
+      this.draw(this.reduceMat, this.emission!)
+    }
     this.finish(project)
 
     r.setRenderTarget(prevTarget)
+  }
+
+  hasEmission = false
+
+  private ensureEmission() {
+    if (this.emitPing) return
+    const size = this.bake.size
+    this.emitPing = [target(size), target(size)]
+    this.emission = target(size / this.factor, true)
   }
 
   // Dither and palette only, for when just the palette changed.
@@ -349,10 +390,10 @@ export class Compositor {
   }
 
   // The finished texture as a base64 PNG, top row first like glTF UVs.
-  png(): string {
-    const size = this.out.width
+  png(from: THREE.WebGLRenderTarget = this.out): string {
+    const size = from.width
     const pixels = new Uint8Array(size * size * 4)
-    this.renderer.readRenderTargetPixels(this.out, 0, 0, size, size, pixels)
+    this.renderer.readRenderTargetPixels(from, 0, 0, size, size, pixels)
 
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = size
@@ -362,7 +403,7 @@ export class Compositor {
   }
 
   dispose() {
-    for (const t of [this.out, this.reduced, this.mask, ...this.ping]) t.dispose()
+    for (const t of [this.out, this.reduced, this.mask, ...this.ping, ...(this.emitPing ?? []), this.emission]) t?.dispose()
     this.layerMat.dispose()
     this.lightMat.dispose()
     this.reduceMat.dispose()

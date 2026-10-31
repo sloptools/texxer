@@ -8,14 +8,37 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import type { Light, View } from '../types'
 import { TrackpadControls } from './controls'
 import { game, gameDeclarations, gamePatch, gameUniforms, gradePass } from './gamelook'
+import { Torch, torchDeclarations } from './torch'
 
 export type Hit = { point: THREE.Vector3; normal: THREE.Vector3; part: number }
 
 // Our textures hold display colors; materials decode them so lighting works in linear.
+const decode = /* glsl */ `
+uniform sampler2D uPosMap;
+uniform float uHover;
+uniform sampler2D uEmitMap;
+uniform float uEmit;
+vec3 srgbDecode(vec3 c) {
+  return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
+}
+`
+
 const patch = /* glsl */ `
 #include <map_fragment>
-diffuseColor.rgb = mix(diffuseColor.rgb / 12.92, pow((diffuseColor.rgb + 0.055) / 1.055, vec3(2.4)), step(0.04045, diffuseColor.rgb));
+diffuseColor.rgb = srgbDecode(diffuseColor.rgb);
 if (uHover >= 0.0 && abs(texture(uPosMap, vMapUv).w - uHover) < 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 1.0, 0.95), 0.18);
+`
+
+// Glow from the emissive map: the lit material adds it as emission, the
+// others, which aren't lit by three, add it to their color after their light.
+const emitLambert = /* glsl */ `
+#include <emissivemap_fragment>
+totalEmissiveRadiance += srgbDecode(texture(uEmitMap, vMapUv).rgb) * uEmit;
+`
+const emitBasic = /* glsl */ `
+#ifndef LAMBERT
+diffuseColor.rgb += srgbDecode(texture(uEmitMap, vMapUv).rgb) * uEmit;
+#endif
 `
 
 // The 3D view: model, lights, bloom for emissive parts, and trackpad camera.
@@ -31,6 +54,11 @@ export class Stage {
   private background = new THREE.Color()
   private grid: THREE.GridHelper | undefined
   private gridColor = new THREE.Color(0x555555)
+  private showGrid = false
+  private radius = 1
+  // Vertical resolution to render at, like a game would; 0 renders at full size.
+  private lines = 0
+  readonly torch = new Torch()
 
   private hemi = new THREE.HemisphereLight(0xfff1e0, 0x2c3038, 1)
   private key = new THREE.DirectionalLight(0xfff6ea, 2)
@@ -42,7 +70,12 @@ export class Stage {
   private lit: THREE.MeshLambertMaterial
   private unlit: THREE.MeshBasicMaterial
   private gameMat: THREE.MeshBasicMaterial
-  private shared = { uPosMap: { value: null as THREE.Texture | null }, uHover: { value: -1 } }
+  private shared = {
+    uPosMap: { value: null as THREE.Texture | null },
+    uHover: { value: -1 },
+    uEmitMap: { value: null as THREE.Texture | null },
+    uEmit: { value: 0 },
+  }
   private gameShared = gameUniforms()
   private raycaster = new THREE.Raycaster()
   private timer = new THREE.Timer()
@@ -67,7 +100,7 @@ export class Stage {
     container.appendChild(renderer.domElement)
     this.renderer = renderer
 
-    this.scene.add(this.hemi, this.key, this.key.target, this.camera)
+    this.scene.add(this.hemi, this.key, this.key.target, this.camera, this.torch.light, this.torch.light.target)
     // The headlight sits a little above the eye, so faces don't go flat.
     this.head.position.set(0, 0.4, 0)
     this.head.target.position.set(0, 0, -1)
@@ -91,20 +124,38 @@ export class Stage {
 
     this.controls = new TrackpadControls(this.camera, renderer.domElement, (x, y) => this.hit(x, y)?.point)
 
-    this.resize = new ResizeObserver(() => {
-      const { clientWidth: w, clientHeight: h } = container
-      renderer.setSize(w, h)
-      this.composer.setSize(w, h)
-      this.camera.aspect = w / h
-      this.camera.updateProjectionMatrix()
-    })
+    this.resize = new ResizeObserver(() => this.applySize())
     this.resize.observe(container)
+  }
+
+  private applySize() {
+    const { clientWidth: w, clientHeight: h } = this.container
+    const ratio = this.lines ? this.lines / Math.max(h, 1) : window.devicePixelRatio
+    this.renderer.setPixelRatio(ratio)
+    this.renderer.setSize(w, h)
+    this.composer.setPixelRatio(ratio)
+    this.composer.setSize(w, h)
+    this.renderer.domElement.style.imageRendering = this.lines ? 'pixelated' : ''
+    this.camera.aspect = w / h
+    this.camera.updateProjectionMatrix()
+  }
+
+  setResolution(lines: number) {
+    this.lines = lines
+    this.applySize()
+  }
+
+  setGrid(on: boolean) {
+    this.showGrid = on
+    if (this.grid) this.grid.visible = on
   }
 
   private material<T extends THREE.MeshLambertMaterial | THREE.MeshBasicMaterial>(m: T, game = false): T {
     m.onBeforeCompile = (s) => {
-      Object.assign(s.uniforms, this.shared, this.gameShared)
-      s.fragmentShader = 'uniform sampler2D uPosMap;\nuniform float uHover;\n' + gameDeclarations + s.fragmentShader.replace('#include <map_fragment>', patch + gamePatch)
+      Object.assign(s.uniforms, this.shared, this.gameShared, this.torch.uniforms)
+      s.fragmentShader = (decode + gameDeclarations + torchDeclarations + s.fragmentShader)
+        .replace('#include <map_fragment>', patch + gamePatch + emitBasic)
+        .replace('#include <emissivemap_fragment>', emitLambert)
     }
     // A fixed define keeps the game material's program apart from the unlit one.
     if (game) m.defines = { GAME_VIEW: '' }
@@ -140,6 +191,9 @@ export class Stage {
     this.root = gltf.scene
     this.scene.add(gltf.scene)
     this.box.setFromObject(gltf.scene)
+    this.radius = this.box.getBoundingSphere(new THREE.Sphere()).radius
+    this.torch.uniforms.uMin.value.copy(this.box.min)
+    this.torch.uniforms.uDiag.value = this.box.getSize(new THREE.Vector3()).length()
     this.controls.frame(this.box)
     this.snap = true
 
@@ -152,6 +206,7 @@ export class Stage {
     gm.color.copy(this.gridColor)
     gm.transparent = true
     gm.opacity = 0.35
+    this.grid.visible = this.showGrid
     this.scene.add(this.grid)
   }
 
@@ -229,6 +284,11 @@ export class Stage {
     return this.camera.position.clone()
   }
 
+  setEmission(texture: THREE.Texture | null, strength: number) {
+    this.shared.uEmitMap.value = texture
+    this.shared.uEmit.value = texture ? strength : 0
+  }
+
   setHover(part: number) {
     this.shared.uHover.value = part
   }
@@ -282,6 +342,7 @@ export class Stage {
     const dt = Math.min(this.timer.getDelta(), 0.1)
     this.controls.update(dt, this.snap)
     this.snap = false
+    this.torch.update(this.camera, this.radius)
     this.composer.render()
   }
 

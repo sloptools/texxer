@@ -75,6 +75,8 @@ uniform float uGrain;
 uniform float uShine;
 uniform float uSeed;
 uniform int uStampColors;
+uniform int uEmitPass;
+uniform int uGlow;
 uniform vec3 uL;
 uniform vec3 uL2;
 uniform int uBoth;
@@ -235,6 +237,13 @@ void main() {
   }
 
   vec3 prev = texelFetch(uPrev, t, 0).rgb;
+
+  // The emissive pass: glowing layers add their color, others cover it.
+  if (uEmitPass == 1) {
+    outColor = vec4(mix(prev, uGlow == 1 ? c : vec3(0.0), m * uOpacity), 1.0);
+    return;
+  }
+
   outColor = vec4(clamp(mix(prev, blend(prev, c), m * uOpacity), 0.0, 1.0), 1.0);
 }
 `

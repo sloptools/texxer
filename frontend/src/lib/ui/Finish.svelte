@@ -30,6 +30,7 @@
     <Slider label="colors" bind:value={p.finish.count} min={4} max={256} step={1} digits={0} def={48} />
   {/if}
   <Slider label="dither" bind:value={p.finish.dither} def={0} />
+  <Slider label="glow" bind:value={p.finish.glow} min={0} max={8} step={0.1} def={3} digits={1} />
 </div>
 
 <div class="section">
@@ -67,6 +68,7 @@
   <ColorField label="ambient" bind:value={p.light.gameAmbient} />
   <Slider label="energy" bind:value={p.light.gameEnergy} max={4} def={1.5} />
   <Slider label="top light" bind:value={p.light.gameTop} max={3} def={0.6} />
+  <Slider label="torch" bind:value={p.light.torch} max={4} def={1} />
 </div>
 
 <style>

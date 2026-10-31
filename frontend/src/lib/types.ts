@@ -59,6 +59,8 @@ export type Layer = {
   shine: number
   // Take the color from image stamps instead of the layer color.
   stampColors: boolean
+  // Glows: the layer's color also goes into the emissive map.
+  glow: boolean
   opacity: number
   blend: Blend
   visible: boolean
@@ -74,6 +76,8 @@ export type Finish = {
   count: number
   colors: [number, number, number][]
   dither: number
+  // Emissive strength in the viewport and the export; above 1 it blooms.
+  glow: number
 }
 
 // Light baked into the texture, before the colors are crunched.
@@ -101,6 +105,7 @@ export type Light = {
   gameAmbient: string
   gameEnergy: number
   gameTop: number
+  torch: number
 }
 
 export type Project = {
