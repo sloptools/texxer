@@ -108,6 +108,10 @@
     padding: 12px 14px 14px;
     border-top: 1px solid var(--line);
   }
+  .section:first-child {
+    padding-top: 4px;
+    border-top: 0;
+  }
 
   .head,
   .row {

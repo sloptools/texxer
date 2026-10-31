@@ -72,6 +72,8 @@ export class Stage {
   private lit: THREE.MeshLambertMaterial
   private unlit: THREE.MeshBasicMaterial
   private gameMat: THREE.MeshBasicMaterial
+  // Until the layers are rendered, instead of the model's own texture.
+  private placeholder = new THREE.MeshLambertMaterial({ color: 0x77756e })
   private shared = {
     uPosMap: { value: null as THREE.Texture | null },
     uHover: { value: -1 },
@@ -194,6 +196,8 @@ export class Stage {
       const glow = mat.emissive && mat.emissive.getHex() !== 0 && !mat.emissiveMap
       if (anyTextured ? mat.map : !glow) {
         this.textured.push(mesh)
+        mesh.material = this.placeholder
+        mat.map?.dispose()
       } else if (glow) {
         // Above 1, so only these reach the bloom threshold.
         const color = mat.emissive.clone().multiplyScalar(Math.max(mat.emissiveIntensity, 1) * 2.5)

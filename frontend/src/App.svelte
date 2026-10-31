@@ -15,6 +15,8 @@
   import Viewport from './lib/Viewport.svelte'
 
   let headlight = 0.6
+  let side = $state<'layers' | 'settings'>(localStorage.getItem('side') === 'settings' ? 'settings' : 'layers')
+  $effect(() => localStorage.setItem('side', side))
 
   onMount(() => {
     store.init()
@@ -208,10 +210,22 @@
 
   <aside class="left">
     {#if store.model}
+      <div class="tabs">
+        <button class="caps" class:on={side === 'layers'} onclick={() => (side = 'layers')}>layers</button>
+        <button class="caps" class:on={side === 'settings'} onclick={() => (side = 'settings')}>settings</button>
+        {#if side === 'layers'}
+          <span class="icons">
+            <button class="icon" title="Put the layer in a new folder (⌘G)" onclick={() => store.groupLayer()}><Icon name="dir" size={11} /></button>
+            <button class="icon" title="New layer (N)" onclick={() => store.addLayer(tools.layerMask)}><Icon name="plus" size={11} /></button>
+          </span>
+        {/if}
+      </div>
       <div class="scroll">
-        <LayerList />
-        <div class="spacer"></div>
-        <Finish />
+        {#if side === 'layers'}
+          <LayerList />
+        {:else}
+          <Finish />
+        {/if}
       </div>
     {/if}
   </aside>
@@ -318,11 +332,51 @@
   .left .scroll {
     flex: 1;
     min-height: 0;
-    padding-top: 8px;
+    padding-bottom: 12px;
     overflow-y: auto;
   }
-  .spacer {
-    height: 16px;
+
+  .tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 38px;
+    padding: 0 8px 0 6px;
+  }
+  .tabs .caps {
+    height: 24px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--faint);
+  }
+  .tabs .caps:hover {
+    color: var(--strong);
+  }
+  .tabs .caps.on {
+    background: var(--active);
+    color: var(--fg);
+  }
+  .icons {
+    display: flex;
+    gap: 2px;
+    margin-left: auto;
+  }
+  .icon {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--dim);
+  }
+  .icon:hover {
+    background: var(--hover);
+    color: var(--strong);
   }
   .right {
     border-left: 1px solid var(--line);

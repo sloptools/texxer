@@ -103,6 +103,24 @@ func overlapsPixel(p [3][2]float64, x, y float64) bool {
 	return true
 }
 
+// nextFree is the first free pixel in line y from x on, or -1.
+func (b *bitmap) nextFree(y, x int) int {
+	row := b.rows[y*b.words : (y+1)*b.words]
+	for k := x / 64; k < b.words; k++ {
+		free := ^row[k]
+		if k == x/64 {
+			free &= math.MaxUint64 << (x % 64)
+		}
+		if free != 0 {
+			if p := k*64 + bits.TrailingZeros64(free); p < b.w {
+				return p
+			}
+			return -1
+		}
+	}
+	return -1
+}
+
 // fits reports whether the mask at (x, y) only covers free pixels of the bin.
 func (b *bitmap) fits(m *bitmap, x, y int) bool {
 	shift := x % 64
@@ -175,18 +193,19 @@ func (g *geometry) rasterLayout(charts []*chart, size, pad int, density float64)
 	for _, it := range items {
 		placed := false
 		for y := top; y+it.m.h <= size && !placed; y++ {
-			for x := 0; x+it.m.w <= size; x++ {
-				if bin.rows[y*bin.words+x/64] == math.MaxUint64 {
-					x += 63 - x%64
-					continue
+			// Only where the mask's first pixel lands on a free one.
+			for x := 0; ; x++ {
+				free := bin.nextFree(y, x+it.first)
+				if free < 0 || free-it.first+it.m.w > size {
+					break
 				}
-				if bin.get(x+it.first, y) || !bin.fits(it.m, x, y) {
-					continue
+				x = free - it.first
+				if bin.fits(it.m, x, y) {
+					bin.stamp(it.m, x, y)
+					at[it.i] = [2]int{x + pad, y + pad}
+					placed = true
+					break
 				}
-				bin.stamp(it.m, x, y)
-				at[it.i] = [2]int{x + pad, y + pad}
-				placed = true
-				break
 			}
 		}
 		if !placed {

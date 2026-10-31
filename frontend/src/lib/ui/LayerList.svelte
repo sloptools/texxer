@@ -1,7 +1,6 @@
 <script lang="ts">
   import Icon from '../Icon.svelte'
   import { store } from '../store.svelte'
-  import { tools } from '../tools.svelte'
   import type { Group, Layer } from '../types'
 
   type Row = { kind: 'layer'; key: string; l: Layer; i: number; nested: boolean } | { kind: 'group'; key: string; g: Group; first: number; last: number; count: number }
@@ -93,13 +92,6 @@
 
 <svelte:window onpointermove={move} onpointerup={up} />
 
-<div class="head caps">
-  <span>layers</span>
-  <span class="actions">
-    <button class="icon" title="Put the layer in a new folder (⌘G)" onclick={() => store.groupLayer()}><Icon name="dir" size={11} /></button>
-    <button class="icon" title="New layer (N)" onclick={() => store.addLayer(tools.layerMask)}><Icon name="plus" size={11} /></button>
-  </span>
-</div>
 
 <div class="list" class:dragging={drag?.active}>
   {#each rows as row (row.key)}
@@ -177,34 +169,6 @@
 {/snippet}
 
 <style>
-  .head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 26px;
-    padding: 0 8px 0 12px;
-  }
-  .actions {
-    display: flex;
-    gap: 2px;
-  }
-
-  .icon {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 0;
-    border-radius: 4px;
-    background: none;
-    color: var(--dim);
-  }
-  .icon:hover {
-    background: var(--hover);
-    color: var(--strong);
-  }
-
   .list {
     display: flex;
     flex-direction: column;

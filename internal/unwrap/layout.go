@@ -138,21 +138,22 @@ func minRectAngle(h [][2]float64) float64 {
 }
 
 // pack finds the highest texel density at which all charts fit the texture and places
-// them there. Charts keep their orientation so up stays up. Rectangles give a quick
-// first density; pixel masks then pack tighter.
+// them there, by their pixel masks. Charts keep their orientation so up stays up.
 func (g *geometry) pack(charts []*chart, size, padding int) float64 {
-	d := packRects(charts, size, padding)
-	at, ok := g.rasterLayout(charts, size, padding, d)
-	if d == 0 || !ok {
-		place(charts, size, padding, d)
-		return d
+	total := 0.0
+	for _, c := range charts {
+		total += c.area
+	}
+	if total == 0 {
+		return 0
 	}
 
 	// Several densities at once, each round narrowing to the gap between the best that
-	// fit and the next that didn't.
+	// fit and the next that didn't. Above full coverage nothing fits.
 	const tries = 6
-	lo, hi := d, d*2
-	for range 3 {
+	lo, hi := 0.0, float64(size)/math.Sqrt(total)
+	var at [][2]int
+	for round := 0; round < 3 || at == nil && round < 12; round++ {
 		var wg sync.WaitGroup
 		results := make([][][2]int, tries)
 		for k := range tries {
@@ -173,6 +174,9 @@ func (g *geometry) pack(charts []*chart, size, padding int) float64 {
 		}
 		hi = next
 	}
+	if at == nil {
+		return 0
+	}
 
 	for i, c := range charts {
 		c.x, c.y = at[i][0], at[i][1]
@@ -180,133 +184,6 @@ func (g *geometry) pack(charts []*chart, size, padding int) float64 {
 	return lo
 }
 
-func packRects(charts []*chart, size, padding int) float64 {
-	total := 0.0
-	for _, c := range charts {
-		total += c.area
-	}
-	if total == 0 {
-		return 0
-	}
-
-	order := slices.Clone(charts)
-	slices.SortStableFunc(order, func(a, b *chart) int {
-		if a.h != b.h {
-			if a.h > b.h {
-				return -1
-			}
-			return 1
-		}
-		if a.w > b.w {
-			return -1
-		}
-		if a.w < b.w {
-			return 1
-		}
-		return 0
-	})
-
-	hi := float64(size) / math.Sqrt(total)
-	lo := 0.0
-	for range 24 {
-		d := (lo + hi) / 2
-		if place(order, size, padding, d) {
-			lo = d
-		} else {
-			hi = d
-		}
-	}
-	place(order, size, padding, lo)
-	return lo
-}
-
 func pixels(world, density float64) int {
 	return max(1, int(math.Ceil(world*density)))
-}
-
-// place packs the charts with MaxRects (best short side fit); each takes its size plus
-// padding, so neighbors keep that distance and the border half of it.
-func place(charts []*chart, size, padding int, density float64) bool {
-	bins := maxRects{free: []rect{{0, 0, size, size}}}
-	for _, c := range charts {
-		w := pixels(c.w, density) + padding
-		h := pixels(c.h, density) + padding
-		r, ok := bins.insert(w, h)
-		if !ok {
-			return false
-		}
-		c.x, c.y = r.x+padding/2, r.y+padding/2
-	}
-	return true
-}
-
-type rect struct{ x, y, w, h int }
-
-func (r rect) contains(o rect) bool {
-	return o.x >= r.x && o.y >= r.y && o.x+o.w <= r.x+r.w && o.y+o.h <= r.y+r.h
-}
-
-type maxRects struct {
-	free []rect
-}
-
-func (m *maxRects) insert(w, h int) (rect, bool) {
-	best, bestShort, bestLong := rect{}, math.MaxInt, math.MaxInt
-	for _, f := range m.free {
-		if f.w < w || f.h < h {
-			continue
-		}
-		short, long := min(f.w-w, f.h-h), max(f.w-w, f.h-h)
-		if short < bestShort || short == bestShort && long < bestLong {
-			best, bestShort, bestLong = rect{f.x, f.y, w, h}, short, long
-		}
-	}
-	if bestShort == math.MaxInt {
-		return rect{}, false
-	}
-
-	var next []rect
-	for _, f := range m.free {
-		next = append(next, split(f, best)...)
-	}
-	m.free = prune(next)
-	return best, true
-}
-
-// split cuts the used rectangle out of a free one, leaving up to four overlapping free rectangles.
-func split(f, u rect) []rect {
-	if u.x >= f.x+f.w || u.x+u.w <= f.x || u.y >= f.y+f.h || u.y+u.h <= f.y {
-		return []rect{f}
-	}
-	var out []rect
-	if u.x > f.x {
-		out = append(out, rect{f.x, f.y, u.x - f.x, f.h})
-	}
-	if u.x+u.w < f.x+f.w {
-		out = append(out, rect{u.x + u.w, f.y, f.x + f.w - u.x - u.w, f.h})
-	}
-	if u.y > f.y {
-		out = append(out, rect{f.x, f.y, f.w, u.y - f.y})
-	}
-	if u.y+u.h < f.y+f.h {
-		out = append(out, rect{f.x, u.y + u.h, f.w, f.y + f.h - u.y - u.h})
-	}
-	return out
-}
-
-func prune(rs []rect) []rect {
-	var out []rect
-	for i, r := range rs {
-		inside := false
-		for j, o := range rs {
-			if i != j && o.contains(r) && (r != o || j < i) {
-				inside = true
-				break
-			}
-		}
-		if !inside {
-			out = append(out, r)
-		}
-	}
-	return out
 }
