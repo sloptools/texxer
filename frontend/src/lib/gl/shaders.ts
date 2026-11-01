@@ -181,15 +181,20 @@ float stamps(int i, vec3 p, vec3 n) {
 
 float field(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   int k = uKind[i];
-  int axis = int(uB[i].x);
+  // Axes 3 to 5 are 0 to 2 the other way round.
+  int axis = int(uB[i].x) % 3;
+  bool flip = int(uB[i].x) >= 3;
   if (k == 7) return paintAt(i, t);
   if (k == 8) return stamps(i, pos.xyz, n);
   if (k == 9) return grunge(i, pos.xyz, n);
   if (k == 1) return 1.0 - geo.r;
   if (k == 2) return geo.g;
   if (k == 3) return geo.b;
-  if (k == 4) return 1.0 - (pos.xyz / uExtent)[axis];
-  if (k == 5) return n[axis] * 0.5 + 0.5;
+  if (k == 4) {
+    float g = (pos.xyz / uExtent)[axis];
+    return flip ? g : 1.0 - g;
+  }
+  if (k == 5) return (flip ? -n[axis] : n[axis]) * 0.5 + 0.5;
   return fbm(pos.xyz * uA[i].w + uB[i].y * 1.37);
 }
 

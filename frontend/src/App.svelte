@@ -152,7 +152,7 @@
     } else {
       switch (e.key) {
         case 'n':
-          store.addLayer(tools.layerMask)
+          store.addLayer()
           break
         case 'd':
           store.duplicateLayer()
@@ -257,7 +257,7 @@
           <span class="icons">
             <button class="icon" title="Add a material: a folder of layers (⇧M)" onclick={() => (materials = !materials)}><Icon name="ball" size={11} /></button>
             <button class="icon" title="Put the layer in a new folder (⌘G)" onclick={() => store.groupLayer()}><Icon name="dir" size={11} /></button>
-            <button class="icon" title="New layer (N)" onclick={() => store.addLayer(tools.layerMask)}><Icon name="plus" size={11} /></button>
+            <button class="icon" title="New layer (N)" onclick={() => store.addLayer()}><Icon name="plus" size={11} /></button>
           </span>
         {:else if side === 'models'}
           <span class="icons">
@@ -420,7 +420,7 @@
     align-items: center;
     gap: 1px;
     height: 38px;
-    padding: 0 4px 0 6px;
+    padding: 0 10px 0 6px;
   }
   .tabs .caps {
     height: 24px;

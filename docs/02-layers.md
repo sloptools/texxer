@@ -12,7 +12,7 @@ Layers stack bottom to top. A layer without masks covers everything.
 - **blend**: normal, multiply, add, overlay, relief. Relief takes gray stamps as bumps: mid gray keeps the surface.
 - **opacity**
 
-**N** new, **D** duplicate, **⌫** delete, **V** show or hide, **↑ ↓** select, **⌥↑ ⌥↓** move.
+**N** new (in the picked folder, if one is), **D** duplicate, **⌫** delete, **V** show or hide, **↑ ↓** select, **⌥↑ ⌥↓** move. Right-click a layer or folder for the same and more.
 
 ## Folders
 

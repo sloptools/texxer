@@ -1,12 +1,46 @@
 <script lang="ts">
   import Icon from '../Icon.svelte'
   import { store } from '../store.svelte'
+  import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import type { Group, Layer } from '../types'
 
   type Row = { kind: 'layer'; key: string; l: Layer; i: number; nested: boolean } | { kind: 'group'; key: string; g: Group; first: number; last: number; count: number }
   type Where = 'above' | 'below' | 'into'
 
   let renaming = $state('')
+  let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
+
+  // Right click picks the row, then offers what fits it.
+  function context(e: MouseEvent, row?: Row) {
+    e.preventDefault()
+    e.stopPropagation()
+    const items: MenuItem[] = []
+    if (row?.kind === 'group') {
+      const id = row.g.id
+      store.selectedGroup = id
+      items.push(
+        { label: 'new layer in folder', key: 'N', run: () => store.addLayer() },
+        { label: 'rename', run: () => (renaming = id) },
+        'line',
+        { label: 'dissolve folder', key: '⇧⌘G', run: () => store.ungroup(id) },
+        { label: 'delete folder and its layers', danger: true, run: () => store.deleteGroup(id) },
+      )
+    } else if (row?.kind === 'layer') {
+      store.selected = row.i
+      store.selectedGroup = ''
+      items.push(
+        { label: 'new layer', key: 'N', run: () => store.addLayer() },
+        { label: 'duplicate', key: 'D', run: () => store.duplicateLayer() },
+        { label: 'rename', run: () => (renaming = row.key) },
+        { label: 'into a new folder', key: '⌘G', run: () => store.groupLayer() },
+        'line',
+        { label: 'delete', key: '⌫', danger: true, run: () => store.deleteLayer() },
+      )
+    } else {
+      items.push({ label: 'new layer', key: 'N', run: () => store.addLayer() })
+    }
+    menu = { x: e.clientX, y: e.clientY, items }
+  }
   let drag = $state<{ key: string; x: number; y: number; active: boolean } | null>(null)
   let drop = $state<{ key: string; where: Where } | null>(null)
 
@@ -93,7 +127,7 @@
 <svelte:window onpointermove={move} onpointerup={up} />
 
 
-<div class="list" class:dragging={drag?.active}>
+<div class="list" class:dragging={drag?.active} role="tree" tabindex="-1" oncontextmenu={(e) => context(e)}>
   {#each rows as row (row.key)}
     {@const dropWhere = drop?.key === row.key ? drop.where : null}
     {#if row.kind === 'group'}
@@ -111,6 +145,7 @@
         aria-selected={store.selectedGroup === row.g.id}
         tabindex="-1"
         onpointerdown={(e) => down(e, row)}
+        oncontextmenu={(e) => context(e, row)}
         onclick={() => store.selectedGroup !== row.g.id && ((store.selectedGroup = row.g.id), (store.pickingZone = false))}
         onkeydown={() => {}}
         ondblclick={() => (renaming = row.key)}
@@ -140,6 +175,7 @@
         aria-selected={row.i === store.selected}
         tabindex="-1"
         onpointerdown={(e) => down(e, row)}
+        oncontextmenu={(e) => context(e, row)}
         onclick={() => ((store.selected = row.i), (store.selectedGroup = ''), (store.pickingZone = false))}
         ondblclick={() => (renaming = row.key)}
         onkeydown={() => {}}
@@ -172,6 +208,10 @@
     }}
   />
 {/snippet}
+
+{#if menu}
+  <ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />
+{/if}
 
 <style>
   .list {

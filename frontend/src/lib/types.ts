@@ -1,6 +1,7 @@
 export type MaskKind = 'parts' | 'islands' | 'paint' | 'stamps' | 'grunge' | 'ao' | 'edges' | 'cavity' | 'gradient' | 'facing' | 'noise'
 export type Blend = 'normal' | 'multiply' | 'add' | 'overlay' | 'relief'
-export type Axis = 0 | 1 | 2
+// x, y, z as glTF has them (y up, z towards the front), then the same the other way.
+export type Axis = 0 | 1 | 2 | 3 | 4 | 5
 
 export type Vec3 = [number, number, number]
 

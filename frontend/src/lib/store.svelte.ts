@@ -264,12 +264,19 @@ class Store {
 
   // Layers
 
-  // With a mask, the new layer starts empty, ready for the brush or stamps.
-  addLayer(mask?: MaskKind) {
-    const at = this.selected + 1
-    const group = this.layer?.group ?? ''
-    this.project.layers.splice(at, 0, newLayer('layer ' + (this.project.layers.length + 1), '#8a8578', mask ? [newMask(mask)] : [], { group }))
+  // Above the selected layer, or at the top of the picked folder.
+  addLayer() {
+    const layers = this.project.layers
+    let at = this.selected + 1
+    let group = this.layer?.group ?? ''
+    if (this.selectedGroup) {
+      group = this.selectedGroup
+      at = Math.max(...layers.map((l, i) => (l.group === group ? i : -1))) + 1
+    }
+    layers.splice(at, 0, newLayer('layer ' + (layers.length + 1), '#8a8578', [], { group }))
     this.selected = at
+    this.selectedGroup = ''
+    this.pickingZone = false
   }
 
   duplicateLayer() {
@@ -322,10 +329,20 @@ class Store {
   }
 
   // Dissolves the selected layer's folder; its layers stay where they are.
-  ungroup() {
-    const id = this.layer?.group
+  ungroup(id = this.layer?.group) {
     if (!id) return
+    if (this.selectedGroup === id) this.selectedGroup = ''
     for (const l of this.project.layers) if (l.group === id) l.group = ''
+    this.dropEmptyGroups()
+  }
+
+  // Removes a folder and its layers.
+  deleteGroup(id: string) {
+    const keep = this.project.layers.filter((l) => l.group !== id)
+    const selectedId = this.layer?.id
+    this.project.layers = keep
+    this.selected = Math.max(0, keep.findIndex((l) => l.id === selectedId))
+    if (this.selectedGroup === id) this.selectedGroup = ''
     this.dropEmptyGroups()
   }
 

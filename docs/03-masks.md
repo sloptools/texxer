@@ -16,8 +16,8 @@ Most masks have **amount** (how much shows), **soft** (edge falloff), **rough** 
 | ao | the surface is occluded |
 | edges | convex edges, for wear |
 | cavity | creases and gaps, for grime |
-| gradient | low along an axis, for dirt from below |
-| facing | the surface faces along an axis |
+| gradient | rises from one side: below, above, left, right, back, front (as in a front view) |
+| facing | the surface faces a direction |
 | noise | value noise |
 
 Use parts or islands for zones, ao, edges and cavity for wear. Prefer hard cuts: soft masks read as smears once crunched.

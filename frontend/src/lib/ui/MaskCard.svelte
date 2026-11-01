@@ -8,10 +8,23 @@
 
   let { mask, parts, onremove }: { mask: Mask; parts: string[]; onremove: () => void } = $props()
 
-  const axes: [Axis, string][] = [
-    [0, 'x'],
-    [1, 'y'],
-    [2, 'z'],
+  // Directions as seen in a front view, like Blender's. A gradient rises from its
+  // side; facing picks surfaces that face that way.
+  const from: [Axis, string][] = [
+    [1, 'below'],
+    [4, 'above'],
+    [0, 'left'],
+    [3, 'right'],
+    [2, 'back'],
+    [5, 'front'],
+  ]
+  const faces: [Axis, string][] = [
+    [1, 'up'],
+    [4, 'down'],
+    [3, 'left'],
+    [0, 'right'],
+    [5, 'back'],
+    [2, 'front'],
   ]
 
   function clearPaint() {
@@ -77,7 +90,10 @@
       </div>
     {/if}
     {#if mask.kind === 'gradient' || mask.kind === 'facing'}
-      <Seg value={mask.axis} options={axes} onchange={(v) => (mask.axis = v)} />
+      <div class="dirs">
+        <span>{mask.kind === 'gradient' ? 'from' : 'faces'}</span>
+        <Seg value={mask.axis} options={mask.kind === 'gradient' ? from : faces} onchange={(v) => (mask.axis = v)} />
+      </div>
     {/if}
     <Slider label="amount" bind:value={mask.amount} def={0.5} />
     <Slider label="soft" bind:value={mask.soft} def={0} />
@@ -143,6 +159,21 @@
   .icon:hover {
     background: var(--hover);
     color: var(--error);
+  }
+
+  .dirs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font: 11px var(--mono);
+    color: var(--faint);
+  }
+  .dirs :global(.seg) {
+    flex: 1;
+  }
+  .dirs :global(.seg button) {
+    padding: 0 2px;
+    font-size: 11px;
   }
 
   .parts {

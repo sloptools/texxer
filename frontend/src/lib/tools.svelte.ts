@@ -29,10 +29,6 @@ class Tools {
   }
 
   // The mask a new layer starts with, so it is ready for the current tool.
-  get layerMask(): 'paint' | 'stamps' | undefined {
-    return this.tool === 'brush' ? 'paint' : this.tool === 'stamp' ? 'stamps' : undefined
-  }
-
   get pickedStamp(): Stamp | undefined {
     const p = this.picked
     return p ? store.layer?.masks[p.mask]?.stamps[p.index] : undefined
