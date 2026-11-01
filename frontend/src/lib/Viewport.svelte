@@ -207,7 +207,7 @@
   $effect(() => {
     if (!stage) return
     stage.setLight({ ...store.project.light })
-    stage.setBloom(store.bloom)
+    stage.setBloom(store.bloom, store.project.light.bloom)
     stage.setGrid(store.grid)
     stage.torch.set(store.torch, store.project.light.torch)
   })

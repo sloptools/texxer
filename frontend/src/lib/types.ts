@@ -110,6 +110,8 @@ export type Light = {
   gameEnergy: number
   gameTop: number
   torch: number
+  // How strongly glowing parts bloom in the views.
+  bloom: number
 }
 
 // How a model's maps are baked: widths of the edge and cavity masks as fractions of

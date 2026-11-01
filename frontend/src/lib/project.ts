@@ -69,7 +69,7 @@ export function newProject(): Project {
       rim: 0.3,
       bothSides: true,
     },
-    light: { key: 2.2, ambient: 1, headlight: 0.6, angle: 35, gameAmbient: '#ffffff', gameEnergy: 1, gameTop: 0.6, torch: 1 },
+    light: { key: 2.2, ambient: 1, headlight: 0.6, angle: 35, gameAmbient: '#ffffff', gameEnergy: 1, gameTop: 0.6, torch: 1, bloom: 0.3 },
   }
 }
 

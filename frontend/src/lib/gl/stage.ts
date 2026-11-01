@@ -294,8 +294,9 @@ export class Stage {
     this.key.target.position.copy(center)
   }
 
-  setBloom(on: boolean) {
-    this.bloom.enabled = on
+  setBloom(on: boolean, strength: number) {
+    this.bloom.enabled = on && strength > 0
+    this.bloom.strength = strength
   }
 
   // The brush cursor: a ring lying on the surface.
