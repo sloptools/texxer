@@ -99,6 +99,11 @@ export class Stage {
   )
 
   onError: (message: string) => void = () => {}
+  // Grips of the picked stamp, square pixels the same size at any distance.
+  private grips = new THREE.Points(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+    new THREE.PointsMaterial({ color: 0x7fc4af, size: 9, sizeAttenuation: false, depthTest: false, transparent: true }),
+  )
   posData: Float32Array | undefined
   nrmData: Float32Array | undefined
   posSize = 0
@@ -120,9 +125,10 @@ export class Stage {
     this.head.target.position.set(0, 0, -1)
     this.camera.add(this.head, this.head.target)
 
-    this.ring.visible = this.outline.visible = false
+    this.ring.visible = this.outline.visible = this.grips.visible = false
     this.ring.renderOrder = this.outline.renderOrder = 10
-    this.scene.add(this.ring, this.outline)
+    this.grips.renderOrder = 11
+    this.scene.add(this.ring, this.outline, this.grips)
 
     this.lit = this.material(new THREE.MeshLambertMaterial())
     this.unlit = this.material(new THREE.MeshBasicMaterial())
@@ -314,6 +320,27 @@ export class Stage {
     if (!points) return
     this.outline.geometry.setFromPoints(points)
     if (color) (this.outline.material as THREE.LineBasicMaterial).color.set(color)
+  }
+
+  setGrips(points: THREE.Vector3[] | null) {
+    this.grips.visible = !!points
+    if (points) this.grips.geometry.setFromPoints(points)
+  }
+
+  // Where a point in the scene lands on screen, in client pixels.
+  toScreen(p: THREE.Vector3): { x: number; y: number } {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const v = p.clone().project(this.camera)
+    return { x: rect.left + ((v.x + 1) / 2) * rect.width, y: rect.top + ((1 - v.y) / 2) * rect.height }
+  }
+
+  // Where the ray under a screen point meets the plane through p facing n.
+  onPlane(x: number, y: number, p: THREE.Vector3, n: THREE.Vector3): THREE.Vector3 | undefined {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const ndc = new THREE.Vector2(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1)
+    this.raycaster.setFromCamera(ndc, this.camera)
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(n, p)
+    return this.raycaster.ray.intersectPlane(plane, new THREE.Vector3()) ?? undefined
   }
 
   get cameraUp() {

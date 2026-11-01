@@ -45,7 +45,9 @@
     <div class="caps">brush · {store.layer?.name} <HelpLink page="brush-stamps" /></div>
     <Slider label="size" bind:value={tools.brush.size} min={0.002} max={0.3} step={0.001} digits={3} def={0.03} />
     <Slider label="hardness" bind:value={tools.brush.hard} def={0.7} />
-    <p class="hint">paints into the layer's paint mask · [ ] size · ⌥ erases · ⇧click draws a line</p>
+    <Slider label="strength" bind:value={tools.brush.strength} def={1} />
+    <Slider label="grit" bind:value={tools.brush.grit} max={0.9} def={0} />
+    <p class="hint">paints into the layer's paint mask · [ ] size · ⌥ erases · ⇧click draws a line · grit breaks the brush up for rust and dirt</p>
   </div>
 {:else if tools.tool === 'stamp'}
   <div class="section">

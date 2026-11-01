@@ -8,7 +8,7 @@ export type Picked = { mask: number; index: number }
 
 class Tools {
   tool = $state<Tool>('nav')
-  brush = $state({ size: 0.03, hard: 0.7, erase: false })
+  brush = $state({ size: 0.03, hard: 0.7, strength: 1, grit: 0, erase: false })
   // Settings for the next stamp; a picked stamp shares them while it's picked.
   stamp = $state({ shape: 'circle', size: 0.12, rot: 0, aspect: 1 })
   // Spacing of stamp rows, in stamp widths.
@@ -70,6 +70,17 @@ class Tools {
     this.stamp.rot = (((this.stamp.rot + deg) % 360) + 360) % 360
     this.update((s) => ({ ...s, rot: this.stamp.rot }))
     if (this.ghost) this.ghost = { ...this.ghost, rot: this.stamp.rot }
+  }
+
+  setRotation(deg: number) {
+    this.stamp.rot = ((Math.round(deg) % 360) + 360) % 360
+    this.update((s) => ({ ...s, rot: this.stamp.rot }))
+  }
+
+  // A world size for the picked stamp.
+  setSize(size: number) {
+    this.stamp.size = Math.min(1, Math.max(0.005, size / this.diag))
+    this.update((s) => ({ ...s, size: this.stamp.size * this.diag }))
   }
 
   resize(factor: number) {

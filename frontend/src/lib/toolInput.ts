@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { Compositor } from './gl/compositor'
 import type { Dab } from './gl/paint'
 import type { Hit, Stage } from './gl/stage'
-import { contains, corners, expand } from './stamps'
+import { contains, corners, expand, handles, rotationTowards, sizeTowards } from './stamps'
 import { store } from './store.svelte'
 import { tools, type Picked } from './tools.svelte'
 
@@ -14,6 +14,8 @@ export class ToolInput {
   private stroke: { id: string; before: Uint8Array; last: THREE.Vector3 } | undefined
   private lastDab: THREE.Vector3 | undefined
   private dragging = false
+  // A grip of the picked stamp being dragged.
+  private grip: 'rotate' | 'scale' | undefined
   private cleanup: () => void
 
   constructor(
@@ -40,6 +42,10 @@ export class ToolInput {
 
   private down(e: PointerEvent) {
     if (e.button !== 0 || tools.tool === 'nav') return
+    if (tools.tool === 'stamp' && (this.grip = this.gripAt(e.clientX, e.clientY))) {
+      this.stage.renderer.domElement.setPointerCapture(e.pointerId)
+      return
+    }
     const hit = this.stage.hit(e.clientX, e.clientY)
     if (!hit) return
     this.stage.renderer.domElement.setPointerCapture(e.pointerId)
@@ -51,6 +57,20 @@ export class ToolInput {
 
   private move(e: PointerEvent) {
     if (tools.tool === 'nav') return
+    if (this.grip) {
+      this.dragGrip(e)
+      return
+    }
+    // Over a grip: no preview of a new stamp, a hand to say it can be dragged.
+    const grip = tools.tool === 'stamp' && !this.dragging && !this.stroke ? this.gripAt(e.clientX, e.clientY) : undefined
+    this.stage.renderer.domElement.style.cursor = grip ? 'grab' : ''
+    if (grip) {
+      if (tools.ghost) {
+        tools.ghost = null
+        this.changed()
+      }
+      return
+    }
     const hit = this.stage.hit(e.clientX, e.clientY)
 
     if (this.stroke) {
@@ -64,6 +84,7 @@ export class ToolInput {
   private up() {
     if (this.stroke) this.endStroke()
     this.dragging = false
+    this.grip = undefined
   }
 
   // Cursor feedback: the brush ring, or the frame of the stamp that would be placed or moved.
@@ -102,6 +123,30 @@ export class ToolInput {
         if (expand([list[index]], c?.mirrorX ?? 0).some((s) => contains(s, p))) return { mask, index }
       }
     }
+  }
+
+  private gripAt(x: number, y: number): 'rotate' | 'scale' | undefined {
+    const s = tools.pickedStamp
+    if (!s) return
+    const g = handles(s)
+    for (const kind of ['rotate', 'scale'] as const) {
+      const at = this.stage.toScreen(g[kind])
+      if (Math.hypot(at.x - x, at.y - y) < 10) return kind
+    }
+  }
+
+  // Turns or sizes the picked stamp from where the cursor meets its plane; ⇧ turns in 15° steps.
+  private dragGrip(e: PointerEvent) {
+    const s = tools.pickedStamp
+    if (!s) return
+    const p = this.stage.onPlane(e.clientX, e.clientY, new THREE.Vector3(...s.p), new THREE.Vector3(...s.n))
+    if (!p) return
+    if (this.grip === 'scale') tools.setSize(sizeTowards(s, p))
+    else {
+      const deg = rotationTowards(s, p)
+      tools.setRotation(e.shiftKey ? Math.round(deg / 15) * 15 : deg)
+    }
+    this.changed()
   }
 
   private pressStamp(hit: Hit) {
@@ -151,6 +196,8 @@ export class ToolInput {
       view,
       radius: tools.brush.size,
       hard: tools.brush.hard,
+      strength: tools.brush.strength,
+      grit: tools.brush.grit,
       erase: tools.brush.erase !== alt,
     }
     paint.dab(this.stroke.id, d)

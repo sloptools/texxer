@@ -273,6 +273,7 @@ class Store {
       group = this.selectedGroup
       at = Math.max(...layers.map((l, i) => (l.group === group ? i : -1))) + 1
     }
+    at = Math.min(at, layers.length)
     layers.splice(at, 0, newLayer('layer ' + (layers.length + 1), '#8a8578', [], { group }))
     this.selected = at
     this.selectedGroup = ''

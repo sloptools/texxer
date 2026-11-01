@@ -96,8 +96,10 @@
       </div>
     {/if}
     <Slider label="amount" bind:value={mask.amount} def={0.5} />
-    <Slider label="soft" bind:value={mask.soft} def={0} />
-    {#if mask.kind !== 'noise' && mask.kind !== 'grunge'}
+    {#if mask.kind !== 'paint'}
+      <Slider label="soft" bind:value={mask.soft} def={0} />
+    {/if}
+    {#if mask.kind !== 'noise' && mask.kind !== 'grunge' && mask.kind !== 'paint'}
       <Slider label="rough" bind:value={mask.rough} def={0} />
     {/if}
     {#if mask.kind === 'noise' || mask.kind === 'grunge' || mask.rough > 0}

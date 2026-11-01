@@ -104,3 +104,28 @@ export function nudge(s: Stamp, dx: number, dy: number): Stamp {
   const p = f.c.addScaledVector(f.t, dx * s.size).addScaledVector(f.b, dy * s.size)
   return { ...s, p: arr(p) }
 }
+
+// The grips of a picked stamp: one above its top edge turns it, one on its
+// top right corner sizes it.
+export function handles(s: Stamp): { rotate: THREE.Vector3; scale: THREE.Vector3 } {
+  const f = frame(s)
+  return {
+    rotate: f.c.clone().addScaledVector(f.b, f.hh + Math.max(f.hw, f.hh) * 0.4),
+    scale: f.c.clone().addScaledVector(f.t, f.hw).addScaledVector(f.b, f.hh),
+  }
+}
+
+// The rotation that points a stamp's top at p, in degrees.
+export function rotationTowards(s: Stamp, p: THREE.Vector3): number {
+  const f = frame({ ...s, rot: 0 })
+  const v = p.clone().sub(f.c)
+  return THREE.MathUtils.radToDeg(Math.atan2(-v.dot(f.t), v.dot(f.b)))
+}
+
+// The size that puts a stamp's corner at p.
+export function sizeTowards(s: Stamp, p: THREE.Vector3): number {
+  const f = frame(s)
+  const v = p.clone().sub(f.c)
+  const along = new THREE.Vector3(v.dot(f.t), v.dot(f.b), 0).length()
+  return (2 * along) / Math.hypot(1, s.aspect)
+}

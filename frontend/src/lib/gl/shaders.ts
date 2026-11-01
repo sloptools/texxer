@@ -202,6 +202,9 @@ float mask(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   float m;
   if (uKind[i] == 0) {
     m = texelFetch(uParts, ivec2(int(pos.w), int(uB[i].w)), 0).r;
+  } else if (uKind[i] == 7) {
+    // Painted values are coverage as they are, so soft brushes stay soft.
+    m = clamp(paintAt(i, t) * uA[i].x * 2.0, 0.0, 1.0);
   } else if (uKind[i] == 10) {
     m = texelFetch(uIslands, ivec2(int(texelFetch(uNrm, t, 0).w), int(uB[i].w)), 0).r;
   } else {

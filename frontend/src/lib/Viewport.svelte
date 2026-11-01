@@ -5,7 +5,7 @@
   import { PaintStore } from './gl/paint'
   import { Stage } from './gl/stage'
   import { withVariant } from './project'
-  import { corners } from './stamps'
+  import { corners, handles } from './stamps'
   import { store } from './store.svelte'
   import { ToolInput } from './toolInput'
   import { tools } from './tools.svelte'
@@ -232,6 +232,13 @@
     const p = tools.pickedStamp
     if (!stage || tools.ghost) return
     stage.setOutline(p ? corners($state.snapshot(p)) : null, '#7fc4af')
+  })
+
+  // Its grips stay put while the next stamp's preview follows the cursor.
+  $effect(() => {
+    const p = tools.pickedStamp
+    const g = p && tools.tool === 'stamp' ? handles($state.snapshot(p)) : null
+    stage?.setGrips(g ? [g.rotate, g.scale] : null)
   })
 
   const flatKeys: Record<string, FlatMap> = { '1': 'texture', '2': 'mask', '3': 'glow', '4': 'ao', '5': 'edges', '6': 'cavity', '7': 'parts' }

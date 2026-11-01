@@ -4,7 +4,9 @@ import type { Bake } from './compositor'
 import { quadVertex } from './shaders'
 
 // A brush dab: a sphere in model space, painted into every texel whose
-// position lies inside it and whose surface faces the camera.
+// position lies inside it and whose surface faces the camera. Hardness sets how far
+// in from the rim it fades, strength the most it paints, grit breaks it up with
+// noise that sits on the model, so dabs join into one pattern.
 const dabFragment = /* glsl */ `
 precision highp float;
 
@@ -14,9 +16,25 @@ uniform vec3 uCenter;
 uniform vec3 uView;
 uniform float uRadius;
 uniform float uHard;
+uniform float uStrength;
+uniform float uGrit;
 uniform int uErase;
 
 out vec4 outColor;
+
+float hash(vec3 p) {
+  return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
+float noise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
+    mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y),
+    f.z);
+}
 
 void main() {
   ivec2 t = ivec2(gl_FragCoord.xy);
@@ -25,6 +43,11 @@ void main() {
 
   float v = 1.0 - smoothstep(uHard * uRadius * 0.999, uRadius, distance(p, uCenter));
   v *= step(0.05, dot(n, uView));
+  if (uGrit > 0.0) {
+    float g = noise(p * 8.0 / uRadius) * 0.6 + noise(p * 23.0 / uRadius) * 0.4;
+    v *= smoothstep(uGrit - 0.08, uGrit + 0.08, g);
+  }
+  v *= uStrength;
   outColor = vec4(uErase == 1 ? 1.0 - v : v);
 }
 `
@@ -38,7 +61,7 @@ void main() {
 }
 `
 
-export type Dab = { center: THREE.Vector3; view: THREE.Vector3; radius: number; hard: number; erase: boolean }
+export type Dab = { center: THREE.Vector3; view: THREE.Vector3; radius: number; hard: number; strength: number; grit: number; erase: boolean }
 
 // Painted masks, one render target each, kept at the bake's size.
 export class PaintStore {
@@ -70,6 +93,8 @@ export class PaintStore {
         uView: { value: new THREE.Vector3() },
         uRadius: { value: 0.01 },
         uHard: { value: 0.8 },
+        uStrength: { value: 1 },
+        uGrit: { value: 0 },
         uErase: { value: 0 },
       },
       blending: THREE.CustomBlending,
@@ -144,6 +169,8 @@ export class PaintStore {
     u.uView.value.copy(d.view)
     u.uRadius.value = d.radius
     u.uHard.value = d.hard
+    u.uStrength.value = d.strength
+    u.uGrit.value = d.grit
     u.uErase.value = d.erase ? 1 : 0
     this.dabMat.blendEquation = d.erase ? THREE.MinEquation : THREE.MaxEquation
     this.draw(this.dabMat, t)
