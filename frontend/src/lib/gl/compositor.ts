@@ -6,7 +6,7 @@ import { StampAtlas, atlasGrid, atlasInset } from './atlas'
 import type { PaintStore } from './paint'
 import { fetchBlob, imageURL, track } from '../assets'
 import { medianCut, type RGB } from './mediancut'
-import { blendIndex, finishFragment, kindIndex, layerFragment, lightFragment, maxGroups, maxIslands, maxMasks, maxStamps, quadVertex, reduceFragment } from './shaders'
+import { blendIndex, finishFragment, kindIndex, layerFragment, lightFragment, lookupRows, maskRows, maxGroups, maxIslands, maxMasks, maxStamps, quadVertex, reduceFragment } from './shaders'
 
 // Where the model sits: bake positions are (p - min) / diag.
 export type ModelFrame = { min: number[]; diag: number; extent: number[] }
@@ -78,11 +78,9 @@ export class Compositor {
   private layerMat: THREE.ShaderMaterial
   private finishMat: THREE.ShaderMaterial
 
-  private parts = new THREE.DataTexture(new Uint8Array(256 * 256), 256, 256, THREE.RedFormat)
-  private islands = new THREE.DataTexture(new Uint8Array(maxIslands * 256), maxIslands, 256, THREE.RedFormat)
-  // A row per folder: the parts and islands of its zone.
-  private zoneParts = new THREE.DataTexture(new Uint8Array(256 * maxGroups), 256, maxGroups, THREE.RedFormat)
-  private zoneIslands = new THREE.DataTexture(new Uint8Array(maxIslands * maxGroups), maxIslands, maxGroups, THREE.RedFormat)
+  private parts = new THREE.DataTexture(new Uint8Array(256 * lookupRows), 256, lookupRows, THREE.RedFormat)
+  private islands = new THREE.DataTexture(new Uint8Array(maxIslands * lookupRows), maxIslands, lookupRows, THREE.RedFormat)
+  // Folders with a zone, by id, and their row in the lookups.
   private zones = new Map<string, number>()
   private palette = new THREE.DataTexture(new Uint8Array(256 * 4), 256, 1, THREE.RGBAFormat)
 
@@ -132,8 +130,6 @@ export class Compositor {
         uNrm: { value: bake.nrm },
         uParts: { value: this.parts },
         uIslands: { value: this.islands },
-        uZoneParts: { value: this.zoneParts },
-        uZoneIslands: { value: this.zoneIslands },
         uZone: { value: -1 },
         uExtent: { value: new THREE.Vector3(...model.extent) },
         uColor: { value: new THREE.Color() },
@@ -385,38 +381,30 @@ export class Compositor {
     u.uSN.value[j].set(f.n.x, f.n.y, f.n.z, this.atlas.cell(s.shape))
   }
 
-  // Rows per layer mask: 1 for every part or island the mask selects.
+  // Rows per layer mask, then per folder zone: 1 for every part or island selected.
   private fillParts(project: Project) {
     const parts = this.parts.image.data as Uint8Array
     const islands = this.islands.image.data as Uint8Array
     parts.fill(0)
     islands.fill(0)
-    project.layers.slice(0, 256 / maxMasks).forEach((layer, li) => {
+    project.layers.slice(0, maskRows / maxMasks).forEach((layer, li) => {
       layer.masks.slice(0, maxMasks).forEach((m, mi) => {
         const row = li * maxMasks + mi
         for (const p of m.parts) if (p >= 0 && p < 256) parts[row * 256 + p] = 255
         for (const p of m.islands) if (p >= 0 && p < maxIslands) islands[row * maxIslands + p] = 255
       })
     })
-    this.parts.needsUpdate = true
-    this.islands.needsUpdate = true
-    this.fillZones(project)
-  }
 
-  private fillZones(project: Project) {
-    const parts = this.zoneParts.image.data as Uint8Array
-    const islands = this.zoneIslands.image.data as Uint8Array
-    parts.fill(0)
-    islands.fill(0)
     this.zones.clear()
-    project.groups.slice(0, maxGroups).forEach((g, row) => {
+    project.groups.slice(0, maxGroups).forEach((g, i) => {
       if (!g.zone.parts.length && !g.zone.islands.length) return
+      const row = maskRows + i
       this.zones.set(g.id, row)
       for (const p of g.zone.parts) if (p >= 0 && p < 256) parts[row * 256 + p] = 255
       for (const p of g.zone.islands) if (p >= 0 && p < maxIslands) islands[row * maxIslands + p] = 255
     })
-    this.zoneParts.needsUpdate = true
-    this.zoneIslands.needsUpdate = true
+    this.parts.needsUpdate = true
+    this.islands.needsUpdate = true
   }
 
   private fillPalette(list: RGB[]): number {
@@ -448,8 +436,6 @@ export class Compositor {
     this.finishMat.dispose()
     this.parts.dispose()
     this.islands.dispose()
-    this.zoneParts.dispose()
-    this.zoneIslands.dispose()
     this.atlas.dispose()
     for (const t of this.grunges.values()) t.dispose()
     this.palette.dispose()

@@ -26,6 +26,7 @@
     if (import.meta.env.DEV) Object.assign(window, { stage: s })
     const input = new ToolInput(s, () => compositor, () => (dirty = true))
     tools.surface = (p, n, reach) => s.surface(p, n, reach)
+    s.onError = (m) => store.say(m, true)
 
     s.controls.onLight = (d) => (store.project.light.angle = (store.project.light.angle - d * 0.4 + 360) % 360)
     s.controls.onClick = (e) => {
@@ -158,7 +159,7 @@
         store.ready = true
         dirty = true
       })
-      .catch((e) => store.say(String(e)))
+      .catch((e) => store.say(String(e), true))
       .finally(() => {
         if (!cancelled) store.baking = false
       })

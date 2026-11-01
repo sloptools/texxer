@@ -14,6 +14,10 @@ export const maxIslands = 4096
 
 // Folders that can have a zone.
 export const maxGroups = 64
+
+// Rows of the parts and islands lookups: one per layer mask, then one per folder.
+export const maskRows = 256
+export const lookupRows = maskRows + maxGroups
 export const blendIndex = { normal: 0, multiply: 1, add: 2, overlay: 3, relief: 4 } as const
 
 // Light from direction l on normal n: 1 facing it, 0 away. Wrap lights half the
@@ -74,8 +78,6 @@ uniform sampler2D uPos;
 uniform sampler2D uNrm;
 uniform sampler2D uParts;
 uniform sampler2D uIslands;
-uniform sampler2D uZoneParts;
-uniform sampler2D uZoneIslands;
 uniform int uZone;
 uniform vec3 uExtent;
 uniform vec3 uColor;
@@ -219,11 +221,12 @@ vec3 blend(vec3 a, vec3 b) {
   return b;
 }
 
-// The folder's zone: its parts and islands, or everywhere without one.
+// The folder's zone: its parts and islands, or everywhere without one. Zones have
+// rows of their own below the masks' in the parts and islands lookups.
 float zone(ivec2 t, vec4 pos) {
   if (uZone < 0) return 1.0;
-  float p = texelFetch(uZoneParts, ivec2(int(pos.w), uZone), 0).r;
-  float i = texelFetch(uZoneIslands, ivec2(int(texelFetch(uNrm, t, 0).w), uZone), 0).r;
+  float p = texelFetch(uParts, ivec2(int(pos.w), uZone), 0).r;
+  float i = texelFetch(uIslands, ivec2(int(texelFetch(uNrm, t, 0).w), uZone), 0).r;
   return max(p, i);
 }
 
@@ -267,6 +270,11 @@ void main() {
   outColor = vec4(clamp(mix(prev, blend(prev, c), m * uOpacity), 0.0, 1.0), 1.0);
 }
 `
+
+// WebKit on macOS links at most 16 textures per shader; past that the layers just don't draw.
+if (import.meta.env.DEV && (layerFragment.match(/uniform sampler2D/g) ?? []).length > 16) {
+  throw new Error('the layer shader samples more than 16 textures')
+}
 
 // Light baked into the texture: AO, form light, a colored key, a dark under light and lit rims.
 export const lightFragment = /* glsl */ `

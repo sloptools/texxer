@@ -102,10 +102,11 @@ class Store {
     this.help = true
   }
 
-  say(text: string) {
+  // Sticky messages stay until the next one, for errors that leave the view broken.
+  say(text: string, sticky = false) {
     this.message = text
     clearTimeout(this.messageTimer)
-    this.messageTimer = setTimeout(() => (this.message = ''), 4000)
+    if (!sticky) this.messageTimer = setTimeout(() => (this.message = ''), 4000)
   }
 
   // History

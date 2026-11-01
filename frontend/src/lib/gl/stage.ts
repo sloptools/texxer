@@ -98,12 +98,18 @@ export class Stage {
     new THREE.LineBasicMaterial({ color: 0x7fc4af, depthTest: false, transparent: true }),
   )
 
+  onError: (message: string) => void = () => {}
   posData: Float32Array | undefined
   nrmData: Float32Array | undefined
   posSize = 0
 
   constructor(private container: HTMLElement) {
     const renderer = new THREE.WebGLRenderer({ antialias: true })
+    renderer.debug.onShaderError = (gl, program, _vs, fs) => {
+      const log = gl.getProgramInfoLog(program) || gl.getShaderInfoLog(fs) || 'unknown error'
+      console.error('shader error', log)
+      this.onError('a shader failed: ' + log.trim().split('\n')[0])
+    }
     renderer.setPixelRatio(window.devicePixelRatio)
     container.appendChild(renderer.domElement)
     this.renderer = renderer
