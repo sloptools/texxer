@@ -96,7 +96,7 @@
   <Slider label="ambient" bind:value={p.light.ambient} max={3} def={1} />
   <Slider label="headlight" bind:value={p.light.headlight} max={3} def={0.6} />
   <Slider label="angle" bind:value={p.light.angle} max={360} step={1} digits={0} def={35} />
-  <Slider label="bloom" bind:value={p.light.bloom} max={1.5} def={0.3} />
+  <Slider label="bloom" bind:value={p.light.bloom} max={1.5} def={0.05} />
 </div>
 
 <div class="section">
