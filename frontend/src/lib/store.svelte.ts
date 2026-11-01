@@ -38,6 +38,8 @@ class Store {
   selected = $state(0)
   // A folder picked in the list shows its panel instead of the layer's.
   selectedGroup = $state('')
+  // Clicks on the model add to the picked folder's zone only while this is on.
+  pickingZone = $state(false)
   // The variant being looked at and edited, '' for the base.
   variant = $state('')
   view = $state<View>('lit')
@@ -349,6 +351,7 @@ class Store {
   select(delta: number) {
     this.selected = Math.max(0, Math.min(this.project.layers.length - 1, this.selected + delta))
     this.selectedGroup = ''
+    this.pickingZone = false
   }
 
   addMask(kind: MaskKind) {
@@ -393,7 +396,7 @@ class Store {
 
   // Clicks pick islands while a folder is picked or the layer has an islands mask.
   get picksIslands() {
-    return !!this.selectedGroup || !!this.layer?.masks.some((m) => m.kind === 'islands')
+    return (!!this.selectedGroup && this.pickingZone) || !!this.layer?.masks.some((m) => m.kind === 'islands')
   }
 
   // Toggles a part or an island in the picked folder's zone.

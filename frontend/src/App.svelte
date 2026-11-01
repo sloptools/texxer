@@ -56,7 +56,8 @@
         tools.set('stamp')
         return true
       case 'Escape':
-        if (tools.picked) tools.picked = null
+        if (store.pickingZone) store.pickingZone = false
+        else if (tools.picked) tools.picked = null
         else if (tools.tool !== 'nav') tools.set(tools.tool)
         return true
       case '[':

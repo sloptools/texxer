@@ -130,4 +130,5 @@ export function insertMaterial(mat: Material) {
   p.layers.splice(Math.min(at, p.layers.length), 0, ...layers)
   store.selected = at + layers.length - 1
   store.selectedGroup = g.id
+  store.pickingZone = true
 }

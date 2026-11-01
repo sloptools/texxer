@@ -111,7 +111,7 @@
         aria-selected={store.selectedGroup === row.g.id}
         tabindex="-1"
         onpointerdown={(e) => down(e, row)}
-        onclick={() => (store.selectedGroup = row.g.id)}
+        onclick={() => store.selectedGroup !== row.g.id && ((store.selectedGroup = row.g.id), (store.pickingZone = false))}
         onkeydown={() => {}}
         ondblclick={() => (renaming = row.key)}
       >
@@ -140,7 +140,7 @@
         aria-selected={row.i === store.selected}
         tabindex="-1"
         onpointerdown={(e) => down(e, row)}
-        onclick={() => ((store.selected = row.i), (store.selectedGroup = ''))}
+        onclick={() => ((store.selected = row.i), (store.selectedGroup = ''), (store.pickingZone = false))}
         ondblclick={() => (renaming = row.key)}
         onkeydown={() => {}}
       >

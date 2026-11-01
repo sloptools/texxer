@@ -25,13 +25,17 @@
   <div class="section">
     <div class="caps head">
       zone
-      {#if group.zone.parts.length || group.zone.islands.length}
-        <button class="text" title="Remove all parts and islands" onclick={() => (group.zone = { parts: [], islands: [] })}>clear</button>
-      {/if}
+      <span class="actions">
+        {#if group.zone.parts.length || group.zone.islands.length}
+          <button class="text" title="Remove all parts and islands" onclick={() => (group.zone = { parts: [], islands: [] })}>clear</button>
+        {/if}
+        <button class="text" class:on={store.pickingZone} title="While on, clicks on the model add or remove surfaces (Esc ends)" onclick={() => (store.pickingZone = !store.pickingZone)}>pick</button>
+      </span>
     </div>
     <p class="hint">
       {group.zone.islands.length}
-      {group.zone.islands.length === 1 ? 'island' : 'islands'} · click surfaces in the view, ⌘click whole parts
+      {group.zone.islands.length === 1 ? 'island' : 'islands'} ·
+      {store.pickingZone ? 'click surfaces in the view, ⌘click whole parts' : 'pick to add surfaces from the view'}
     </p>
     <div class="parts">
       {#each parts as part, i}
@@ -113,6 +117,13 @@
   }
   .text:hover {
     color: var(--strong);
+  }
+  .text.on {
+    color: var(--accent);
+  }
+  .actions {
+    display: flex;
+    gap: 2px;
   }
 
   .save {
