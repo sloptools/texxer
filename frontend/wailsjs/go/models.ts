@@ -10,6 +10,7 @@ export namespace main {
 	    offsets: number[][];
 	    hash: string;
 	    details: boolean;
+	    texture: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModelInfo(source);
@@ -26,6 +27,7 @@ export namespace main {
 	        this.offsets = source["offsets"];
 	        this.hash = source["hash"];
 	        this.details = source["details"];
+	        this.texture = source["texture"];
 	    }
 	}
 	export class ProjectFile {

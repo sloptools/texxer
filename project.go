@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -152,4 +153,32 @@ func movePNG(file string, src, dst *mesh.Model) error {
 		return err
 	}
 	return os.WriteFile(file, out.Bytes(), 0o644)
+}
+
+// KeepOriginals keeps copies of a model's files beside the project, for layers that
+// take the model's own colors: export writes texxer's texture into the files, and
+// the colors must still come from before. It copies them when there are none yet or
+// when refresh says the files changed outside texxer, and returns their model key.
+func (a *App) KeepOriginals(project, id, key string, refresh bool) (string, error) {
+	if project == "" || id == "" || strings.ContainsAny(id, `/\.`) {
+		return "", errors.New("bad model id")
+	}
+	var kept []string
+	for i, p := range keyPaths(key) {
+		dst := filepath.Join(project+".paint", fmt.Sprintf("%s-original-%d.glb", id, i))
+		if refresh || !exists(dst) {
+			data, err := os.ReadFile(p)
+			if err != nil {
+				return "", err
+			}
+			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+				return "", err
+			}
+			if err := os.WriteFile(dst, data, 0o644); err != nil {
+				return "", err
+			}
+		}
+		kept = append(kept, dst)
+	}
+	return strings.Join(kept, "|"), nil
 }

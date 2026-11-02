@@ -87,6 +87,8 @@ uniform float uGrain;
 uniform float uShine;
 uniform float uSeed;
 uniform int uStampColors;
+uniform sampler2D uSource;
+uniform int uFromSource;
 uniform int uEmitPass;
 uniform int uGlow;
 uniform vec3 uL;
@@ -256,6 +258,7 @@ void main() {
   }
 
   vec3 c = uStampColors == 1 && gStampA > 0.0 ? gStampRGB : uColor;
+  if (uFromSource == 1) c = texelFetch(uSource, t, 0).rgb;
   float v = (fbm(pos.xyz * uToneScale + uSeed) - 0.5) * 2.0 * uTone;
   v += (hash(vec3(vec2(t), uSeed)) - 0.5) * 2.0 * uGrain;
   c = clamp(c * (1.0 + v), 0.0, 1.0);

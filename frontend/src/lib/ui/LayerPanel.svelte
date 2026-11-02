@@ -31,6 +31,9 @@
     {#if layer.masks.some((m) => m.kind === 'stamps')}
       <label class="check"><input type="checkbox" bind:checked={layer.stampColors} /> colors from image stamps</label>
     {/if}
+    {#if store.model?.texture || layer.source}
+      <label class="check" title="The model's texture as it was before texxer; texxer keeps a copy of it beside the project"><input type="checkbox" bind:checked={layer.source} /> colors from the model's texture</label>
+    {/if}
     <div class="swatches">
       {#each used as c}
         <button class="sw" class:on={c === look.color.toLowerCase()} style:background={c} title={c} aria-label={c} onclick={() => (look.color = c)}></button>

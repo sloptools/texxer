@@ -52,6 +52,8 @@ type ModelInfo struct {
 	Hash string `json:"hash"`
 	// Details tells whether the model has normal or occlusion maps to bake from.
 	Details bool `json:"details"`
+	// Texture tells whether it has a base color texture of its own.
+	Texture bool `json:"texture"`
 }
 
 // Open loads the files of a model key, see keyPaths.
@@ -76,7 +78,10 @@ func (a *App) Open(key string) (*ModelInfo, error) {
 		Diag:    diag,
 		Overlap: unwrap.Overlap(m.Tris, 256),
 		Hash:    hash,
-		Details: len(m.Details) > 0,
+	}
+	for _, d := range m.Details {
+		info.Details = info.Details || d.HasDetail()
+		info.Texture = info.Texture || d.Color != nil
 	}
 	for _, o := range l.offsets {
 		info.Offsets = append(info.Offsets, [3]float64(o))

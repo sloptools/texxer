@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import * as api from '../../wailsjs/go/main/App'
   import { Compositor, loadBake } from './gl/compositor'
   import { PaintStore } from './gl/paint'
   import { Stage } from './gl/stage'
   import { withVariant } from './project'
+  import { stateOf } from './projects.svelte'
   import { corners, handles } from './stamps'
   import { store } from './store.svelte'
   import { ToolInput } from './toolInput'
@@ -112,12 +113,16 @@
     return () => clearTimeout(t)
   })
 
+  // Layers that take the model's own colors need them baked too.
+  const wantsSource = $derived(store.project.layers.some((l) => l.source))
+
   // Model and bake, again when the texture size or bake settings change.
   $effect(() => {
     const s = stage
     const model = store.model
     const layout = store.project.unwrap
     const settings = bakeSettings
+    const source = wantsSource
     if (!s || !model) return
 
     let cancelled = false
@@ -126,8 +131,13 @@
     const project = store.path
     const key = encodeURIComponent(model.path)
     const files = model.offsets.map((offset, i) => ({ url: `/model?path=${key}&unwrap=${layout}&file=${i}`, offset }))
+    // The colors come from kept copies of the files, as export overwrites them; a
+    // new copy when the files changed outside texxer.
+    const doc = store.project
+    const refresh = untrack(() => !doc.exported || stateOf(doc) === 'changed')
+    const originals = source ? api.KeepOriginals(project, doc.id, model.path, refresh) : Promise.resolve('')
     // Strokes in flight are saved first, so the new paint store loads them.
-    Promise.all([s.load(files), loadBake(model.path, size * factor, layout, settings), store.paint?.flush()])
+    Promise.all([s.load(files), originals.then((kept) => loadBake(model.path, size * factor, layout, settings, kept)), store.paint?.flush()])
       .then(([, bake]) => {
         if (cancelled) return
         compositor?.dispose()

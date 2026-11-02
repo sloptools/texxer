@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Pixel art texture filtering for engines: nearest when magnified, mipmaps when far away.
@@ -234,17 +235,13 @@ func writeGLB(doc map[string]any, bin []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-var textureRefs = map[string]bool{
-	"baseColorTexture": true, "emissiveTexture": true, "normalTexture": true,
-	"occlusionTexture": true, "metallicRoughnessTexture": true,
-}
-
-// eachTextureRef calls fn with every texture reference in the materials.
+// eachTextureRef calls fn with every texture reference in the materials, those in
+// extensions too: glTF names them all ...Texture, with an index.
 func eachTextureRef(v any, fn func(ref map[string]any)) {
 	switch v := v.(type) {
 	case map[string]any:
 		for k, x := range v {
-			if ref, ok := x.(map[string]any); ok && textureRefs[k] {
+			if ref, ok := x.(map[string]any); ok && strings.HasSuffix(k, "Texture") && ref["index"] != nil {
 				fn(ref)
 			}
 			eachTextureRef(x, fn)

@@ -22,6 +22,10 @@ export function ImportStamps() {
   return window['go']['main']['App']['ImportStamps']();
 }
 
+export function KeepOriginals(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['KeepOriginals'](arg1, arg2, arg3, arg4);
+}
+
 export function LoadProject(arg1) {
   return window['go']['main']['App']['LoadProject'](arg1);
 }

@@ -16,13 +16,17 @@ export type Bake = {
   geo: THREE.DataTexture
   pos: THREE.DataTexture
   nrm: THREE.DataTexture
+  // The model's own colors, when a layer asked for them.
+  source?: THREE.DataTexture
   // CPU copies of the position and normal maps, for picking parts and islands.
   posData: Float32Array
   nrmData: Float32Array
 }
 
-export async function loadBake(path: string, size: number, layout: number, b: BakeSettings): Promise<Bake> {
-  const blob = await fetchBlob(`/bake?path=${encodeURIComponent(path)}&size=${size}&unwrap=${layout}&edges=${b.edges}&cavity=${b.cavity}&detail=${b.detail}`, 2)
+// source is the model key of the kept originals to take the model's own colors from.
+export async function loadBake(path: string, size: number, layout: number, b: BakeSettings, source = ''): Promise<Bake> {
+  const q = `path=${encodeURIComponent(path)}&size=${size}&unwrap=${layout}&edges=${b.edges}&cavity=${b.cavity}&detail=${b.detail}&source=${encodeURIComponent(source)}`
+  const blob = await fetchBlob(`/bake?${q}`, 2)
   if (!blob) throw new Error('bake failed')
   const buf = await blob.arrayBuffer()
 
@@ -33,8 +37,13 @@ export async function loadBake(path: string, size: number, layout: number, b: Ba
     t.needsUpdate = true
     return t
   }
-  return { size, geo: texture(0), pos: texture(1), nrm: texture(2), posData: new Float32Array(buf, n * 4, n), nrmData: new Float32Array(buf, 2 * n * 4, n) }
+  const bake: Bake = { size, geo: texture(0), pos: texture(1), nrm: texture(2), posData: new Float32Array(buf, n * 4, n), nrmData: new Float32Array(buf, 2 * n * 4, n) }
+  if (source) bake.source = texture(3)
+  return bake
 }
+
+const none = new THREE.DataTexture(new Float32Array(4), 1, 1, THREE.RGBAFormat, THREE.FloatType)
+none.needsUpdate = true
 
 // With mipmaps, the finished texture is sampled like Godot's nearest_mipmap filter,
 // so the view at a distance or at game resolution matches the game.
@@ -139,6 +148,8 @@ export class Compositor {
         uShine: { value: 0 },
         uSeed: { value: 0 },
         uStampColors: { value: 0 },
+        uSource: { value: bake.source ?? none },
+        uFromSource: { value: 0 },
         uEmitPass: { value: 0 },
         uGlow: { value: 0 },
         uL: { value: new THREE.Vector3() },
@@ -229,6 +240,7 @@ export class Compositor {
       u.uShine.value = layer.shine
       u.uSeed.value = (i * 7.31) % 97
       u.uStampColors.value = layer.stampColors ? 1 : 0
+      u.uFromSource.value = layer.source && this.bake.source ? 1 : 0
       u.uOpacity.value = layer.opacity
       u.uBlend.value = blendIndex[layer.blend]
 

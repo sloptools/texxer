@@ -66,7 +66,11 @@ type gltfDoc struct {
 		} `json:"primitives"`
 	} `json:"meshes"`
 	Materials []struct {
-		Name             string      `json:"name"`
+		Name string `json:"name"`
+		PBR  struct {
+			BaseColorTexture *textureRef `json:"baseColorTexture"`
+			BaseColorFactor  []float64   `json:"baseColorFactor"`
+		} `json:"pbrMetallicRoughness"`
 		NormalTexture    *textureRef `json:"normalTexture"`
 		OcclusionTexture *textureRef `json:"occlusionTexture"`
 	} `json:"materials"`
@@ -155,17 +159,19 @@ func parseGLB(data []byte) (*gltfDoc, []byte, error) {
 	return &doc, bin, nil
 }
 
-// addDetails reads each material's normal and occlusion maps and returns, per
-// material, its index in m.Details or -1.
+// addDetails reads each material's maps and returns, per material, its index in
+// m.Details.
 func (m *Model) addDetails(doc *gltfDoc, bin []byte) ([]int, error) {
 	out := make([]int, len(doc.Materials))
 	for i, mat := range doc.Materials {
-		out[i] = -1
-		if mat.NormalTexture == nil && mat.OcclusionTexture == nil {
-			continue
-		}
-		d := &Detail{}
+		d := &Detail{Factor: [4]float64{1, 1, 1, 1}}
+		copy(d.Factor[:], mat.PBR.BaseColorFactor)
 		var err error
+		if mat.PBR.BaseColorTexture != nil {
+			if d.Color, err = decodeTexture(doc, bin, mat.PBR.BaseColorTexture.Index); err != nil {
+				return nil, fmt.Errorf("base color: %w", err)
+			}
+		}
 		if mat.NormalTexture != nil {
 			if d.Normal, err = decodeTexture(doc, bin, mat.NormalTexture.Index); err != nil {
 				return nil, fmt.Errorf("normal map: %w", err)

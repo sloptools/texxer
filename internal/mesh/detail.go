@@ -7,10 +7,14 @@ import (
 	"sync"
 )
 
-// Detail is a material's normal and occlusion maps, mostly baked from a high-poly
-// model. They follow the model's own UVs (Tri.Src), whatever layout texxer paints on.
+// Detail is a material's own maps: its base color, and normal and occlusion maps,
+// mostly baked from a high-poly model. They follow the model's own UVs (Tri.Src),
+// whatever layout texxer paints on.
 type Detail struct {
-	// Normal is in tangent space, +Y up as glTF has it. Either map may be nil.
+	// Color is the base color texture, Factor the color it is multiplied by.
+	Color  image.Image
+	Factor [4]float64
+	// Normal is in tangent space, +Y up as glTF has it. Any map may be nil.
 	Normal    image.Image
 	Occlusion image.Image
 
@@ -58,6 +62,20 @@ func pixel(img image.Image, u, v float64) (r, g, b float64) {
 func (d *Detail) normalAt(u, v float64) Vec {
 	r, g, b := pixel(d.Normal, u, v)
 	return Vec{r*2 - 1, g*2 - 1, b*2 - 1}
+}
+
+// HasDetail tells whether the material has a normal or occlusion map to bake from.
+func (d *Detail) HasDetail() bool {
+	return d.Normal != nil || d.Occlusion != nil
+}
+
+func (d *Detail) colorAt(u, v float64) [3]float64 {
+	c := [3]float64{d.Factor[0], d.Factor[1], d.Factor[2]}
+	if d.Color != nil {
+		r, g, b := pixel(d.Color, u, v)
+		c = [3]float64{c[0] * r, c[1] * g, c[2] * b}
+	}
+	return c
 }
 
 func (d *Detail) occlusionAt(u, v float64) float64 {

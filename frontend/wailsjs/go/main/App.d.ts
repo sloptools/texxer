@@ -12,6 +12,8 @@ export function GrungeMaps():Promise<Array<string>>;
 
 export function ImportStamps():Promise<Array<string>>;
 
+export function KeepOriginals(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<string>;
+
 export function LoadProject(arg1:string):Promise<main.ProjectFile>;
 
 export function Materials():Promise<Record<string, string>>;

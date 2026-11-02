@@ -69,9 +69,14 @@ export function serializeWorkspace(path: string, ws: Workspace): string {
   return JSON.stringify({ version: 2, finish: ws.finish, shading: ws.shading, light: ws.light, models }, null, 2)
 }
 
-// Changes whenever anything that ends up in the export does.
+// Changes whenever anything that ends up in the export does. Keys are sorted, as
+// reading a project back can order them differently.
 export function docHash(m: ModelDoc): string {
-  const json = JSON.stringify(m, (k, v) => (k === 'exported' || k === 'id' || k === 'files' ? undefined : v))
+  const json = JSON.stringify(m, (k, v) => {
+    if (k === 'exported' || k === 'id' || k === 'files') return undefined
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return v
+    return Object.fromEntries(Object.keys(v).sort().map((key) => [key, v[key]]))
+  })
   let h = 2166136261
   for (let i = 0; i < json.length; i++) h = Math.imul(h ^ json.charCodeAt(i), 16777619)
   return (h >>> 0).toString(16)

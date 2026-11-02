@@ -64,6 +64,8 @@ export type Layer = {
   shine: number
   // Take the color from image stamps instead of the layer color.
   stampColors: boolean
+  // Take the color from the model's own texture or material colors, as they were before texxer.
+  source?: boolean
   // Glows: the layer's color also goes into the emissive map.
   glow: boolean
   opacity: number

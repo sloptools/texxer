@@ -222,7 +222,7 @@ func rasterize(m *Model, o BakeOptions) []sample {
 		ng := t.P[1].Sub(t.P[0]).Cross(t.P[2].Sub(t.P[0])).Norm()
 		detail := -1
 		var tan, bit Vec
-		if o.Detail > 0 && t.Detail >= 0 && t.Detail < len(m.Details) {
+		if o.Detail > 0 && t.Detail >= 0 && t.Detail < len(m.Details) && m.Details[t.Detail].HasDetail() {
 			detail = t.Detail
 			tan, bit = tangents(t)
 		}

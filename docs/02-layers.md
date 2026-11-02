@@ -9,6 +9,7 @@ Layers stack bottom to top. A layer without masks covers everything.
 - **grain**: single texels a bit lighter or darker.
 - **shine**: baked sheen and glints, for glass and gloss.
 - **glows**: the color also goes into the emissive map.
+- **colors from the model's texture**: the layer takes the model's own texture or material colors. One such layer alone just crunches a finished texture; layers above it add to it. texxer keeps a copy of the original beside the project, since the export overwrites it, and takes a new one when the file changes outside texxer.
 - **blend**: normal, multiply, add, overlay, relief. Relief takes gray stamps as bumps: mid gray keeps the surface.
 - **opacity**
 

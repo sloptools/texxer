@@ -15,11 +15,15 @@ import (
 // bake returns three float32 RGBA maps of size×size texels, back to back:
 // AO, convex edges, concave cavity, coverage;
 // position (p - min) / diagonal, part index;
-// normal, island.
+// normal, island;
+// with a source, the model's own colors.
 // bakeOptions are what a model may tune about its bake: the widths of edges and
 // cavities, as fractions of the model's size, and how much its detail maps count.
+// source names the files whose own colors to bake too, see KeepOriginals; empty
+// leaves them out.
 type bakeOptions struct {
 	edges, cavity, detail float64
+	source                string
 }
 
 func (c *modelCache) bake(path string, size, layout int, b bakeOptions) ([]byte, error) {
@@ -27,8 +31,16 @@ func (c *modelCache) bake(path string, size, layout int, b bakeOptions) ([]byte,
 	if err != nil {
 		return nil, err
 	}
+	var src *mesh.Model
+	if b.source != "" {
+		l, err := c.get(b.source)
+		if err != nil {
+			return nil, err
+		}
+		src = l.model
+	}
 
-	key := fmt.Sprintf("%s|%p|%d|%v", path, m, size, b)
+	key := fmt.Sprintf("%s|%p|%d|%v|%p", path, m, size, b, src)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if b, ok := c.bakes[key]; ok {
@@ -48,7 +60,11 @@ func (c *modelCache) bake(path string, size, layout int, b bakeOptions) ([]byte,
 	})
 
 	n := size * size
-	out := make([]byte, n*4*4*3)
+	textures := 3
+	if src != nil {
+		textures = 4
+	}
+	out := make([]byte, n*4*4*textures)
 	put := func(texture, texel, ch int, v float32) {
 		binary.LittleEndian.PutUint32(out[((texture*n+texel)*4+ch)*4:], math.Float32bits(v))
 	}
@@ -63,6 +79,13 @@ func (c *modelCache) bake(path string, size, layout int, b bakeOptions) ([]byte,
 		}
 		put(1, i, 3, float32(math.Floor(float64(maps.PartID[i]*256))))
 		put(2, i, 3, maps.Island[i])
+	}
+	// The model's own colors, from the kept originals, which have the same faces.
+	if src != nil {
+		colors := mesh.BaseColors(src.Details, src.Tris, m.Tris, size)
+		for i, v := range colors {
+			binary.LittleEndian.PutUint32(out[(3*n*4+i)*4:], math.Float32bits(v))
+		}
 	}
 
 	c.bakes[key] = out
@@ -134,7 +157,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 				}
 				return v
 			}
-			opts := bakeOptions{number("edges", 0.03), number("cavity", 0.03), number("detail", 1)}
+			opts := bakeOptions{number("edges", 0.03), number("cavity", 0.03), number("detail", 1), q.Get("source")}
 			data, err := a.models.bake(path, size, layout, opts)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)

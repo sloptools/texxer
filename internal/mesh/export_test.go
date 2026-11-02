@@ -122,3 +122,46 @@ func baseColor(t *testing.T, glb []byte, material string) image.Image {
 	t.Fatalf("no base color texture on %s", material)
 	return nil
 }
+
+// Textures that extensions point at survive the export, renumbered with the rest.
+func TestWithTextureKeepsExtensionTextures(t *testing.T) {
+	src, err := os.ReadFile("../../examples/models/ship_unique.glb")
+	if err != nil {
+		t.Skip("example model missing")
+	}
+	doc, bin, err := rawGLB(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// One more texture, used only by an extension of the first textured material.
+	images := sliceArray(doc, "images")
+	textures := sliceArray(doc, "textures")
+	doc["textures"] = append(textures, map[string]any{"source": float64(len(images) - 1)})
+	var mat map[string]any
+	for _, m := range sliceArray(doc, "materials") {
+		if pbr, _ := m.(map[string]any)["pbrMetallicRoughness"].(map[string]any); pbr != nil && pbr["baseColorTexture"] != nil {
+			mat = m.(map[string]any)
+			break
+		}
+	}
+	mat["extensions"] = map[string]any{"KHR_materials_specular": map[string]any{"specularTexture": map[string]any{"index": float64(len(textures))}}}
+	glb, err := writeGLB(doc, bin)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	img := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	out, err := WithTexture(glb, Textures{Color: buf.Bytes()}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, _, _ := rawGLB(out)
+	count := len(sliceArray(after, "textures"))
+	eachTextureRef(sliceArray(after, "materials"), func(ref map[string]any) {
+		if i := intField(ref, "index"); i >= count {
+			t.Errorf("reference to texture %d, but only %d are left", i, count)
+		}
+	})
+}
