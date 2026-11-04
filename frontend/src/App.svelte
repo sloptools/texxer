@@ -20,12 +20,17 @@
   import QuickOpen from './lib/ui/QuickOpen.svelte'
   import MaterialMenu from './lib/ui/MaterialMenu.svelte'
   import { addDirt, dirt } from './lib/dirt'
+  import { snippets } from './lib/snippets.svelte'
+  import PhotoList from './lib/ui/PhotoList.svelte'
+  import PhotoView from './lib/ui/PhotoView.svelte'
+  import CutPanel from './lib/ui/CutPanel.svelte'
+  import SnippetStrip from './lib/ui/SnippetStrip.svelte'
   import { addModels, createProject, cycleModel, exportChanged, exportModel, openProject, pickProject, projectName, recent, refreshHashes } from './lib/projects.svelte'
 
   let headlight = 0.6
   let materials = $state(false)
-  type Side = 'models' | 'layers' | 'settings'
-  const sides: Side[] = ['models', 'layers', 'settings']
+  type Side = 'models' | 'layers' | 'photos' | 'settings'
+  const sides: Side[] = ['models', 'layers', 'photos', 'settings']
   let side = $state<Side>(sides.find((s) => s === localStorage.getItem('side')) ?? 'layers')
   $effect(() => localStorage.setItem('side', side))
 
@@ -34,10 +39,20 @@
     OnFileDrop((_x, _y, paths) => {
       const project = paths.find((p) => p.toLowerCase().endsWith('.texxer'))
       const glbs = paths.filter((p) => p.toLowerCase().endsWith('.glb'))
+      const photos = paths.filter((p) => /\.(png|jpe?g|webp)$/i.test(p))
       if (project) openProject(project)
       else if (glbs.length) addModels(glbs)
+      else if (photos.length && store.path) {
+        side = 'photos'
+        snippets.addPhotos(photos)
+      }
     }, false)
     requestAnimationFrame(() => WindowShow())
+  })
+
+  // Each project has its own snippets.
+  $effect(() => {
+    if (store.path) snippets.load('')
   })
 
   // A picked stamp belongs to the layer it was picked on.
@@ -293,6 +308,8 @@
       <div class="scroll">
         {#if side === 'models'}
           <ModelList />
+        {:else if side === 'photos'}
+          <PhotoList />
         {:else if !store.model}
           <p class="note">pick a model first</p>
         {:else if side === 'layers'}
@@ -312,7 +329,13 @@
         <FlatBar />
       {:else}
         <Toolbar />
+        {#if tools.tool === 'stamp'}
+          <SnippetStrip />
+        {/if}
       {/if}
+    {/if}
+    {#if side === 'photos' && snippets.current}
+      <PhotoView photo={snippets.current} />
     {/if}
     {#if !store.workspace}
       <div class="empty">
@@ -339,7 +362,9 @@
   </main>
 
   <aside class="right">
-    {#if store.model}
+    {#if side === 'photos'}
+      <CutPanel />
+    {:else if store.model}
       <ToolPanel />
       <LayerPanel />
     {/if}

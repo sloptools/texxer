@@ -154,6 +154,16 @@ func (a *App) middleware(next http.Handler) http.Handler {
 			}
 			http.ServeFile(w, r, filepath.Join(dir, filepath.Base(r.URL.Query().Get("name"))+".png"))
 
+		case "/photo", "/snippet":
+			q := r.URL.Query()
+			file, err := snippetFile(q.Get("project"), q.Get("category"), r.URL.Path[1:], q.Get("name"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Cache-Control", "no-store")
+			http.ServeFile(w, r, file)
+
 		case "/paint":
 			file, err := paintPath(r.URL.Query().Get("project"), r.URL.Query().Get("id"))
 			if err != nil {

@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { drawDecal, isDecal } from '../decals'
 import { fetchBlob, track } from '../assets'
 import { drawShape } from '../shapes'
+import { libraryURL, snippetChanged } from '../snippets.svelte'
 
 const grid = 8
 const cell = 256
@@ -13,6 +14,7 @@ export class StampAtlas {
   private ctx: CanvasRenderingContext2D
   private cells = new Map<string, number>()
   onLoad: () => void = () => {}
+  private redraw = (e: Event) => this.draw('snip:' + (e as CustomEvent<string>).detail)
 
   constructor() {
     const canvas = document.createElement('canvas')
@@ -22,6 +24,7 @@ export class StampAtlas {
     this.texture.flipY = false
     this.texture.generateMipmaps = false
     this.texture.minFilter = this.texture.magFilter = THREE.LinearFilter
+    snippetChanged.addEventListener('change', this.redraw)
   }
 
   cell(shape: string): number {
@@ -35,23 +38,37 @@ export class StampAtlas {
     }
     i = this.cells.size
     this.cells.set(shape, i)
-    const x = (i % grid) * cell
-    const y = Math.floor(i / grid) * cell
-    this.ctx.clearRect(x, y, cell, cell)
-    if (shape.startsWith('img:')) track(this.drawImage(shape.slice(4), x + pad, y + pad, cell - pad * 2))
-    else if (isDecal(shape)) drawDecal(this.ctx, shape, x + pad, y + pad, cell - pad * 2)
-    else drawShape(this.ctx, shape, x + pad, y + pad, cell - pad * 2)
-    this.texture.needsUpdate = true
+    this.draw(shape)
     return i
   }
 
+  // A shape that has a cell, again, as when a snippet changed.
+  private draw(shape: string) {
+    const i = this.cells.get(shape)
+    if (i === undefined) return
+    const x = (i % grid) * cell + pad
+    const y = Math.floor(i / grid) * cell + pad
+    const size = cell - pad * 2
+    this.ctx.clearRect(x - pad, y - pad, cell, cell)
+    if (shape.startsWith('img:')) track(this.drawImage(`/stamp?name=${encodeURIComponent(shape.slice(4))}`, x, y, size, true))
+    else if (shape.startsWith('snip:')) track(this.drawImage(libraryURL('snippet', shape.slice(5), '', Date.now()), x, y, size, false))
+    else if (isDecal(shape)) drawDecal(this.ctx, shape, x, y, size)
+    else drawShape(this.ctx, shape, x, y, size)
+    this.texture.needsUpdate = true
+  }
+
   // Images keep their colors. Opaque gray images, like scanned stencils, use
-  // their brightness as the shape.
-  private async drawImage(name: string, x: number, y: number, size: number) {
-    const blob = await fetchBlob(`/stamp?name=${encodeURIComponent(name)}`)
+  // their brightness as the shape; snippets stay as they are.
+  private async drawImage(url: string, x: number, y: number, size: number, stencil: boolean) {
+    const blob = await fetchBlob(url)
     if (!blob) return
     const img = await createImageBitmap(blob)
     this.ctx.drawImage(img, x, y, size, size)
+    if (!stencil) {
+      this.texture.needsUpdate = true
+      this.onLoad()
+      return
+    }
 
     const data = this.ctx.getImageData(x, y, size, size)
     const px = data.data
@@ -70,6 +87,7 @@ export class StampAtlas {
   }
 
   dispose() {
+    snippetChanged.removeEventListener('change', this.redraw)
     this.texture.dispose()
   }
 }

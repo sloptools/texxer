@@ -30,6 +30,22 @@ export namespace main {
 	        this.texture = source["texture"];
 	    }
 	}
+	export class Photo {
+	    id: string;
+	    file: string;
+	    cuts: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Photo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.file = source["file"];
+	        this.cuts = source["cuts"];
+	    }
+	}
 	export class ProjectFile {
 	    path: string;
 	    json: string;
