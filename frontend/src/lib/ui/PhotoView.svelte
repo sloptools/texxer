@@ -183,6 +183,7 @@
     <img src={url} alt={photo.file} onload={loaded} draggable="false" />
     <svg viewBox="0 0 {size[0]} {size[1]}" width={size[0]} height={size[1]}>
       {#each photo.cuts as cut (cut.id)}
+        <polygon class="halo" points={points(cut.corners)} />
         <polygon class="cut" class:on={cut.id === snippets.cut} points={points(cut.corners)} />
         {#if cut.id === snippets.cut}
           {#each cut.corners as c}
@@ -193,9 +194,11 @@
         {/if}
       {/each}
       {#if drag?.kind === 'rect' && drag.moved && !pending.length}
+        <rect class="halo" x={Math.min(drag.from[0], drag.to[0])} y={Math.min(drag.from[1], drag.to[1])} width={Math.abs(drag.to[0] - drag.from[0])} height={Math.abs(drag.to[1] - drag.from[1])} />
         <rect class="cut on" x={Math.min(drag.from[0], drag.to[0])} y={Math.min(drag.from[1], drag.to[1])} width={Math.abs(drag.to[0] - drag.from[0])} height={Math.abs(drag.to[1] - drag.from[1])} />
       {/if}
       {#if pending.length}
+        <polyline class="halo" points={points(cursor ? [...pending, cursor] : pending)} />
         <polyline class="pending" points={points(cursor ? [...pending, cursor] : pending)} />
         {#each pending as c}
           <circle class="corner" cx={c[0]} cy={c[1]} r={4 / zoom} />
@@ -232,26 +235,34 @@
   svg {
     overflow: visible;
   }
+  /* A dark edge under every mark, so it shows on light and dark photos alike. */
+  .halo {
+    fill: none;
+    stroke: rgb(0 0 0 / 0.7);
+    stroke-width: 4;
+    vector-effect: non-scaling-stroke;
+  }
   .cut {
-    fill: rgb(127 196 175 / 0.08);
-    stroke: rgb(235 232 223 / 0.6);
+    fill: rgb(255 176 32 / 0.06);
+    stroke: rgb(235 232 223 / 0.85);
     stroke-width: 1.5;
     vector-effect: non-scaling-stroke;
   }
   .cut.on {
-    fill: rgb(127 196 175 / 0.14);
-    stroke: var(--accent);
+    fill: rgb(255 176 32 / 0.12);
+    stroke: var(--mark);
+    stroke-width: 2;
   }
   .pending {
     fill: none;
-    stroke: var(--accent);
+    stroke: var(--mark);
     stroke-width: 1.5;
     stroke-dasharray: 4 3;
     vector-effect: non-scaling-stroke;
   }
   .corner {
-    fill: var(--bg);
-    stroke: var(--accent);
+    fill: var(--mark);
+    stroke: rgb(0 0 0 / 0.8);
     stroke-width: 1.5;
     vector-effect: non-scaling-stroke;
   }

@@ -129,7 +129,7 @@ const art: Record<MaskKind, string> = {
 }
 
 // Rows of # into an svg path on the 11×11 grid, vertically centered.
-function path(rows: string): string {
+export function pixelPath(rows: string): string {
   const lines = rows.trim().split('\n').map((l) => l.trim())
   const top = Math.floor((11 - lines.length) / 2)
   const rects: string[] = []
@@ -139,4 +139,4 @@ function path(rows: string): string {
   return rects.join(' ')
 }
 
-export const maskIcons = Object.fromEntries(Object.entries(art).map(([k, rows]) => [k, path(rows)])) as Record<MaskKind, string>
+export const maskIcons = Object.fromEntries(Object.entries(art).map(([k, rows]) => [k, pixelPath(rows)])) as Record<MaskKind, string>

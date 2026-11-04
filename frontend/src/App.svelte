@@ -29,8 +29,13 @@
 
   let headlight = 0.6
   let materials = $state(false)
-  type Side = 'models' | 'layers' | 'photos' | 'settings'
-  const sides: Side[] = ['models', 'layers', 'photos', 'settings']
+  type Side = 'models' | 'layers' | 'settings'
+  const sides: Side[] = ['models', 'layers', 'settings']
+
+  // Painting the model, or cutting snippets from photos.
+  type Mode = 'paint' | 'photos'
+  let mode = $state<Mode>(localStorage.getItem('mode') === 'photos' ? 'photos' : 'paint')
+  $effect(() => localStorage.setItem('mode', mode))
   let side = $state<Side>(sides.find((s) => s === localStorage.getItem('side')) ?? 'layers')
   $effect(() => localStorage.setItem('side', side))
 
@@ -43,7 +48,7 @@
       if (project) openProject(project)
       else if (glbs.length) addModels(glbs)
       else if (photos.length && store.path) {
-        side = 'photos'
+        mode = 'photos'
         snippets.addPhotos(photos)
       }
     }, false)
@@ -90,7 +95,8 @@
         tools.set('stamp')
         return true
       case 'Escape':
-        if (store.pickingZone) store.pickingZone = false
+        if (store.sampling) store.sampling = false
+        else if (store.pickingZone) store.pickingZone = false
         else if (tools.picked) tools.picked = null
         else if (tools.tool !== 'nav') tools.set(tools.tool)
         return true
@@ -243,6 +249,9 @@
         case 'p':
           store.cycleLines()
           break
+        case 'k':
+          if (store.layer) store.sampling = !store.sampling
+          break
         case 't':
           store.torch = !store.torch
           break
@@ -277,6 +286,12 @@
 <div class="app">
   <header class="top">
     <span class="title">texxer{#if store.path}<span class="project">{projectName()}</span>{/if}</span>
+    {#if store.workspace}
+      <div class="modes" role="tablist">
+        <button role="tab" aria-selected={mode === 'paint'} class:on={mode === 'paint'} onclick={() => (mode = 'paint')}>paint</button>
+        <button role="tab" aria-selected={mode === 'photos'} class:on={mode === 'photos'} onclick={() => (mode = 'photos')}>photos</button>
+      </div>
+    {/if}
     <span class="actions">
       <button title="New project (⌘N)" onclick={createProject}><Icon name="plus" size={11} />new</button>
       <button title="Open a project or a model (⌘O)" onclick={pickProject}><Icon name="dir" size={11} />open</button>
@@ -285,18 +300,16 @@
   </header>
 
   <aside class="left">
-    {#if store.workspace}
+    {#if store.workspace && mode === 'photos'}
+      <div class="scroll">
+        <PhotoList />
+      </div>
+    {:else if store.workspace}
       <div class="tabs">
         {#each sides as s}
           <button class="caps" class:on={side === s} onclick={() => (side = s)}>{s}</button>
         {/each}
-        {#if side === 'layers' && store.model}
-          <span class="icons">
-            <button class="icon" title="Add a material: a folder of layers (⇧M)" onclick={() => (materials = !materials)}><Icon name="ball" size={11} /></button>
-            <button class="icon" title="Put the layer in a new folder (⌘G)" onclick={() => store.groupLayer()}><Icon name="dir" size={11} /></button>
-            <button class="icon" title="New layer (N)" onclick={() => store.addLayer()}><Icon name="plus" size={11} /></button>
-          </span>
-        {:else if side === 'models'}
+        {#if side === 'models'}
           <span class="icons">
             <button class="icon" title="Add models (each file its own model)" onclick={() => addModels()}><Icon name="plus" size={11} /></button>
           </span>
@@ -308,12 +321,15 @@
       <div class="scroll">
         {#if side === 'models'}
           <ModelList />
-        {:else if side === 'photos'}
-          <PhotoList />
         {:else if !store.model}
           <p class="note">pick a model first</p>
         {:else if side === 'layers'}
           <VariantBar />
+          <div class="adds">
+            <button title="New layer (N)" onclick={() => store.addLayer()}><Icon name="plus" size={11} />layer</button>
+            <button title="Put the layer in a new folder (⌘G)" onclick={() => store.groupLayer()}><Icon name="dir" size={11} />folder</button>
+            <button title="Add a material or dirt (⇧M)" onclick={() => (materials = !materials)}><Icon name="ball" size={11} />material</button>
+          </div>
           <LayerList />
         {:else}
           <Finish />
@@ -334,8 +350,12 @@
         {/if}
       {/if}
     {/if}
-    {#if side === 'photos' && snippets.current}
-      <PhotoView photo={snippets.current} />
+    {#if mode === 'photos'}
+      {#if snippets.current}
+        <PhotoView photo={snippets.current} />
+      {:else}
+        <div class="nophoto">drop photos here to cut snippets from them</div>
+      {/if}
     {/if}
     {#if !store.workspace}
       <div class="empty">
@@ -362,7 +382,7 @@
   </main>
 
   <aside class="right">
-    {#if side === 'photos'}
+    {#if mode === 'photos'}
       <CutPanel />
     {:else if store.model}
       <ToolPanel />
@@ -391,6 +411,7 @@
   }
 
   .top {
+    position: relative;
     grid-column: 1 / -1;
     display: flex;
     align-items: center;
@@ -399,6 +420,41 @@
     border-bottom: 1px solid var(--line);
     background: var(--panel);
     --wails-draggable: drag;
+  }
+  .modes {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 1px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--bg);
+    --wails-draggable: no-drag;
+  }
+  .modes button {
+    height: 22px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    font: 11px var(--mono);
+    color: var(--dim);
+  }
+  .modes button.on {
+    background: var(--active);
+    color: var(--strong);
+  }
+  .nophoto {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    background: var(--bg);
+    font: 12px var(--mono);
+    color: var(--faint);
   }
   .title {
     font-size: 13px;
@@ -483,6 +539,27 @@
   .tabs .caps.on {
     background: var(--active);
     color: var(--fg);
+  }
+  .adds {
+    display: flex;
+    gap: 4px;
+    padding: 2px 12px 8px;
+  }
+  .adds button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 7px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: none;
+    font: 11px var(--mono);
+    color: var(--dim);
+  }
+  .adds button:hover {
+    color: var(--strong);
+    background: var(--hover);
   }
   .icons {
     display: flex;

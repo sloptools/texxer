@@ -73,6 +73,29 @@ export function corners(s: Stamp): THREE.Vector3[] {
   ].map(([x, y]) => f.c.clone().addScaledVector(f.t, x * f.hw).addScaledVector(f.b, y * f.hh).add(lift))
 }
 
+// A stamp filling the flat surface the points lie on, upright as placed stamps are.
+export function fitted(points: THREE.Vector3[], normal: THREE.Vector3, hint: THREE.Vector3, base: Pick<Stamp, 'shape' | 'mirror'>): Stamp {
+  const up = uprightOn(normal, hint)
+  const t = up.clone().cross(normal)
+  let [u0, u1, v0, v1, w] = [Infinity, -Infinity, Infinity, -Infinity, 0]
+  for (const p of points) {
+    const u = p.dot(t)
+    const v = p.dot(up)
+    u0 = Math.min(u0, u)
+    u1 = Math.max(u1, u)
+    v0 = Math.min(v0, v)
+    v1 = Math.max(v1, v)
+    w += p.dot(normal)
+  }
+  const size = Math.max(u1 - u0, 1e-6)
+  const c = t
+    .clone()
+    .multiplyScalar((u0 + u1) / 2)
+    .addScaledVector(up, (v0 + v1) / 2)
+    .addScaledVector(normal, w / points.length)
+  return { ...base, p: arr(c), n: arr(normal), up: arr(up), rot: 0, size, aspect: (v1 - v0) / size }
+}
+
 // Snaps p to a grid on the surface plane, half a stamp wide, anchored at the model origin.
 export function snapOnPlane(p: THREE.Vector3, n: THREE.Vector3, up: THREE.Vector3, step: number): THREE.Vector3 {
   const t = up.clone().cross(n)
@@ -107,12 +130,38 @@ export function nudge(s: Stamp, dx: number, dy: number): Stamp {
 
 // The grips of a picked stamp: one above its top edge turns it, one on its
 // top right corner sizes it.
-export function handles(s: Stamp): { rotate: THREE.Vector3; scale: THREE.Vector3 } {
+const cornerSigns = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+]
+
+// The grips of a picked stamp: one above it to turn it, one on each corner.
+export function handles(s: Stamp): { rotate: THREE.Vector3; corners: THREE.Vector3[] } {
   const f = frame(s)
   return {
     rotate: f.c.clone().addScaledVector(f.b, f.hh + Math.max(f.hw, f.hh) * 0.4),
-    scale: f.c.clone().addScaledVector(f.t, f.hw).addScaledVector(f.b, f.hh),
+    corners: cornerSigns.map(([x, y]) => f.c.clone().addScaledVector(f.t, x * f.hw).addScaledVector(f.b, y * f.hh)),
   }
+}
+
+// The stamp with corner i at p and the opposite corner where it was; keep holds
+// the aspect, so it only scales.
+export function cornerTo(s: Stamp, i: number, p: THREE.Vector3, keep: boolean): Stamp {
+  const f = frame(s)
+  const [sx, sy] = cornerSigns[i]
+  const opposite = f.c.clone().addScaledVector(f.t, -sx * f.hw).addScaledVector(f.b, -sy * f.hh)
+  const v = p.clone().sub(opposite)
+  let du = Math.max(Math.abs(v.dot(f.t)), 1e-4)
+  let dv = Math.max(Math.abs(v.dot(f.b)), 1e-4)
+  if (keep) {
+    const k = Math.max(du / (2 * f.hw), dv / (2 * f.hh))
+    du = 2 * f.hw * k
+    dv = 2 * f.hh * k
+  }
+  const c = opposite.addScaledVector(f.t, (sx * du) / 2).addScaledVector(f.b, (sy * dv) / 2)
+  return { ...s, p: arr(c), size: du, aspect: dv / du }
 }
 
 // The rotation that points a stamp's top at p, in degrees.
@@ -122,10 +171,3 @@ export function rotationTowards(s: Stamp, p: THREE.Vector3): number {
   return THREE.MathUtils.radToDeg(Math.atan2(-v.dot(f.t), v.dot(f.b)))
 }
 
-// The size that puts a stamp's corner at p.
-export function sizeTowards(s: Stamp, p: THREE.Vector3): number {
-  const f = frame(s)
-  const v = p.clone().sub(f.c)
-  const along = new THREE.Vector3(v.dot(f.t), v.dot(f.b), 0).length()
-  return (2 * along) / Math.hypot(1, s.aspect)
-}

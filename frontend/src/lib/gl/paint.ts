@@ -23,6 +23,12 @@ uniform int uErase;
 uniform sampler2D uMap;
 uniform float uMapScale;
 uniform int uUseMap;
+uniform float uPixels;
+// Color dabs lay the brush color over what is there, premultiplied by coverage.
+uniform int uColored;
+uniform vec3 uBrush;
+uniform float uTexel;
+uniform int uBlock;
 
 out vec4 outColor;
 
@@ -47,6 +53,13 @@ void main() {
 
   float v = 1.0 - smoothstep(uHard * uRadius * 0.999, uRadius, distance(p, uCenter));
   v *= step(0.05, dot(n, uView));
+  if (uPixels > 0.0) {
+    // Whole texels of the texture: every bake texel of a block decides by the block's middle.
+    ivec2 b = min((t / uBlock) * uBlock + uBlock / 2, textureSize(uPos, 0) - 1);
+    p = texelFetch(uPos, b, 0).xyz;
+    n = texelFetch(uNrm, b, 0).xyz;
+    v = step(distance(p, uCenter), (uPixels * 0.5 + 0.05) * uTexel) * step(0.05, dot(n, uView));
+  }
   if (uGrit > 0.0) {
     float g = noise(p * 8.0 / uRadius) * 0.6 + noise(p * 23.0 / uRadius) * 0.4;
     v *= smoothstep(uGrit - 0.08, uGrit + 0.08, g);
@@ -60,7 +73,8 @@ void main() {
     float g = texture(uMap, vec2(q.z, -q.y)).r * w.x + texture(uMap, q.xz).r * w.y + texture(uMap, vec2(q.x, -q.y)).r * w.z;
     v = v > 0.0 ? smoothstep(1.0 - v - 0.04, 1.0 - v + 0.04, g) : 0.0;
   }
-  outColor = vec4(uErase == 1 ? 1.0 - v : v);
+  if (uColored == 1) outColor = uErase == 1 ? vec4(v) : vec4(uBrush * v, v);
+  else outColor = vec4(uErase == 1 ? 1.0 - v : v);
 }
 `
 
@@ -84,11 +98,32 @@ export type Dab = {
   // A grunge map the dab reveals, at repeats per model size.
   map?: THREE.Texture
   mapScale?: number
+  // A brush color makes a color dab, for layers that paint colors.
+  color?: THREE.Color
+  // Pixel dabs paint whole texture texels, this many across; texel is their size and
+  // block how many bake texels make one.
+  pixel?: { count: number; texel: number; block: number }
+}
+
+export function premultiply(data: Uint8Array) {
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3] / 255
+    for (let c = 0; c < 3; c++) data[i + c] = Math.round(data[i + c] * a)
+  }
+}
+
+export function unpremultiply(data: Uint8Array) {
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3]
+    for (let c = 0; c < 3; c++) data[i + c] = a ? Math.min(255, Math.round((data[i + c] * 255) / a)) : 0
+  }
 }
 
 // Painted masks, one render target each, kept at the bake's size.
 export class PaintStore {
   private targets = new Map<string, THREE.WebGLRenderTarget>()
+  // Masks that hold colors, premultiplied, with coverage in alpha.
+  readonly colored = new Set<string>()
   private dirty = new Set<string>()
   private scene = new THREE.Scene()
   private camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
@@ -122,6 +157,11 @@ export class PaintStore {
         uMap: { value: null },
         uMapScale: { value: 3 },
         uUseMap: { value: 0 },
+        uPixels: { value: 0 },
+        uTexel: { value: 0 },
+        uBlock: { value: 1 },
+        uColored: { value: 0 },
+        uBrush: { value: new THREE.Color() },
       },
       blending: THREE.CustomBlending,
       blendSrc: THREE.OneFactor,
@@ -185,7 +225,9 @@ export class PaintStore {
     const ctx = canvas.getContext('2d')!
     ctx.imageSmoothingEnabled = false
     ctx.drawImage(img, 0, 0, size, size)
-    this.write(id, new Uint8Array(ctx.getImageData(0, 0, size, size).data.buffer), false)
+    const data = new Uint8Array(ctx.getImageData(0, 0, size, size).data.buffer)
+    if (this.colored.has(id)) premultiply(data)
+    this.write(id, data, false)
   }
 
   dab(id: string, d: Dab) {
@@ -201,8 +243,20 @@ export class PaintStore {
     u.uMap.value = d.map ?? null
     u.uMapScale.value = d.mapScale ?? 3
     u.uUseMap.value = d.map ? 1 : 0
-    this.dabMat.blendEquation = d.erase ? THREE.MinEquation : THREE.MaxEquation
-    this.draw(this.dabMat, t)
+    u.uPixels.value = d.pixel?.count ?? 0
+    u.uTexel.value = d.pixel?.texel ?? 0
+    u.uBlock.value = d.pixel?.block ?? 1
+    u.uColored.value = d.color ? 1 : 0
+    if (d.color) {
+      u.uBrush.value.copy(d.color)
+      this.colored.add(id)
+    }
+    // Coverage only: the strongest dab stays. Colors: over, or scaled down to erase.
+    const m = this.dabMat
+    m.blendEquation = d.color ? THREE.AddEquation : d.erase ? THREE.MinEquation : THREE.MaxEquation
+    m.blendSrc = d.color ? (d.erase ? THREE.ZeroFactor : THREE.OneFactor) : THREE.OneFactor
+    m.blendDst = d.color ? THREE.OneMinusSrcAlphaFactor : THREE.OneFactor
+    this.draw(m, t)
     this.dirty.add(id)
   }
 
@@ -237,6 +291,7 @@ export class PaintStore {
 
   clone(from: string, to: string) {
     if (!this.targets.has(from)) return
+    if (this.colored.has(from)) this.colored.add(to)
     this.write(to, this.read(from))
   }
 
@@ -259,9 +314,11 @@ export class PaintStore {
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = size
     const ctx = canvas.getContext('2d')!
-    // Opaque, so the canvas doesn't premultiply the values away.
+    // Coverage only: opaque, so the canvas doesn't premultiply the values away.
+    // Colors: straight, as PNGs keep them.
     const data = this.read(id)
-    for (let i = 3; i < data.length; i += 4) data[i] = 255
+    if (this.colored.has(id)) unpremultiply(data)
+    else for (let i = 3; i < data.length; i += 4) data[i] = 255
     ctx.putImageData(new ImageData(new Uint8ClampedArray(data), size, size), 0, 0)
     return canvas.toDataURL('image/png').split(',')[1]
   }

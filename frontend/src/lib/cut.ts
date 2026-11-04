@@ -4,13 +4,14 @@
 export type Corner = [number, number]
 
 // px is the long side; calm flattens contrast, sat scales saturation, bright lifts.
-// Mono keeps only brightness around mid gray, for the relief blend to tint.
-export type CutLook = { px: number; calm: number; sat: number; bright: number; mono: boolean }
+// Mono keeps only brightness around mid gray, for the relief blend to tint. Width
+// widens what the photo foreshortened.
+export type CutLook = { px: number; calm: number; sat: number; bright: number; mono: boolean; width?: number }
 
 // Corners in photo pixels: top left, top right, bottom right, bottom left.
 export type Cut = { id: string; name: string; corners: [Corner, Corner, Corner, Corner]; look: CutLook; aspect: number }
 
-export const defaultLook: CutLook = { px: 64, calm: 0.3, sat: 0.85, bright: 0, mono: false }
+export const defaultLook: CutLook = { px: 64, calm: 0.3, sat: 0.85, bright: 0, mono: false, width: 1 }
 
 // A photo's pixels, halved again and again, so any cut samples a level near its size.
 export type Levels = { width: number; height: number; data: ImageData[] }
@@ -73,6 +74,11 @@ export function cutAspect(c: Cut['corners']): number {
   return w > 0 ? h / w : 1
 }
 
+// The snippet's height over width, as the photo shows it, widened.
+export function aspectOf(cut: Cut): number {
+  return cutAspect(cut.corners) / (cut.look.width ?? 1)
+}
+
 // Orders four clicked points as top left, top right, bottom right, bottom left.
 export function orderCorners(points: Corner[]): Cut['corners'] {
   const cx = points.reduce((s, p) => s + p[0], 0) / 4
@@ -105,7 +111,7 @@ function sample(img: ImageData, x: number, y: number, out: number[]) {
 const sub = 4
 
 export function render(photo: Levels, cut: Cut): ImageData {
-  const aspect = cutAspect(cut.corners)
+  const aspect = aspectOf(cut)
   const px = Math.max(4, Math.round(cut.look.px))
   const ow = aspect <= 1 ? px : Math.max(1, Math.round(px / aspect))
   const oh = aspect <= 1 ? Math.max(1, Math.round(px * aspect)) : px

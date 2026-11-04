@@ -44,38 +44,54 @@ const far = 24 * 24
 
 // Moves an earlier palette onto the pixels with a few k-means steps, so a small
 // edit only shifts the colors near it. A new color far from all of them takes
-// over the least used one, if it covers more pixels.
-export function refine(palette: RGB[], pixels: RGB[], steps = 6): RGB[] {
+// over the least used one when that saves more error than it costs, so even a
+// few painted pixels of a new color keep it.
+// The first fixed colors stay as they are.
+export function refine(palette: RGB[], pixels: RGB[], steps = 6, fixed = 0): RGB[] {
   const n = palette.length
   const colors = new Float64Array(palette.flat())
   const flat = new Float64Array(pixels.flat())
   const sums = new Float64Array(n * 4)
+  const owner = new Int32Array(pixels.length)
+  const error = new Float64Array(pixels.length)
+
+  // The nearest color to pixel i (a flat index), leaving out skip; its distance in dist.
+  let dist = 0
+  const nearest = (i: number, skip = -1) => {
+    const r = flat[i]
+    const g = flat[i + 1]
+    const b = flat[i + 2]
+    let best = 0
+    dist = Infinity
+    for (let k = 0, j = 0; k < n; k++, j += 3) {
+      if (k === skip) continue
+      const d = (r - colors[j]) * (r - colors[j]) + (g - colors[j + 1]) * (g - colors[j + 1]) + (b - colors[j + 2]) * (b - colors[j + 2])
+      if (d < dist) {
+        dist = d
+        best = k
+      }
+    }
+    return best
+  }
 
   for (let step = 0; step < steps; step++) {
     sums.fill(0)
     let worst = -1
     let worstDist = far
-    let farCount = 0
+    let gain = 0
 
-    for (let i = 0; i < flat.length; i += 3) {
-      const r = flat[i]
-      const g = flat[i + 1]
-      const b = flat[i + 2]
-      let best = 0
-      let bestDist = Infinity
-      for (let k = 0; k < n * 3; k += 3) {
-        const d = (r - colors[k]) ** 2 + (g - colors[k + 1]) ** 2 + (b - colors[k + 2]) ** 2
-        if (d < bestDist) {
-          bestDist = d
-          best = k
-        }
-      }
-      const s = (best / 3) * 4
-      sums[s] += r
-      sums[s + 1] += g
-      sums[s + 2] += b
+    for (let p = 0; p < pixels.length; p++) {
+      const i = p * 3
+      const best = nearest(i)
+      const bestDist = dist
+      owner[p] = best
+      error[p] = bestDist
+      const s = best * 4
+      sums[s] += flat[i]
+      sums[s + 1] += flat[i + 1]
+      sums[s + 2] += flat[i + 2]
       sums[s + 3]++
-      if (bestDist > far) farCount++
+      if (bestDist > far) gain += bestDist
       if (bestDist > worstDist) {
         worstDist = bestDist
         worst = i
@@ -83,8 +99,8 @@ export function refine(palette: RGB[], pixels: RGB[], steps = 6): RGB[] {
     }
 
     let moved = false
-    let least = 0
-    for (let k = 0; k < n; k++) {
+    let least = fixed
+    for (let k = fixed; k < n; k++) {
       const count = sums[k * 4 + 3]
       if (count < sums[least * 4 + 3]) least = k
       if (!count) continue
@@ -95,9 +111,18 @@ export function refine(palette: RGB[], pixels: RGB[], steps = 6): RGB[] {
       }
     }
 
-    if (worst >= 0 && farCount > sums[least * 4 + 3]) {
-      colors.set(flat.subarray(worst, worst + 3), least * 3)
-      moved = true
+    if (worst >= 0 && least < n) {
+      // What the least used color's pixels lose by going to their next nearest one.
+      let cost = 0
+      for (let p = 0; p < pixels.length; p++) {
+        if (owner[p] !== least) continue
+        nearest(p * 3, least)
+        cost += dist - error[p]
+      }
+      if (gain > cost) {
+        colors.set(flat.subarray(worst, worst + 3), least * 3)
+        moved = true
+      }
     }
     if (!moved) break
   }

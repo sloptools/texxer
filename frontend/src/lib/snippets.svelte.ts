@@ -1,5 +1,5 @@
 import * as api from '../../wailsjs/go/main/App'
-import { cutAspect, defaultLook, levels, pngBase64, render, type Corner, type Cut, type Levels } from './cut'
+import { aspectOf, cutAspect, defaultLook, levels, pngBase64, render, type Corner, type Cut, type Levels } from './cut'
 import { newLayer, newMask, uid } from './project'
 import { store } from './store.svelte'
 import { tools } from './tools.svelte'
@@ -13,6 +13,21 @@ export const snippetChanged = new EventTarget()
 export function libraryURL(kind: 'photo' | 'snippet', name: string, category: string, version = 0) {
   const q = new URLSearchParams({ project: store.path, category, name, v: String(version) })
   return `/${kind}?${q}`
+}
+
+// Snippet stamps can repeat their snippet, `snip:<id>*<cols>x<rows>`.
+export function snipTiles(shape: string) {
+  const [id, tiles] = shape.slice(5).split('*')
+  const [cols, rows] = (tiles ?? '1x1').split('x').map(Number)
+  return { id, cols: cols || 1, rows: rows || 1 }
+}
+
+// The snippet shape with cols across and as many rows as keep its tiles square to it.
+export function tiled(shape: string, cols: number, stampAspect: number): string {
+  const { id } = snipTiles(shape)
+  const aspect = snippets.all.find((c) => c.id === id)?.aspect ?? 1
+  const rows = Math.max(1, Math.round((cols * stampAspect) / aspect))
+  return cols <= 1 && rows <= 1 ? 'snip:' + id : `snip:${id}*${cols}x${rows}`
 }
 
 // Photos to cut snippets from, in the project's library or a global category.
@@ -117,13 +132,14 @@ class Snippets {
 
   moveCorner(photo: PhotoEntry, cut: Cut, i: number, to: Corner) {
     cut.corners[i] = to
-    cut.aspect = cutAspect(cut.corners)
     this.changed(photo, cut)
   }
 
   // Writes the snippet and the photo's cuts once edits pause.
   changed(photo: PhotoEntry, cut: Cut) {
     const category = this.category
+    const aspect = aspectOf(cut)
+    if (cut.aspect !== aspect) cut.aspect = aspect
     clearTimeout(this.timers.get(cut.id))
     this.timers.set(
       cut.id,

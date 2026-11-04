@@ -30,6 +30,8 @@ export class TrackpadControls {
 
   private goal = { target: new THREE.Vector3(), yaw: 0.8, pitch: 0.35, dist: 3, fov: perspFov }
   private radius = 1
+  // The model's bounding sphere center; clip planes hug the sphere, wherever the target went.
+  private center = new THREE.Vector3()
   private gestureScale = 1
   private drag: { x: number; y: number; moved: boolean; mode: 'orbit' | 'pan' | 'light' } | undefined
   private cleanup: () => void
@@ -133,6 +135,7 @@ export class TrackpadControls {
   frame(box: THREE.Box3) {
     const sphere = box.getBoundingSphere(new THREE.Sphere())
     this.radius = sphere.radius
+    this.center.copy(sphere.center)
     this.goal.target.copy(sphere.center)
     this.goal.dist = sphere.radius / Math.sin(THREE.MathUtils.degToRad(perspFov / 2)) * 1.1
   }
@@ -176,17 +179,20 @@ export class TrackpadControls {
 
     // Same framing at any lens: the camera backs off as the lens narrows.
     const far = this.dist * (Math.tan(THREE.MathUtils.degToRad(perspFov / 2)) / Math.tan(THREE.MathUtils.degToRad(this.fov / 2)))
-    const near = Math.max(this.radius / 200, far - this.radius * 4)
-    if (this.camera.fov !== this.fov || this.camera.near !== near) {
-      this.camera.fov = this.fov
-      this.camera.near = near
-      this.camera.far = far + this.radius * 200
-      this.camera.updateProjectionMatrix()
-    }
-
     const c = Math.cos(this.pitch)
     this.camera.position.set(Math.sin(this.yaw) * c, Math.sin(this.pitch), Math.cos(this.yaw) * c).multiplyScalar(far).add(this.target)
     this.camera.lookAt(this.target)
+
+    // Zooming out past the cursor moves the target behind the model, so the planes
+    // go by the model's sphere, with room for a pan.
+    const toModel = this.camera.position.distanceTo(this.center)
+    const near = Math.max(this.radius / 200, toModel - this.radius * 3)
+    if (this.camera.fov !== this.fov || this.camera.near !== near) {
+      this.camera.fov = this.fov
+      this.camera.near = near
+      this.camera.far = toModel + this.radius * 200
+      this.camera.updateProjectionMatrix()
+    }
   }
 
   dispose() {

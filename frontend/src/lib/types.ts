@@ -74,6 +74,10 @@ export type Layer = {
   shine: number
   // Take the color from image stamps instead of the layer color.
   stampColors: boolean
+  // Paint colors, not just where: the first paint mask keeps color and coverage.
+  paintColors?: boolean
+  // The colors painted so far, kept by the auto palette and offered as swatches.
+  brushColors?: string[]
   // Take the color from the model's own texture or material colors, as they were before texxer.
   source?: boolean
   // Glows: the layer's color also goes into the emissive map.

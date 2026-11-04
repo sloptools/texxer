@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from '../Icon.svelte'
   import { store } from '../store.svelte'
   import { tools } from '../tools.svelte'
   import { blends, type MaskKind } from '../types'
@@ -51,8 +52,12 @@
 {:else if layer && look}
   <div class="section">
     <div class="caps">color{#if store.activeVariant}<span class="variant">{store.activeVariant.name}</span>{/if}</div>
-    <ColorField bind:value={look.color} />
+    <div class="colorrow">
+      <div class="field"><ColorField bind:value={look.color} /></div>
+      <button class="pipette" class:on={store.sampling} title="Take a color from the model (K)" onclick={() => (store.sampling = !store.sampling)}><Icon name="pipette" size={11} /></button>
+    </div>
     <label class="check"><input type="checkbox" bind:checked={layer.glow} /> glows (emissive)</label>
+    <label class="check"><input type="checkbox" checked={!!layer.paintColors} onchange={(e) => store.setPaintColors((e.currentTarget as HTMLInputElement).checked)} /> colors from paint (the brush's color)</label>
     {#if layer.masks.some((m) => m.kind === 'stamps')}
       <label class="check"><input type="checkbox" bind:checked={layer.stampColors} /> colors from image stamps</label>
     {/if}
@@ -118,6 +123,34 @@
     border-top: 1px solid var(--line);
   }
 
+  .colorrow {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .field {
+    flex: 1;
+    min-width: 0;
+  }
+  .pipette {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--dim);
+  }
+  .pipette:hover {
+    color: var(--strong);
+  }
+  .pipette.on {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
   .check {
     display: flex;
     align-items: center;

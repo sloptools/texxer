@@ -90,6 +90,8 @@ uniform float uGrain;
 uniform float uShine;
 uniform float uSeed;
 uniform int uStampColors;
+// The mask whose paint holds colors (coverage in alpha), or -1.
+uniform int uPaintColor;
 uniform sampler2D uSource;
 uniform int uFromSource;
 uniform int uEmitPass;
@@ -129,11 +131,17 @@ ${noise}
 ${shade}
 
 // Sampler arrays can't take a loop index in GLSL ES 3.0.
+vec4 paintTexel(int i, ivec2 t) {
+  if (i == 0) return texelFetch(uPaint0, t, 0);
+  if (i == 1) return texelFetch(uPaint1, t, 0);
+  if (i == 2) return texelFetch(uPaint2, t, 0);
+  return texelFetch(uPaint3, t, 0);
+}
+
+// Coverage: alpha for painted colors, red otherwise.
 float paintAt(int i, ivec2 t) {
-  if (i == 0) return texelFetch(uPaint0, t, 0).r;
-  if (i == 1) return texelFetch(uPaint1, t, 0).r;
-  if (i == 2) return texelFetch(uPaint2, t, 0).r;
-  return texelFetch(uPaint3, t, 0).r;
+  vec4 p = paintTexel(i, t);
+  return i == uPaintColor ? p.a : p.r;
 }
 
 float grungeAt(int i, vec2 uv) {
@@ -305,7 +313,14 @@ void main() {
     return;
   }
 
-  vec3 c = uStampColors == 1 && gStampA > 0.0 ? gStampRGB : uColor;
+  vec3 c = uColor;
+  if (uPaintColor >= 0) {
+    // Dabs blend color over what is there, weighted by coverage; dividing it back out
+    // gives the color itself, also at soft edges.
+    vec4 p = paintTexel(uPaintColor, t);
+    if (p.a > 0.0) c = clamp(p.rgb / p.a, 0.0, 1.0);
+  }
+  if (uStampColors == 1 && gStampA > 0.0) c = gStampRGB;
   if (uFromSource == 1) c = texelFetch(uSource, t, 0).rgb;
   float v = (fbm(pos.xyz * uToneScale + uSeed) - 0.5) * 2.0 * uTone;
   v += (hash(vec3(vec2(t), uSeed)) - 0.5) * 2.0 * uGrain;

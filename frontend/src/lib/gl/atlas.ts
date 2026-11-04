@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { drawDecal, isDecal } from '../decals'
 import { fetchBlob, track } from '../assets'
 import { drawShape } from '../shapes'
-import { libraryURL, snippetChanged } from '../snippets.svelte'
+import { libraryURL, snipTiles, snippetChanged } from '../snippets.svelte'
 
 const grid = 8
 const cell = 256
@@ -14,7 +14,10 @@ export class StampAtlas {
   private ctx: CanvasRenderingContext2D
   private cells = new Map<string, number>()
   onLoad: () => void = () => {}
-  private redraw = (e: Event) => this.draw('snip:' + (e as CustomEvent<string>).detail)
+  private redraw = (e: Event) => {
+    const id = (e as CustomEvent<string>).detail
+    for (const shape of this.cells.keys()) if (shape.startsWith('snip:') && snipTiles(shape).id === id) this.draw(shape)
+  }
 
   constructor() {
     const canvas = document.createElement('canvas')
@@ -51,7 +54,10 @@ export class StampAtlas {
     const size = cell - pad * 2
     this.ctx.clearRect(x - pad, y - pad, cell, cell)
     if (shape.startsWith('img:')) track(this.drawImage(`/stamp?name=${encodeURIComponent(shape.slice(4))}`, x, y, size, true))
-    else if (shape.startsWith('snip:')) track(this.drawImage(libraryURL('snippet', shape.slice(5), '', Date.now()), x, y, size, false))
+    else if (shape.startsWith('snip:')) {
+      const t = snipTiles(shape)
+      track(this.drawImage(libraryURL('snippet', t.id, '', Date.now()), x, y, size, false, t.cols, t.rows))
+    }
     else if (isDecal(shape)) drawDecal(this.ctx, shape, x, y, size)
     else drawShape(this.ctx, shape, x, y, size)
     this.texture.needsUpdate = true
@@ -59,11 +65,13 @@ export class StampAtlas {
 
   // Images keep their colors. Opaque gray images, like scanned stencils, use
   // their brightness as the shape; snippets stay as they are.
-  private async drawImage(url: string, x: number, y: number, size: number, stencil: boolean) {
+  private async drawImage(url: string, x: number, y: number, size: number, stencil: boolean, cols = 1, rows = 1) {
     const blob = await fetchBlob(url)
     if (!blob) return
     const img = await createImageBitmap(blob)
-    this.ctx.drawImage(img, x, y, size, size)
+    const w = size / cols
+    const h = size / rows
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) this.ctx.drawImage(img, x + i * w, y + j * h, w, h)
     if (!stencil) {
       this.texture.needsUpdate = true
       this.onLoad()

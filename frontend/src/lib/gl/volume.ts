@@ -35,7 +35,7 @@ export class VolumeGizmo {
   private controls: TransformControls
   private helper: THREE.Object3D
   private shape: VolumeShape | undefined
-  private material = new THREE.LineBasicMaterial({ color: 0x7fc4af, depthTest: false, transparent: true, opacity: 0.8 })
+  private material = new THREE.LineBasicMaterial({ color: 0xffb020, depthTest: false, transparent: true, opacity: 0.8 })
   private mirrorMaterial = new THREE.LineBasicMaterial({ color: 0xb9b6ad, depthTest: false, transparent: true, opacity: 0.4 })
 
   onChange: (v: Pick<Volume, 'p' | 'q' | 'size'>) => void = () => {}

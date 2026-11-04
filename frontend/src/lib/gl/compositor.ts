@@ -83,6 +83,7 @@ export class Compositor {
   // The auto palette, picked from the texture a moment after it changes.
   autoColors: RGB[] = []
   private autoCount = 0
+  private autoPinned = 0
 
   private scene = new THREE.Scene()
   private camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
@@ -153,6 +154,7 @@ export class Compositor {
         uShine: { value: 0 },
         uSeed: { value: 0 },
         uStampColors: { value: 0 },
+        uPaintColor: { value: -1 },
         uSource: { value: bake.source ?? none },
         uFromSource: { value: 0 },
         uEmitPass: { value: 0 },
@@ -263,6 +265,7 @@ export class Compositor {
       }
     })
 
+    this.layered = src
     if (sh.on) {
       const lu = this.lightMat.uniforms
       lu.uSrc.value = this.ping[src].texture
@@ -295,6 +298,22 @@ export class Compositor {
   }
 
   hasEmission = false
+  // The ping target holding the layers before baked light, for sampling colors.
+  private layered = 0
+
+  // The layers' color around a texel of the bake, as a hex color.
+  colorAt(texel: [number, number]): string {
+    const prev = this.renderer.getRenderTarget()
+    const size = this.bake.size
+    const x = Math.min(Math.max(texel[0] - 1, 0), size - 3)
+    const y = Math.min(Math.max(texel[1] - 1, 0), size - 3)
+    const px = new Uint8Array(9 * 4)
+    this.renderer.readRenderTargetPixels(this.ping[this.layered], x, y, 3, 3, px)
+    this.renderer.setRenderTarget(prev)
+    const sum = [0, 0, 0]
+    for (let i = 0; i < 9; i++) for (let c = 0; c < 3; c++) sum[c] += px[i * 4 + c]
+    return '#' + sum.map((v) => Math.round(v / 9).toString(16).padStart(2, '0')).join('')
+  }
 
   private ensureEmission() {
     if (this.emitPing) return
@@ -316,17 +335,22 @@ export class Compositor {
 
   // Picks the auto palette from the texture before quantizing, from a sample of its
   // texels. Later picks refine the last one, so colors stay put while editing.
-  pickPalette(count: number) {
+  // Pinned colors, like painted ones, keep their own entries however few texels use them.
+  pickPalette(count: number, pinned: RGB[] = []) {
+    pinned = pinned.slice(0, count - 1)
     const size = this.reduced.width
     const data = new Uint8Array(size * size * 4)
     this.renderer.readRenderTargetPixels(this.reduced, 0, 0, size, size, data)
 
-    const step = Math.max(1, Math.floor((size * size) / 24000))
+    const step = Math.max(1, Math.floor((size * size) / 32000))
     const pixels: RGB[] = []
     for (let i = 0; i < size * size; i += step) pixels.push([data[i * 4], data[i * 4 + 1], data[i * 4 + 2]])
-    const fresh = count !== this.autoCount || !this.autoColors.length
-    this.autoColors = refine(fresh ? medianCut(pixels, count) : this.autoColors, pixels, fresh ? 10 : 6)
+    const rest = this.autoColors.slice(this.autoPinned)
+    const fresh = count !== this.autoCount || rest.length < count - pinned.length
+    const start = fresh ? medianCut(pixels, count - pinned.length) : rest.slice(0, count - pinned.length)
+    this.autoColors = refine([...pinned, ...start], pixels, fresh ? 10 : 6, pinned.length)
     this.autoCount = count
+    this.autoPinned = pinned.length
   }
 
   private draw(material: THREE.ShaderMaterial, to: THREE.WebGLRenderTarget) {
@@ -381,6 +405,9 @@ export class Compositor {
     u.uShine.value = layer.shine
     u.uSeed.value = (index * 7.31) % 97
     u.uStampColors.value = layer.stampColors ? 1 : 0
+    const colorMask = layer.paintColors ? layer.masks.slice(0, maxMasks).findIndex((m) => m.kind === 'paint') : -1
+    u.uPaintColor.value = colorMask
+    if (colorMask >= 0) this.paint.colored.add(layer.masks[colorMask].paint)
     u.uFromSource.value = layer.source && this.bake.source ? 1 : 0
     u.uOpacity.value = layer.opacity
     u.uBlend.value = blendIndex[layer.blend]

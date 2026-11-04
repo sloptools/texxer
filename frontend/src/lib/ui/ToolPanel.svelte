@@ -5,9 +5,18 @@
   import { store } from '../store.svelte'
   import { tools } from '../tools.svelte'
   import GrungePicker from './GrungePicker.svelte'
+  import { snipTiles, tiled } from '../snippets.svelte'
+  import Seg from './Seg.svelte'
+  import ColorField from './ColorField.svelte'
+  import Icon from '../Icon.svelte'
   import ShapeTile from './ShapeTile.svelte'
   import Slider from './Slider.svelte'
   import HelpLink from './HelpLink.svelte'
+
+  const brushKinds: [boolean, string][] = [
+    [false, 'soft'],
+    [true, 'pixel'],
+  ]
 
   // Sliders write here and pass changes on, so a picked stamp follows them.
   let size = $state(tools.stamp.size)
@@ -44,8 +53,27 @@
 {#if tools.tool === 'brush'}
   <div class="section">
     <div class="caps">brush · {store.layer?.name} <HelpLink page="brush-stamps" /></div>
-    <Slider label="size" bind:value={tools.brush.size} min={0.002} max={0.3} step={0.001} digits={3} def={0.03} />
-    <Slider label="hardness" bind:value={tools.brush.hard} def={0.7} />
+    {#if store.layer?.paintColors}
+      <div class="brushcolor">
+        <div class="field"><ColorField bind:value={tools.brush.color} /></div>
+        <button class="pipette" class:on={store.sampling} title="Take the brush color from the model (K)" onclick={() => (store.sampling = !store.sampling)}><Icon name="pipette" size={11} /></button>
+      </div>
+      {#if store.layer.brushColors?.length}
+        <div class="swatches">
+          {#each store.layer.brushColors as c}
+            <button class="swatch" class:on={c === tools.brush.color.toLowerCase()} style:background={c} title={c} onclick={() => (tools.brush.color = c)} aria-label={c}></button>
+          {/each}
+          <button class="clear" title="Forget the painted colors; the palette stops keeping them" onclick={() => store.layer && (store.layer.brushColors = [])}>clear</button>
+        </div>
+      {/if}
+    {/if}
+    <Seg value={tools.brush.pixel} options={brushKinds} onchange={(v) => (tools.brush.pixel = v)} />
+    {#if tools.brush.pixel}
+      <Slider label="pixels" bind:value={tools.brush.pixels} min={1} max={16} step={1} digits={0} def={1} />
+    {:else}
+      <Slider label="size" bind:value={tools.brush.size} min={0.002} max={0.3} step={0.001} digits={3} def={0.03} />
+      <Slider label="hardness" bind:value={tools.brush.hard} def={0.7} />
+    {/if}
     <Slider label="strength" bind:value={tools.brush.strength} def={1} />
     <Slider label="grit" bind:value={tools.brush.grit} max={0.9} def={0} />
     <div class="caps sub">grunge · the brush reveals it, more with strength</div>
@@ -53,7 +81,7 @@
     {#if tools.brush.map}
       <Slider label="scale" bind:value={tools.brush.mapScale} min={1} max={12} step={0.5} digits={1} def={3} />
     {/if}
-    <p class="hint">paints into the layer's paint mask · [ ] size · ⌥ erases · ⇧click draws a line · grit breaks the brush up for rust and dirt</p>
+    <p class="hint">paints into the layer's paint mask · [ ] size · ⌥ erases · ⇧click draws a line along an axis from the last stroke, ⇧⌘ free, ⇧ shows it · pixel paints whole texels of the texture · grit breaks the brush up for rust and dirt</p>
   </div>
 {:else if tools.tool === 'stamp'}
   <div class="section">
@@ -90,6 +118,9 @@
     <Slider label="size" bind:value={size} min={0.005} max={1} step={0.005} digits={3} def={0.12} />
     <Slider label="rotation" bind:value={rot} min={0} max={345} step={15} digits={0} def={0} />
     <Slider label="aspect" bind:value={aspect} min={0.05} max={4} step={0.01} def={1} />
+    {#if tools.stamp.shape.startsWith('snip:')}
+      <Slider label="tiles" bind:value={() => snipTiles(tools.stamp.shape).cols, (v) => tools.setShape(tiled(tools.stamp.shape, v, tools.stamp.aspect))} min={1} max={12} step={1} digits={0} def={1} />
+    {/if}
     <Slider label="row gap" bind:value={tools.gap} min={0.5} max={4} step={0.05} def={1} />
     {#if tools.picked}
       <div class="row">
@@ -97,11 +128,63 @@
         <button onclick={() => tools.remove()}>delete <kbd>⌫</kbd></button>
       </div>
     {/if}
-    <p class="hint">sits flat and upright on the face · ⇧click makes a row from the picked stamp · arrows nudge · R rotates 15° · esc deselects</p>
+    <p class="hint">sits flat and upright on the face · ⌘click fills the surface · ⇧click makes a row from the picked stamp · arrows nudge · R rotates 15° · esc deselects</p>
   </div>
 {/if}
 
 <style>
+  .swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+  .swatch {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+  .swatch.on {
+    border-color: var(--strong);
+  }
+  .clear {
+    margin-left: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: 10px var(--mono);
+    color: var(--faint);
+  }
+  .clear:hover {
+    color: var(--strong);
+  }
+  .brushcolor {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .field {
+    flex: 1;
+    min-width: 0;
+  }
+  .pipette {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--dim);
+  }
+  .pipette.on {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
   .section {
     display: flex;
     flex-direction: column;

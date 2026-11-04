@@ -1,4 +1,7 @@
 import * as THREE from 'three'
+import { Line2 } from 'three/examples/jsm/lines/Line2.js'
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
@@ -102,14 +105,19 @@ export class Stage {
   )
   private outline = new THREE.LineLoop(
     new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]),
-    new THREE.LineBasicMaterial({ color: 0x7fc4af, depthTest: false, transparent: true }),
+    new THREE.LineBasicMaterial({ color: 0xffb020, depthTest: false, transparent: true }),
   )
+
+  // The straight line a ⇧click would paint, a few pixels wide to be seen on any texture.
+  // A dark edge under it keeps it readable on a texture of the same color.
+  private line = new Line2(new LineGeometry(), new LineMaterial({ color: 0xffffff, linewidth: 3, depthTest: false, transparent: true }))
+  private lineHalo = new Line2(new LineGeometry(), new LineMaterial({ color: 0x000000, linewidth: 6, depthTest: false, transparent: true, opacity: 0.7 }))
 
   onError: (message: string) => void = () => {}
   // Grips of the picked stamp, square pixels the same size at any distance.
   private grips = new THREE.Points(
     new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
-    new THREE.PointsMaterial({ color: 0x7fc4af, size: 9, sizeAttenuation: false, depthTest: false, transparent: true }),
+    new THREE.PointsMaterial({ color: 0xffb020, size: 9, sizeAttenuation: false, depthTest: false, transparent: true }),
   )
   posData: Float32Array | undefined
   nrmData: Float32Array | undefined
@@ -132,10 +140,10 @@ export class Stage {
     this.head.target.position.set(0, 0, -1)
     this.camera.add(this.head, this.head.target)
 
-    this.ring.visible = this.outline.visible = this.grips.visible = false
-    this.ring.renderOrder = this.outline.renderOrder = 10
-    this.grips.renderOrder = 11
-    this.scene.add(this.ring, this.outline, this.grips)
+    this.ring.visible = this.outline.visible = this.grips.visible = this.line.visible = this.lineHalo.visible = false
+    this.ring.renderOrder = this.outline.renderOrder = this.lineHalo.renderOrder = 10
+    this.line.renderOrder = this.grips.renderOrder = 11
+    this.scene.add(this.ring, this.outline, this.grips, this.lineHalo, this.line)
 
     this.lit = this.material(new THREE.MeshLambertMaterial())
     this.unlit = this.material(new THREE.MeshBasicMaterial())
@@ -321,6 +329,16 @@ export class Stage {
     this.ring.scale.setScalar(at.radius)
   }
 
+  setLine(points: [THREE.Vector3, THREE.Vector3] | null, color = '#ffffff') {
+    this.line.visible = this.lineHalo.visible = !!points
+    if (!points) return
+    for (const l of [this.line, this.lineHalo]) {
+      l.geometry.setPositions([...points[0].toArray(), ...points[1].toArray()])
+      this.renderer.getSize(l.material.resolution)
+    }
+    this.line.material.color.set(color)
+  }
+
   // A stamp's frame, for lining it up.
   setOutline(points: THREE.Vector3[] | null, color?: string) {
     this.outline.visible = !!points
@@ -331,7 +349,13 @@ export class Stage {
 
   setGrips(points: THREE.Vector3[] | null) {
     this.grips.visible = !!points
-    if (points) this.grips.geometry.setFromPoints(points)
+    if (!points) return
+    // A buffer only holds as many points as it was made with.
+    if (this.grips.geometry.getAttribute('position')?.count !== points.length) {
+      this.grips.geometry.dispose()
+      this.grips.geometry = new THREE.BufferGeometry()
+    }
+    this.grips.geometry.setFromPoints(points)
   }
 
   // Where a point in the scene lands on screen, in client pixels.

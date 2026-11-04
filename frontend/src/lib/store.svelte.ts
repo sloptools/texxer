@@ -1,3 +1,4 @@
+import * as THREE from 'three'
 import * as api from '../../wailsjs/go/main/App'
 import type { main } from '../../wailsjs/go/models'
 import type { PaintStore } from './gl/paint'
@@ -30,6 +31,8 @@ class Store {
   workspace = $state<Workspace | null>(null)
   // The layer the list is hovering, -1 for none.
   hoverLayer = $state(-1)
+  // The next click on the model takes its color into the selected layer.
+  sampling = $state(false)
   model = $state<main.ModelInfo | null>(null)
   project = $state<ModelDoc>({ ...newProject(), id: '', name: '', files: [] })
   // Set by the viewport once the model's texture renders.
@@ -282,6 +285,33 @@ class Store {
     this.selected = at
     this.selectedGroup = ''
     this.pickingZone = false
+  }
+
+  // Painted colors on or off for the selected layer; what is painted carries over,
+  // in the layer's color when colors come on.
+  setPaintColors(on: boolean) {
+    const l = this.layer
+    const paint = this.paint
+    if (!l || !paint) return
+    l.paintColors = on
+    if (on) this.ensureMask('paint')
+    const id = l.masks.find((m) => m.kind === 'paint')?.paint
+    if (!id) return
+
+    paint.get(id)
+    const before = paint.read(id)
+    const after = new Uint8Array(before)
+    const rgb = new THREE.Color(l.color).convertLinearToSRGB()
+    const color = [rgb.r, rgb.g, rgb.b].map((v) => v * 255)
+    for (let i = 0; i < after.length; i += 4) {
+      const c = on ? before[i] : before[i + 3]
+      for (let k = 0; k < 3; k++) after[i + k] = on ? Math.round((color[k] * c) / 255) : c
+      after[i + 3] = c
+    }
+    if (on) paint.colored.add(id)
+    else paint.colored.delete(id)
+    paint.write(id, after)
+    this.pushPaint(id, before, after)
   }
 
   duplicateLayer() {

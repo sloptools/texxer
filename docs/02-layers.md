@@ -4,11 +4,12 @@
 
 Layers stack bottom to top. A new layer starts with an empty paint mask and shows nothing until painted; another mask takes its place. A layer without masks covers everything.
 
-- **color**: the layer's color. Swatches reuse colors of other layers.
+- **color**: the layer's color. Swatches reuse colors of other layers; the pipette (**K**) takes one from the model, as the layers show it before baked light.
 - **tone**, **tone scale**: lighter and darker patches over the color, at a world size.
 - **grain**: single texels a bit lighter or darker.
 - **shine**: baked sheen and glints, for glass and gloss.
 - **glows**: the color also goes into the emissive map.
+- **colors from paint**: the brush paints colors into the layer, not just where it shows: many colors in one layer, for details on a projected photo. The brush gets its own color (the pipette **K** sets it); painted colors keep their own entries in the auto palette, so small details aren't crunched away. **clear** under the swatches forgets them.
 - **colors from the model's texture**: the layer takes the model's own texture or material colors. One such layer alone just crunches a finished texture; layers above it add to it. texxer keeps a copy of the original beside the project, since the export overwrites it, and takes a new one when the file changes outside texxer.
 - **blend**: normal, multiply, add, overlay, relief. Relief takes gray stamps as bumps: mid gray keeps the surface.
 - **opacity**

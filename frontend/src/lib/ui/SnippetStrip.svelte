@@ -20,7 +20,7 @@
         <img src={libraryURL('snippet', cut.id, snippets.category, snippets.versions[cut.id])} alt={cut.name} />
       </button>
     {:else}
-      <span class="none">no snippets yet · cut them in the photos tab</span>
+      <span class="none">no snippets yet · cut them in photos, at the top</span>
     {/each}
   </div>
 </div>

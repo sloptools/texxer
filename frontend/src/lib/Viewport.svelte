@@ -11,7 +11,8 @@
   import { store } from './store.svelte'
   import { ToolInput } from './toolInput'
   import { tools } from './tools.svelte'
-  import type { FlatMap } from './types'
+  import type { FlatMap, Project } from './types'
+  import type { RGB } from './gl/mediancut'
 
   let container: HTMLDivElement
   let stage = $state<Stage>()
@@ -63,6 +64,15 @@
       if (part >= 0 && tools.tool === 'nav' && (e.metaKey || store.layer?.masks.some((m) => m.kind === 'parts'))) store.togglePart(part)
     }
 
+    // Ahead of the tools and the camera, so sampling works with any tool.
+    const onSample = (e: PointerEvent) => {
+      if (!store.sampling || e.button !== 0) return
+      e.stopImmediatePropagation()
+      e.preventDefault()
+      sampleColor(s.hit(e.clientX, e.clientY))
+    }
+
+    s.renderer.domElement.addEventListener('pointerdown', onSample, { capture: true })
     s.renderer.domElement.addEventListener('pointermove', onMove)
     s.renderer.domElement.addEventListener('pointerleave', onLeave)
 
@@ -92,6 +102,7 @@
 
     return () => {
       cancelAnimationFrame(frame)
+      s.renderer.domElement.removeEventListener('pointerdown', onSample, { capture: true })
       input.dispose()
       compositor?.dispose()
       store.paint?.dispose()
@@ -100,6 +111,24 @@
       stage = undefined
     }
   })
+
+  // The color the layers show where the model was clicked, into the selected layer.
+  function sampleColor(hit: Hit | undefined) {
+    store.sampling = false
+    const c = compositor
+    const l = store.layer
+    if (!c || !l || !hit?.uv) return
+    const size = c.mask.width
+    const color = c.colorAt([Math.min(size - 1, Math.floor(hit.uv.x * size)), Math.min(size - 1, Math.floor(hit.uv.y * size))])
+    // Layers that paint colors take it as the brush color.
+    if (l.paintColors && tools.tool === 'brush') {
+      tools.brush.color = color
+      store.say(`brush takes ${color}`)
+      return
+    }
+    store.look(l).color = color
+    store.say(`${l.name} takes ${color}`)
+  }
 
   // ⌥click selects the topmost layer that shows where the model was clicked.
   function pickLayer(hit: Hit | undefined) {
@@ -124,9 +153,15 @@
     paletteTimer = setTimeout(() => {
       if (c !== compositor) return
       const project = withVariant($state.snapshot(store.project), store.variant)
-      c.pickPalette(project.finish.count)
+      c.pickPalette(project.finish.count, painted(project))
       c.finish(project)
     }, 150)
+  }
+
+  // Colors painted on shown layers, which the auto palette keeps.
+  function painted(project: Project): RGB[] {
+    const hex = project.layers.filter((l) => l.paintColors && l.visible).flatMap((l) => l.brushColors ?? [])
+    return [...new Set(hex)].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as RGB)
   }
 
   // Bake settings reach the bake once the sliders rest, as each bake takes a moment.
@@ -186,7 +221,7 @@
           const project = withVariant($state.snapshot(store.project), variant)
           c.render(project, store.selected)
           if (project.finish.palette === 'auto') {
-            c.pickPalette(project.finish.count)
+            c.pickPalette(project.finish.count, painted(project))
             c.finish(project)
           }
           dirty = true
@@ -296,7 +331,7 @@
   $effect(() => {
     const p = tools.pickedStamp
     const g = p && tools.tool === 'stamp' ? handles($state.snapshot(p)) : null
-    stage?.setGrips(g ? [g.rotate, g.scale] : null)
+    stage?.setGrips(g ? [g.rotate, ...g.corners] : null)
   })
 
   const flatKeys: Record<string, FlatMap> = { '1': 'texture', '2': 'mask', '3': 'glow', '4': 'ao', '5': 'edges', '6': 'cavity', '7': 'parts' }
@@ -346,7 +381,7 @@
 
 <svelte:window {onkeydown} />
 
-<div class="viewport" class:brush={tools.tool === 'brush'} bind:this={container}></div>
+<div class="viewport" class:brush={tools.tool === 'brush'} class:sampling={store.sampling} bind:this={container}></div>
 {#if stage && !store.flat && store.model}
   <ViewGizmo {stage} />
 {/if}
@@ -364,5 +399,8 @@
   }
   .viewport.brush :global(canvas) {
     cursor: none;
+  }
+  .viewport.sampling :global(canvas) {
+    cursor: crosshair;
   }
 </style>

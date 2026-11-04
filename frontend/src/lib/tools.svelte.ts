@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import type { GizmoMode } from './gl/volume'
 import { shapeAspect } from './shapes'
-import { moveTo, nudge, place } from './stamps'
+import { snipTiles, tiled } from './snippets.svelte'
+import { cornerTo, moveTo, nudge, place } from './stamps'
 import { store } from './store.svelte'
 import type { Mask, Stamp, Tool, Vec3 } from './types'
 
@@ -9,7 +10,8 @@ export type Picked = { mask: number; index: number }
 
 class Tools {
   tool = $state<Tool>('nav')
-  brush = $state({ size: 0.03, hard: 0.7, strength: 1, grit: 0, erase: false, map: '', mapScale: 3 })
+  // Pixel brushes paint whole texels of the texture, pixels across.
+  brush = $state({ size: 0.03, hard: 0.7, strength: 1, grit: 0, erase: false, map: '', mapScale: 3, pixel: false, pixels: 1, color: '#c8c2b4' })
   // Settings for the next stamp; a picked stamp shares them while it's picked.
   stamp = $state({ shape: 'circle', size: 0.12, rot: 0, aspect: 1 })
   // Spacing of stamp rows, in stamp widths.
@@ -99,6 +101,19 @@ class Tools {
     this.update((s) => ({ ...s, rot: this.stamp.rot }))
   }
 
+  // Corner i of the picked stamp to p, the opposite one staying; tiled snippets keep
+  // their tiles square.
+  dragCorner(i: number, p: THREE.Vector3, keepAspect: boolean) {
+    this.update((s) => {
+      const next = cornerTo(s, i, p, keepAspect)
+      if (next.shape.startsWith('snip:')) next.shape = tiled(next.shape, snipTiles(next.shape).cols, next.aspect)
+      return next
+    })
+    const s = this.pickedStamp
+    if (!s) return
+    this.stamp = { ...this.stamp, shape: s.shape, size: s.size / this.diag, aspect: s.aspect }
+  }
+
   // A world size for the picked stamp.
   setSize(size: number) {
     this.stamp.size = Math.min(1, Math.max(0.005, size / this.diag))
@@ -106,6 +121,10 @@ class Tools {
   }
 
   resize(factor: number) {
+    if (this.tool === 'brush' && this.brush.pixel) {
+      this.brush.pixels = Math.min(16, Math.max(1, this.brush.pixels + (factor > 1 ? 1 : -1)))
+      return
+    }
     if (this.tool === 'brush') {
       this.brush.size = Math.min(0.3, Math.max(0.002, this.brush.size * factor))
       return
@@ -178,6 +197,15 @@ class Tools {
     if (!p || !this.pickedStamp) return
     store.layer!.masks[p.mask].stamps.splice(p.index, 1)
     this.picked = null
+  }
+
+  // A finished stamp, like one fitted to a surface, picked to adjust.
+  placeStamp(s: Stamp) {
+    const mask = store.ensureMask('stamps')
+    if (mask < 0) return
+    const list = store.layer!.masks[mask].stamps
+    list.push(s)
+    this.pick({ mask, index: list.length - 1 })
   }
 
   // Takes over a stamp's settings, so the next one matches it.

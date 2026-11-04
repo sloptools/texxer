@@ -29,6 +29,8 @@
   --dim: #76736b;
   --faint: #4c4a45;
   --accent: #7fc4af;
+  /* Marks over photos and models, which turquoise gets lost on. */
+  --mark: #ffb020;
   --dir: #eab3c4;
   --error: #e5826f;
   color-scheme: dark;
