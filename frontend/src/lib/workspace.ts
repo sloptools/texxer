@@ -50,6 +50,8 @@ export function parseWorkspace(path: string, json: string, model: string): Works
     name: m.name,
     files: m.files.map((f) => resolve(dir, f)),
     textures: m.textures && resolve(dir, m.textures),
+    blend: m.blend && resolve(dir, m.blend),
+    target: m.target && resolve(dir, m.target),
     exported: m.exported,
   }))
   return link({ version: 2, finish: base.finish, shading: base.shading, light: base.light, models })
@@ -65,7 +67,8 @@ export function serializeWorkspace(path: string, ws: Workspace): string {
   const dir = dirName(path)
   const models = ws.models.map((m) => {
     const { finish, shading, light, ...rest } = m
-    return { ...rest, files: m.files.map((f) => relative(dir, f)), textures: m.textures && relative(dir, m.textures) }
+    const path = (f?: string) => f && relative(dir, f)
+    return { ...rest, files: m.files.map((f) => relative(dir, f)), textures: path(m.textures), blend: path(m.blend), target: path(m.target) }
   })
   return JSON.stringify({ version: 2, finish: ws.finish, shading: ws.shading, light: ws.light, models }, null, 2)
 }

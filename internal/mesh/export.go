@@ -89,6 +89,29 @@ func WithTexture(glb []byte, t Textures, material string) ([]byte, error) {
 		occlusion = add(t.Occlusion, files.Occlusion, "texxer_occlusion")
 	}
 
+	// Primitives without a material, as Blender writes them, get one to carry the texture.
+	if material == "" {
+		bare := -1.0
+		for _, m := range sliceArray(doc, "meshes") {
+			mesh, _ := m.(map[string]any)
+			prims, _ := mesh["primitives"].([]any)
+			for _, p := range prims {
+				prim, _ := p.(map[string]any)
+				if _, ok := prim["material"]; ok || prim == nil {
+					continue
+				}
+				if bare < 0 {
+					materials = append(materials, map[string]any{"name": "texxer"})
+					bare = float64(len(materials) - 1)
+				}
+				prim["material"] = bare
+			}
+		}
+		if bare >= 0 {
+			doc["materials"] = materials
+		}
+	}
+
 	textured := hasBaseTexture(materials)
 	used := 0
 	for _, m := range materials {

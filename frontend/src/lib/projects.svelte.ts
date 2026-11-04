@@ -174,7 +174,10 @@ export async function exportModel(): Promise<boolean> {
       const s = store.snapshot!(v.id)
       return { name: v.name, color: s.color, emissive: s.emissive }
     })
-    const files = await api.Export(model.path, m.unwrap, m.name, m.textures ?? '', shot.color, shot.emissive, variants, m.finish.glow)
+    // A Blender model's file is the add-on's copy; its export goes to a GLB of its own.
+    if (m.blend && !m.target) m.target = (await api.PickExportTarget(m.name)) || undefined
+    if (m.blend && !m.target) return false
+    const files = await api.Export(model.path, m.unwrap, m.name, m.textures ?? '', m.target ?? '', shot.color, shot.emissive, variants, m.finish.glow)
     m.exported = { doc: docHash(m), files }
     store.fileHashes = { ...store.fileHashes, [model.path]: files }
     store.say('exported ' + m.name)

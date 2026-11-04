@@ -123,6 +123,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 				return
 			}
 			w.Header().Set("Content-Type", "model/gltf-binary")
+			w.Header().Set("Cache-Control", "no-store")
 			w.Write(glb)
 
 		case "/linked":
@@ -194,6 +195,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 				return
 			}
 			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Cache-Control", "no-store")
 			w.Write(data)
 
 		default:

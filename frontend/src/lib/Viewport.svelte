@@ -10,6 +10,7 @@
   import { corners, handles } from './stamps'
   import { store } from './store.svelte'
   import { ToolInput } from './toolInput'
+  import { bridge } from './bridge.svelte'
   import { tools } from './tools.svelte'
   import type { FlatMap, Project } from './types'
   import type { RGB } from './gl/mediancut'
@@ -86,6 +87,7 @@
         compositor.render(project, store.hoverLayer >= 0 ? store.hoverLayer : store.selected, tools.ghost && $state.snapshot(tools.ghost))
         if (project.finish.palette === 'auto') schedulePalette(compositor)
         dirty = false
+        bridge.changed()
       }
       if (compositor) {
         const t = (performance.now() - flashed) / 500
@@ -196,7 +198,8 @@
     store.ready = false
     const project = store.path
     const key = encodeURIComponent(model.path)
-    const files = model.offsets.map((offset, i) => ({ url: `/model?path=${key}&unwrap=${layout}&file=${i}`, images: `/linked?path=${key}&file=${i}&uri=`, offset }))
+    // The hash keeps the webview from serving a file Blender has since rewritten.
+    const files = model.offsets.map((offset, i) => ({ url: `/model?path=${key}&unwrap=${layout}&file=${i}&h=${model.hash}`, images: `/linked?path=${key}&file=${i}&uri=`, offset }))
     // The colors come from kept copies of the files, as export overwrites them; a
     // new copy when the files changed outside texxer.
     const doc = store.project

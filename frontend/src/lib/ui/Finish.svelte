@@ -36,7 +36,12 @@
     <span>uv</span>
     <span class="pair">
       <button class:on={!p.unwrap} title="Paint on the model's own UVs" onclick={() => store.setLayout(0)}>model</button>
-      <button class:on={!!p.unwrap} title="Let texxer lay the UVs out: cut at hard edges, upright, one texel density" onclick={() => store.setLayout(p.unwrap || p.size)}>texxer</button>
+      <button
+        class:on={!!p.unwrap}
+        disabled={!!p.blend && !p.unwrap}
+        title={p.blend ? "Blender's UVs for now; texxer's layout doesn't go back to Blender yet" : 'Let texxer lay the UVs out: cut at hard edges, upright, one texel density'}
+        onclick={() => store.setLayout(p.unwrap || p.size)}>texxer</button
+      >
     </span>
   </div>
   <Slider label="edge width" bind:value={p.bake.edges} min={0.002} max={0.08} step={0.001} digits={3} def={0.03} />
@@ -52,7 +57,7 @@
       <button class="wide" onclick={() => store.setLayout(p.size)}>lay out for {sizeName(p.size)} <span>now {sizeName(p.unwrap)}</span></button>
     {/if}
   {:else if store.model && store.model.overlap > 0.01}
-    <div class="note warn">{store.model.overlap >= 1 ? 'the model has no UVs' : `${Math.round(store.model.overlap * 100)}% of the UVs overlap`}</div>
+    <div class="note warn">{store.model.overlap >= 1 ? 'the model has no UVs' : `${Math.round(store.model.overlap * 100)}% of the UVs overlap`}{p.blend ? ' · unwrap it in Blender' : ''}</div>
   {/if}
 </div>
 

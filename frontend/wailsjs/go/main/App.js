@@ -10,6 +10,18 @@ export function AddPhotos(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['AddPhotos'](arg1, arg2, arg3, arg4);
 }
 
+export function BridgeConnected() {
+  return window['go']['main']['App']['BridgeConnected']();
+}
+
+export function BridgeRequestSync(arg1) {
+  return window['go']['main']['App']['BridgeRequestSync'](arg1);
+}
+
+export function BridgeTexture(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['BridgeTexture'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function DeleteMaterial(arg1) {
   return window['go']['main']['App']['DeleteMaterial'](arg1);
 }
@@ -22,8 +34,8 @@ export function DeleteSnippet(arg1, arg2, arg3) {
   return window['go']['main']['App']['DeleteSnippet'](arg1, arg2, arg3);
 }
 
-export function Export(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
-  return window['go']['main']['App']['Export'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+export function Export(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
+  return window['go']['main']['App']['Export'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
 }
 
 export function FileHashes(arg1) {
@@ -68,6 +80,10 @@ export function Palette(arg1) {
 
 export function Photos(arg1, arg2) {
   return window['go']['main']['App']['Photos'](arg1, arg2);
+}
+
+export function PickExportTarget(arg1) {
+  return window['go']['main']['App']['PickExportTarget'](arg1);
 }
 
 export function PickFolder() {

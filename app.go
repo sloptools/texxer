@@ -20,6 +20,7 @@ import (
 type App struct {
 	ctx    context.Context
 	models *modelCache
+	bridge *bridge
 }
 
 func NewApp() *App {
@@ -28,6 +29,13 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	if err := a.startBridge(); err != nil {
+		runtime.LogError(ctx, "bridge: "+err.Error())
+	}
+}
+
+func (a *App) shutdown(ctx context.Context) {
+	a.stopBridge()
 }
 
 // domReady is a fallback: the frontend shows the window after its first paint.
@@ -184,11 +192,12 @@ type VariantTextures struct {
 	Emissive string `json:"emissive"`
 }
 
-// Export writes the textures into the model's files in place, and as PNGs into dir
-// (beside the first file when empty), named after the model; variants get PNGs of
-// their own. The files link the PNGs instead of embedding them, so engines import
-// one texture, not a copy too. An empty emissive leaves it out. It returns the files' new hash.
-func (a *App) Export(key string, layout int, name, dir, pngBase64, emissiveBase64 string, variants []VariantTextures, emissiveStrength float64) (string, error) {
+// Export writes the textures into the model's files in place, or for a model of one
+// file into target, and as PNGs into dir (beside the first file when empty), named
+// after the model; variants get PNGs of their own. The files link the PNGs instead
+// of embedding them, so engines import one texture, not a copy too. An empty
+// emissive leaves it out. It returns the files' new hash.
+func (a *App) Export(key string, layout int, name, dir, target, pngBase64, emissiveBase64 string, variants []VariantTextures, emissiveStrength float64) (string, error) {
 	t := mesh.Textures{EmissiveStrength: emissiveStrength}
 	var err error
 	if t.Color, err = base64.StdEncoding.DecodeString(pngBase64); err != nil {
@@ -201,6 +210,13 @@ func (a *App) Export(key string, layout int, name, dir, pngBase64, emissiveBase6
 	}
 
 	paths := keyPaths(key)
+	if target != "" && len(paths) > 1 {
+		return "", errors.New("a target needs a model of one file")
+	}
+	outPaths := paths
+	if target != "" {
+		outPaths = []string{target}
+	}
 	if dir == "" {
 		dir = filepath.Dir(paths[0])
 	}
@@ -211,7 +227,7 @@ func (a *App) Export(key string, layout int, name, dir, pngBase64, emissiveBase6
 
 	outs := make([][]byte, len(paths))
 	details := map[string][]byte{}
-	for i, p := range paths {
+	for i, p := range outPaths {
 		glb, err := a.models.glb(key, layout, i)
 		if err != nil {
 			return "", err
@@ -261,12 +277,14 @@ func (a *App) Export(key string, layout int, name, dir, pngBase64, emissiveBase6
 			return "", err
 		}
 	}
-	for i, p := range paths {
+	for i, p := range outPaths {
 		if err := os.WriteFile(p, outs[i], 0o644); err != nil {
 			return "", err
 		}
 	}
-	a.models.touch(key)
+	if target == "" {
+		a.models.touch(key)
+	}
 	return fileHash(key)
 }
 

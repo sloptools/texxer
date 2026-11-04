@@ -2,6 +2,7 @@
   import Icon from '../Icon.svelte'
   import { addFiles, exportChanged, pickTextureFolder, removeModel, selectModel, stateOf } from '../projects.svelte'
   import { store } from '../store.svelte'
+  import { bridge } from '../bridge.svelte'
   import HelpLink from './HelpLink.svelte'
   import type { ModelDoc } from '../types'
   import type { ModelState } from '../workspace'
@@ -22,6 +23,7 @@
   const pending = $derived(models.filter((m) => ['edited', 'changed', 'new'].includes(stateOf(m))).length)
 
   function where(m: ModelDoc) {
+    if (m.blend) return `blender · ${m.blend.split('/').pop()} · ${bridge.isConnected(m) ? 'live' : 'not connected'}`
     const parts = m.files[0]?.split('/') ?? []
     return parts.slice(-3, -1).join('/') + (m.files.length > 1 ? ` · ${m.files.length} files` : '')
   }
@@ -71,7 +73,11 @@
       </span>
       <span class="actions">
         <button class="icon" class:set={m.textures} title={m.textures ? `PNGs go to ${m.textures} (cancel to put them beside the files)` : 'Folder for the texture PNGs (beside the files)'} onclick={(e) => (e.stopPropagation(), pickTextureFolder(m.id))}><Icon name="dir" size={11} /></button>
-        <button class="icon" title="Add files that share this texture" onclick={(e) => (e.stopPropagation(), addFiles(m.id))}><Icon name="plus" size={11} /></button>
+        {#if m.blend}
+          <button class="sync" disabled={m.id !== store.project.id || !bridge.isConnected(m)} title="Get the objects from Blender as they are now" onclick={(e) => (e.stopPropagation(), bridge.requestSync())}>sync</button>
+        {:else}
+          <button class="icon" title="Add files that share this texture" onclick={(e) => (e.stopPropagation(), addFiles(m.id))}><Icon name="plus" size={11} /></button>
+        {/if}
         <button class="icon" class:armed={confirm === m.id} title="Remove from the project (the files stay)" onclick={(e) => (e.stopPropagation(), remove(m))}>
           {#if confirm === m.id}remove?{:else}<Icon name="x" size={11} />{/if}
         </button>
@@ -110,6 +116,22 @@
   }
   .row:hover {
     background: var(--hover);
+  }
+
+  .sync {
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: none;
+    font: 11px var(--mono);
+    color: var(--dim);
+  }
+  .sync:hover:not(:disabled) {
+    color: var(--strong);
+  }
+  .sync:disabled {
+    opacity: 0.4;
   }
   .row.on {
     background: var(--active);

@@ -29,6 +29,7 @@ func main() {
 		StartHidden:      true,
 		OnStartup:        app.startup,
 		OnDomReady:       app.domReady,
+		OnShutdown:       app.shutdown,
 		Bind:             []any{app},
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop:     true,

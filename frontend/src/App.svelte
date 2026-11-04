@@ -19,6 +19,7 @@
   import QuickOpen from './lib/ui/QuickOpen.svelte'
   import MaterialMenu from './lib/ui/MaterialMenu.svelte'
   import { snippets } from './lib/snippets.svelte'
+  import { bridge } from './lib/bridge.svelte'
   import PhotoList from './lib/ui/PhotoList.svelte'
   import PhotoView from './lib/ui/PhotoView.svelte'
   import CutPanel from './lib/ui/CutPanel.svelte'
@@ -38,6 +39,7 @@
 
   onMount(() => {
     store.init()
+    bridge.start()
     OnFileDrop((_x, _y, paths) => {
       const project = paths.find((p) => p.toLowerCase().endsWith('.texxer'))
       const glbs = paths.filter((p) => p.toLowerCase().endsWith('.glb'))

@@ -173,6 +173,10 @@ export type ModelDoc = Project & {
   textures?: string
   // What the last export wrote, to tell whether it needs another.
   exported?: { doc: string; files: string }
+  // A model synced from Blender: its .blend, and the GLB the export writes, as
+  // its file is the add-on's copy. Stored like files.
+  blend?: string
+  target?: string
 }
 
 export type Workspace = {
