@@ -241,7 +241,7 @@
           <span class="name">{row.l.name}</span>
         {/if}
         <span class="meta" title={[...row.l.masks.map((m) => m.kind), row.l.blend !== 'normal' ? row.l.blend + ' blend' : '', look.opacity < 1 ? 'opacity ' + Math.round(look.opacity * 100) + '%' : ''].filter(Boolean).join(' · ')}>
-          {#if row.l.masks.length}{row.l.masks.map((m) => m.kind.slice(0, 2)).join('·')}{/if}
+          {#each row.l.masks as m}<span class="mask" class:inverted={m.invert}><Icon name={m.kind} size={11} /></span>{/each}
           {#if row.l.blend !== 'normal'} {row.l.blend.slice(0, 3)}{/if}
           {#if look.opacity < 1}<span class="opacity">{Math.round(look.opacity * 100)}</span>{/if}
         </span>
@@ -454,8 +454,14 @@
   }
 
   .meta {
+    display: flex;
+    align-items: center;
+    gap: 2px;
     font: 10px var(--mono);
     color: var(--faint);
     white-space: nowrap;
+  }
+  .mask.inverted {
+    opacity: 0.5;
   }
 </style>

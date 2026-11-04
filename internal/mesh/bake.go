@@ -20,6 +20,9 @@ type BakeOptions struct {
 	// AORes caps the resolution AO is traced at; it is soft, so a lower
 	// resolution looks the same and is much faster. 0 traces at full size.
 	AORes int
+	// CavityRays trace the cavity's short reach at up to CavityRes, finding gaps
+	// and creases that aren't shared edges.
+	CavityRays, CavityRes int
 	// FixNormals turns normals around that point into the solid, for models
 	// with flipped faces. It can misjudge real interiors, so it is opt-in.
 	FixNormals bool
@@ -84,7 +87,12 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	partID := make([]float32, n)
 	island := make([]float32, n)
 
-	aos, flips := aoLookup(o, bvh, diag, samples)
+	aos, flips := traced(o.W, o.H, o.AORes, samples, func(s sample) (float64, bool) {
+		return occlusion(bvh, s, o.AORays, o.AODist*diag, o.FixNormals)
+	})
+	gaps, _ := traced(o.W, o.H, o.CavityRes, samples, func(s sample) (float64, bool) {
+		return closeness(bvh, s, o.CavityRays, o.CavityWidth*diag), false
+	})
 
 	results := make([][3]float64, len(samples))
 	parallel(len(samples), func(i int) {
@@ -97,6 +105,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 		if o.CavityWidth != o.EdgeWidth {
 			_, concave = grid.near(s.p, o.CavityWidth*diag)
 		}
+		concave = max(concave, gaps[i])
 		if s.detail >= 0 {
 			ao, convex, concave, samples[i].n = m.Details[s.detail].apply(samples[i], o.Detail, ao, convex, concave)
 		}
@@ -157,18 +166,13 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	return maps
 }
 
-// aoLookup returns AO and the flipped-normal verdict for each sample. Below
-// AORes, rays are traced from one sample per coarse texel and part, and the
-// others take its result; AO is soft, so this looks the same and is much
-// faster. Grouping by part keeps neighbouring islands of different parts apart.
-func aoLookup(o BakeOptions, bvh *BVH, diag float64, samples []sample) (ao []float64, flipped []bool) {
-	dist := o.AODist * diag
-	ao = make([]float64, len(samples))
-	flipped = make([]bool, len(samples))
-
+// traced runs f for one sample per cell of a grid at most res wide (0 for full
+// size) and part, and gives its result to all samples there. Soft maps look the
+// same and bake much faster; grouping by part keeps neighbouring parts apart.
+func traced(w, h, res int, samples []sample, f func(sample) (float64, bool)) ([]float64, []bool) {
 	scale := 1
-	if o.AORes > 0 {
-		for max(o.W, o.H)/(scale*2) >= o.AORes {
+	if res > 0 {
+		for max(w, h)/(scale*2) >= res {
 			scale *= 2
 		}
 	}
@@ -178,8 +182,8 @@ func aoLookup(o BakeOptions, bvh *BVH, diag float64, samples []sample) (ao []flo
 	var reps []int
 	owner := make([]int, len(samples))
 	for i, s := range samples {
-		x, y := s.texel%o.W/scale, s.texel/o.W/scale
-		k := key{y*o.W + x, s.part}
+		x, y := s.texel%w/scale, s.texel/w/scale
+		k := key{y*w + x, s.part}
 		r, ok := rep[k]
 		if !ok {
 			r = len(reps)
@@ -189,16 +193,18 @@ func aoLookup(o BakeOptions, bvh *BVH, diag float64, samples []sample) (ao []flo
 		owner[i] = r
 	}
 
-	traced := make([]float64, len(reps))
-	flips := make([]bool, len(reps))
+	values := make([]float64, len(reps))
+	flags := make([]bool, len(reps))
 	parallel(len(reps), func(r int) {
-		traced[r], flips[r] = occlusion(bvh, samples[reps[r]], o.AORays, dist, o.FixNormals)
+		values[r], flags[r] = f(samples[reps[r]])
 	})
 
+	outV := make([]float64, len(samples))
+	outF := make([]bool, len(samples))
 	for i, r := range owner {
-		ao[i], flipped[i] = traced[r], flips[r]
+		outV[i], outF[i] = values[r], flags[r]
 	}
-	return ao, flipped
+	return outV, outF
 }
 
 // rasterize finds the texels whose centers lie inside each triangle's UVs.
@@ -295,6 +301,33 @@ func hemisphere(b *BVH, s sample, n Vec, rays int, dist float64) float64 {
 		}
 	}
 	return float64(open) / float64(rays)
+}
+
+// closeness is how near the surface faces others, 1 at a right-angled corner and
+// in gaps, fading to 0 at dist.
+func closeness(b *BVH, s sample, rays int, dist float64) float64 {
+	if rays <= 0 || dist <= 0 {
+		return 0
+	}
+
+	ng := s.ng
+	if ng.Dot(s.n) < 0 {
+		ng = ng.Scale(-1)
+	}
+	origin := s.p.Add(ng.Scale(dist * 1e-3))
+
+	t, bt := basis(s.n)
+	sum := 0.0
+	for k := range rays {
+		r1 := fract(float64(k)*0.618034 + hash01(s.texel, 3))
+		r2 := (float64(k) + hash01(s.texel, 4)) / float64(rays)
+		phi := 2 * math.Pi * r1
+		sr := math.Sqrt(r2)
+		d := t.Scale(math.Cos(phi) * sr).Add(bt.Scale(math.Sin(phi) * sr)).Add(s.n.Scale(math.Sqrt(1 - r2)))
+		near := 1 - b.Hit(origin, d.Norm(), dist, false)/dist
+		sum += near * near
+	}
+	return min(1, 4*sum/float64(rays))
 }
 
 func basis(n Vec) (Vec, Vec) {

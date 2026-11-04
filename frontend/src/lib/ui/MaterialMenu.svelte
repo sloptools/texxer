@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from '../Icon.svelte'
+  import { addDirt, dirt } from '../dirt'
   import { builtins, deleteMaterial, insertMaterial, library, loadLibrary, type Material } from '../materials.svelte'
 
   let { onclose }: { onclose: () => void } = $props()
@@ -26,6 +27,10 @@
 
 <div class="backdrop" role="presentation" onclick={onclose}></div>
 <div class="menu" role="menu">
+  <div class="caps">dirt</div>
+  {#each dirt as d}
+    <button class="item" role="menuitem" onclick={() => (addDirt(d), onclose())}>{d.name}<kbd>{d.key}</kbd></button>
+  {/each}
   <div class="caps">materials</div>
   {#each builtins as m}
     <button class="item" role="menuitem" onclick={() => pick(m)}>{m.name}</button>
@@ -41,7 +46,7 @@
       </div>
     {/each}
   {/if}
-  <p class="hint">a folder above the layer · click surfaces to give it its zone</p>
+  <p class="hint">dirt is one layer above the selected one · a material a folder; click surfaces to give it its zone</p>
 </div>
 
 <style>
@@ -82,6 +87,15 @@
     font: 13px var(--sans);
     color: var(--fg);
     text-align: left;
+  }
+  .item:has(kbd) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  kbd {
+    font: 10px var(--mono);
+    color: var(--faint);
   }
   .item:hover {
     background: var(--hover);

@@ -81,6 +81,8 @@ uniform sampler2D uParts;
 uniform sampler2D uIslands;
 uniform int uZone;
 uniform vec3 uExtent;
+uniform vec2 uWidths;
+uniform float uFactor;
 uniform vec3 uColor;
 uniform float uTone;
 uniform float uToneScale;
@@ -201,6 +203,27 @@ float volume(int i, vec3 p) {
   return v;
 }
 
+// World size of a texel of the finished texture, from its nearest neighbor.
+float texelSize(ivec2 t, vec3 p) {
+  ivec2 last = textureSize(uPos, 0) - 1;
+  float s = 1e9;
+  for (int k = 0; k < 4; k++) {
+    ivec2 o = k < 2 ? ivec2(k * 2 - 1, 0) : ivec2(0, k * 2 - 5);
+    float d = distance(texelFetch(uPos, clamp(t + o, ivec2(0), last), 0).xyz, p);
+    if (d > 1e-7) s = min(s, d);
+  }
+  return s * uFactor;
+}
+
+// Edges and cavities, 1 on the edge and 0 at their width, which crisp ones give in texels.
+float edgeField(int i, ivec2 t, float f, float width, vec3 p) {
+  float crisp = uC[i].z;
+  if (crisp <= 0.0) return f;
+  // Well below any cut beyond the line, so rough noise can't lift it there.
+  if (f <= 0.0) return -1.0;
+  return 1.0 - (1.0 - f) * width / (texelSize(t, p) * crisp);
+}
+
 float field(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   int k = uKind[i];
   // Axes 3 to 5 are 0 to 2 the other way round.
@@ -211,8 +234,8 @@ float field(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   if (k == 9) return grunge(i, pos.xyz, n);
   if (k == 11) return volume(i, pos.xyz);
   if (k == 1) return 1.0 - geo.r;
-  if (k == 2) return geo.g;
-  if (k == 3) return geo.b;
+  if (k == 2) return edgeField(i, t, geo.g, uWidths.x, pos.xyz);
+  if (k == 3) return edgeField(i, t, geo.b, uWidths.y, pos.xyz);
   if (k == 4) {
     float g = (pos.xyz / uExtent)[axis];
     return flip ? g : 1.0 - g;

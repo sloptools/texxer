@@ -19,6 +19,7 @@
   import ModelList from './lib/ui/ModelList.svelte'
   import QuickOpen from './lib/ui/QuickOpen.svelte'
   import MaterialMenu from './lib/ui/MaterialMenu.svelte'
+  import { addDirt, dirt } from './lib/dirt'
   import { addModels, createProject, cycleModel, exportChanged, exportModel, openProject, pickProject, projectName, recent, refreshHashes } from './lib/projects.svelte'
 
   let headlight = 0.6
@@ -238,6 +239,14 @@
           break
         case 'PageDown':
           cycleModel(1)
+          break
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+          addDirt(dirt[Number(e.key) - 1])
           break
         case 'F1':
           store.openDocs(store.helpPage)

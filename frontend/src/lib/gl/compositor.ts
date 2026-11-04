@@ -16,6 +16,8 @@ export type Bake = {
   geo: THREE.DataTexture
   pos: THREE.DataTexture
   nrm: THREE.DataTexture
+  // Widths of the edge and cavity fields, as fractions of the model's diagonal.
+  widths: [number, number]
   // The model's own colors, when a layer asked for them.
   source?: THREE.DataTexture
   // CPU copies of the position and normal maps, for picking parts and islands.
@@ -37,7 +39,7 @@ export async function loadBake(path: string, size: number, layout: number, b: Ba
     t.needsUpdate = true
     return t
   }
-  const bake: Bake = { size, geo: texture(0), pos: texture(1), nrm: texture(2), posData: new Float32Array(buf, n * 4, n), nrmData: new Float32Array(buf, 2 * n * 4, n) }
+  const bake: Bake = { size, geo: texture(0), pos: texture(1), nrm: texture(2), widths: [b.edges, b.cavity], posData: new Float32Array(buf, n * 4, n), nrmData: new Float32Array(buf, 2 * n * 4, n) }
   if (source) bake.source = texture(3)
   return bake
 }
@@ -142,6 +144,8 @@ export class Compositor {
         uIslands: { value: this.islands },
         uZone: { value: -1 },
         uExtent: { value: new THREE.Vector3(...model.extent) },
+        uWidths: { value: new THREE.Vector2(...bake.widths) },
+        uFactor: { value: factor },
         uColor: { value: new THREE.Color() },
         uTone: { value: 0 },
         uToneScale: { value: 12 },
@@ -392,7 +396,7 @@ export class Compositor {
       u['uGrunge' + i].value = m.kind === 'grunge' ? this.grunge(m.map) : null
 
       const list = m.kind === 'stamps' ? expand(m.stamps, this.mirrorX).slice(0, maxStamps - stamps) : []
-      u.uC.value[i].set(stamps, list.length, shapeIndex[m.volume.shape], m.volume.mirror ? 1 : 0)
+      u.uC.value[i].set(stamps, list.length, m.kind === 'volume' ? shapeIndex[m.volume.shape] : m.crisp, m.volume.mirror ? 1 : 0)
       for (const s of list) this.setStamp(stamps++, s)
       if (m.kind === 'volume') u.uV.value[i].copy(this.volumeMatrix(m.volume))
     })

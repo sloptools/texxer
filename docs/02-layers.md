@@ -25,6 +25,10 @@ When dragging, the line shows where the layer lands: indented inside a folder, a
 
 Click a folder to give it a **zone**: with **pick** on, clicks in the view add surfaces (**⌘click** whole parts), **Esc** ends. Its layers show only there. Without a zone, the folder covers everything.
 
+## Dirt
+
+**1** to **6** add one dirt layer above the selected one: dust on top, grime in cavities, dirt from below, rust on edges, streaks on walls, and a grunge brush that paints dirt with the brush (B). They are also at the top of the material menu (**⇧M**).
+
 ## Materials
 
 A material is a folder of layers: worn steel, painted metal, rust, wood, plastic, rubber, glass. **⇧M** or the ball above the layers adds one above the selected layer, with **pick** on so the next clicks set its zone. Put the main material first without a zone, then the others with theirs.

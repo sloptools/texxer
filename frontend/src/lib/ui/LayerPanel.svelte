@@ -1,13 +1,37 @@
 <script lang="ts">
   import { store } from '../store.svelte'
   import { tools } from '../tools.svelte'
-  import { blends, maskKinds } from '../types'
+  import { blends, type MaskKind } from '../types'
+  import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import ColorField from './ColorField.svelte'
   import MaskCard from './MaskCard.svelte'
   import Seg from './Seg.svelte'
   import Slider from './Slider.svelte'
   import HelpLink from './HelpLink.svelte'
   import FolderPanel from './FolderPanel.svelte'
+
+  // Picked areas, then geometry, then textures.
+  const kinds: (MaskKind | 'line')[] = ['parts', 'islands', 'paint', 'stamps', 'volume', 'line', 'ao', 'edges', 'cavity', 'gradient', 'facing', 'line', 'grunge', 'noise']
+
+  let menu = $state<{ x: number; y: number }>()
+
+  const items: MenuItem[] = kinds.map((kind) =>
+    kind === 'line'
+      ? 'line'
+      : {
+          label: kind,
+          icon: kind,
+          run: () => {
+            const at = store.addMask(kind)
+            if (kind === 'volume' && at >= 0) tools.editVolume(at)
+          },
+        },
+  )
+
+  function openMenu(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    menu = { x: r.left, y: r.bottom + 4 }
+  }
 
   const layer = $derived(store.layer)
   const look = $derived(layer && store.look(layer))
@@ -44,11 +68,11 @@
 
   <div class="section">
     <div class="caps">surface</div>
-    <Slider label="tone" bind:value={layer.tone} def={0.25} />
+    <Slider label="tone" bind:value={layer.tone} def={0.08} />
     {#if layer.tone > 0}
       <Slider label="tone scale" bind:value={layer.toneScale} min={1} max={64} step={1} digits={0} def={12} />
     {/if}
-    <Slider label="grain" bind:value={layer.grain} max={0.3} def={0.06} />
+    <Slider label="grain" bind:value={layer.grain} max={0.3} def={0.02} />
     <Slider label="shine" bind:value={layer.shine} def={0} />
   </div>
 
@@ -64,11 +88,7 @@
       <MaskCard {mask} index={i} parts={store.model?.parts ?? []} onremove={() => layer.masks.splice(i, 1)} />
     {/each}
     {#if layer.masks.length < 4}
-      <div class="add">
-        {#each maskKinds as kind}
-          <button onclick={() => { const at = store.addMask(kind); if (kind === 'volume' && at >= 0) tools.editVolume(at) }}>+ {kind}</button>
-        {/each}
-      </div>
+      <button class="add" onclick={openMenu}>+ mask</button>
     {/if}
     {#if !layer.masks.length}
       <p class="hint">no mask: the layer covers everything</p>
@@ -76,6 +96,10 @@
   </div>
 {:else}
   <p class="hint pad">no layer selected</p>
+{/if}
+
+{#if menu}
+  <ContextMenu x={menu.x} y={menu.y} {items} onclose={() => (menu = undefined)} />
 {/if}
 
 <style>
@@ -126,11 +150,7 @@
   }
 
   .add {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .add button {
+    align-self: flex-start;
     height: 22px;
     padding: 0 7px;
     border: 1px dashed var(--line);
@@ -139,7 +159,7 @@
     font: 11px var(--mono);
     color: var(--dim);
   }
-  .add button:hover {
+  .add:hover {
     border-style: solid;
     color: var(--strong);
   }

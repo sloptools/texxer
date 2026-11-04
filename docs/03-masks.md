@@ -4,7 +4,7 @@
 
 A mask decides where a layer shows. With several masks, the layer shows where all of them do. **M** shows the selected layer's mask.
 
-Most masks have **amount** (how much shows), **soft** (edge falloff), **rough** (a noisy edge) and **invert**.
+**+ mask** adds one; it replaces an empty paint or stamps mask. Most masks have **amount** (how much shows), **soft** (edge falloff), **rough** (a noisy edge) and **invert**.
 
 | mask | shows where |
 |---|---|
@@ -15,8 +15,8 @@ Most masks have **amount** (how much shows), **soft** (edge falloff), **rough** 
 | volume | inside a box, cylinder or sphere you move in the view, all around the model. **soft** fades it towards its walls |
 | grunge | a grunge map, projected from three sides |
 | ao | the surface is occluded |
-| edges | convex edges, for wear |
-| cavity | creases and gaps, for grime |
+| edges | convex edges, for wear. **1–3 px** gives crisp lines that many texels wide |
+| cavity | creases, gaps and corners where surfaces meet, for grime. **1–3 px** as for edges |
 | gradient | rises from one side: below, above, left, right, back, front (as in a front view) |
 | facing | the surface faces a direction |
 | noise | value noise |

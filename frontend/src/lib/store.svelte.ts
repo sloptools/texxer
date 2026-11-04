@@ -266,9 +266,9 @@ class Store {
 
   // Layers
 
-  // Above the selected layer, or at the top of the picked folder. It starts with an
-  // empty paint mask, so it shows nothing until painted or given another mask.
-  addLayer() {
+  // Above the selected layer, or at the top of the picked folder. A new one starts
+  // with an empty paint mask, so it shows nothing until painted or given another mask.
+  addLayer(layer?: Layer) {
     const layers = this.project.layers
     let at = this.selected + 1
     let group = this.layer?.group ?? ''
@@ -277,7 +277,8 @@ class Store {
       at = Math.max(...layers.map((l, i) => (l.group === group ? i : -1))) + 1
     }
     at = Math.min(at, layers.length)
-    layers.splice(at, 0, newLayer('layer ' + (layers.length + 1), '#8a8578', [newMask('paint')], { group }))
+    const l = layer ?? newLayer('layer ' + (layers.length + 1), '#8a8578', [newMask('paint')])
+    layers.splice(at, 0, { ...l, group })
     this.selected = at
     this.selectedGroup = ''
     this.pickingZone = false

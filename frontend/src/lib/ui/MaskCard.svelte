@@ -35,6 +35,22 @@
     [2, 'front'],
   ]
 
+  const widths: [number, string][] = [
+    [0, 'fade'],
+    [1, '1 px'],
+    [2, '2 px'],
+    [3, '3 px'],
+  ]
+
+  // Crisp lines want the whole width, without a soft cut.
+  function setCrisp(v: number) {
+    if (v && !mask.crisp) {
+      mask.amount = 1
+      mask.soft = 0
+    }
+    mask.crisp = v
+  }
+
   function clearPaint() {
     const paint = store.paint
     if (!paint) return
@@ -53,7 +69,7 @@
 
 <div class="card">
   <div class="head">
-    <span class="caps">{mask.kind}</span>
+    <span class="caps kind"><Icon name={mask.kind} size={11} />{mask.kind}</span>
     <span class="actions">
       {#if mask.kind === 'paint'}
         <button class="text" title="Clear the painted mask" onclick={clearPaint}>clear</button>
@@ -104,6 +120,9 @@
         {/each}
       </div>
     {/if}
+    {#if mask.kind === 'edges' || mask.kind === 'cavity'}
+      <Seg value={mask.crisp} options={widths} onchange={setCrisp} />
+    {/if}
     {#if mask.kind === 'gradient' || mask.kind === 'facing'}
       <div class="dirs">
         <span>{mask.kind === 'gradient' ? 'from' : 'faces'}</span>
@@ -139,6 +158,11 @@
     align-items: center;
     justify-content: space-between;
     height: 20px;
+  }
+  .kind {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
   .actions {
     display: flex;

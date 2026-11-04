@@ -30,6 +30,8 @@ export type Mask = {
   invert: boolean
   amount: number
   soft: number
+  // Edges and cavities this many texels wide; 0 fades over the baked width.
+  crisp: number
   // Noise that roughens the cut, at the given scale; noise masks use scale as their frequency.
   rough: number
   scale: number

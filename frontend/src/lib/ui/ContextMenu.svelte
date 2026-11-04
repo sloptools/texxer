@@ -1,7 +1,19 @@
 <script lang="ts">
-  export type MenuItem = { label: string; key?: string; danger?: boolean; run: () => void } | 'line'
+  import Icon, { type IconName } from '../Icon.svelte'
+
+  export type MenuItem = { label: string; icon?: IconName; key?: string; danger?: boolean; run: () => void } | 'line'
 
   let { x, y, items, onclose }: { x: number; y: number; items: MenuItem[]; onclose: () => void } = $props()
+
+  // Kept inside the window.
+  let el = $state<HTMLElement>()
+  let left = $state(0)
+  let top = $state(0)
+  $effect(() => {
+    if (!el) return
+    left = Math.max(4, Math.min(x, innerWidth - el.offsetWidth - 4))
+    top = Math.max(4, Math.min(y, innerHeight - el.offsetHeight - 4))
+  })
 
   function pick(item: Exclude<MenuItem, 'line'>) {
     onclose()
@@ -12,13 +24,13 @@
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onclose()} />
 
 <div class="backdrop" role="presentation" onpointerdown={onclose} oncontextmenu={(e) => (e.preventDefault(), onclose())}></div>
-<div class="menu" role="menu" style:left="{x}px" style:top="{y}px">
+<div class="menu" role="menu" bind:this={el} style:left="{left}px" style:top="{top}px">
   {#each items as item}
     {#if item === 'line'}
       <div class="line"></div>
     {:else}
       <button role="menuitem" class:danger={item.danger} onclick={() => pick(item)}>
-        <span>{item.label}</span>
+        <span class="label">{#if item.icon}<Icon name={item.icon} size={11} />{/if}{item.label}</span>
         {#if item.key}<kbd>{item.key}</kbd>{/if}
       </button>
     {/if}
@@ -56,6 +68,11 @@
     font: 13px var(--sans);
     color: var(--fg);
     text-align: left;
+  }
+  .label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   button:hover {
     background: var(--hover);

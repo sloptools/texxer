@@ -11,7 +11,7 @@ const maskDefaults: Record<MaskKind, Partial<Mask>> = {
   volume: { amount: 1, soft: 0.3 },
   grunge: { amount: 0.4, scale: 3, map: 'grunge_1' },
   ao: { amount: 0.45, soft: 0.4 },
-  edges: { amount: 0.3, rough: 0.6 },
+  edges: { amount: 0.3, rough: 0.25 },
   cavity: { amount: 0.5, rough: 0.3 },
   gradient: { amount: 0.3, rough: 0.4 },
   facing: { amount: 0.3, rough: 0.2 },
@@ -24,6 +24,7 @@ export function newMask(kind: MaskKind): Mask {
     invert: false,
     amount: 0.5,
     soft: 0,
+    crisp: 0,
     rough: 0,
     scale: 24,
     axis: 1,
@@ -39,7 +40,7 @@ export function newMask(kind: MaskKind): Mask {
 }
 
 export function newLayer(name: string, color: string, masks: Mask[] = [], extra: Partial<Layer> = {}): Layer {
-  return { id: uid(), name, group: '', color, tone: 0.25, toneScale: 12, grain: 0.06, shine: 0, stampColors: false, glow: false, opacity: 1, blend: 'normal', visible: true, masks, ...extra }
+  return { id: uid(), name, group: '', color, tone: 0.08, toneScale: 12, grain: 0.02, shine: 0, stampColors: false, glow: false, opacity: 1, blend: 'normal', visible: true, masks, ...extra }
 }
 
 // A starter stack that already reads as worn metal, so a fresh model looks like something.

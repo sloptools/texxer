@@ -71,21 +71,31 @@ func (b *BVH) build(start, end int) int {
 
 // Occluded reports whether the ray from o along unit dir d hits a triangle closer than maxDist.
 func (b *BVH) Occluded(o, d Vec, maxDist float64) bool {
+	return b.Hit(o, d, maxDist, true) < maxDist
+}
+
+// Hit is the distance to the nearest triangle along the ray, maxDist if none is
+// closer; any stops at the first one found.
+func (b *BVH) Hit(o, d Vec, maxDist float64, any bool) float64 {
 	inv := Vec{1 / d[0], 1 / d[1], 1 / d[2]}
 	stack := [64]int{0}
 	n := 1
+	near := maxDist
 
 	for n > 0 {
 		n--
 		node := &b.nodes[stack[n]]
-		if !hitBox(o, inv, node.min, node.max, maxDist) {
+		if !hitBox(o, inv, node.min, node.max, near) {
 			continue
 		}
 
 		if node.count > 0 {
 			for _, t := range b.tris[node.start : node.start+node.count] {
-				if hitTri(o, d, t.P, maxDist) {
-					return true
+				if d := hitTri(o, d, t.P, near); d < near {
+					near = d
+					if any {
+						return near
+					}
 				}
 			}
 			continue
@@ -96,7 +106,7 @@ func (b *BVH) Occluded(o, d Vec, maxDist float64) bool {
 		stack[n], stack[n+1] = node.left, node.right
 		n += 2
 	}
-	return false
+	return near
 }
 
 func hitBox(o, inv, lo, hi Vec, maxDist float64) bool {
@@ -115,27 +125,31 @@ func hitBox(o, inv, lo, hi Vec, maxDist float64) bool {
 	return true
 }
 
-// hitTri is the Möller-Trumbore test, two-sided.
-func hitTri(o, d Vec, p [3]Vec, maxDist float64) bool {
+// hitTri is the Möller-Trumbore test, two-sided: the distance to the hit, or
+// maxDist if there is none closer.
+func hitTri(o, d Vec, p [3]Vec, maxDist float64) float64 {
 	e1, e2 := p[1].Sub(p[0]), p[2].Sub(p[0])
 	h := d.Cross(e2)
 	det := e1.Dot(h)
 	if math.Abs(det) < 1e-12 {
-		return false
+		return maxDist
 	}
 
 	f := 1 / det
 	s := o.Sub(p[0])
 	u := f * s.Dot(h)
 	if u < 0 || u > 1 {
-		return false
+		return maxDist
 	}
 	q := s.Cross(e1)
 	v := f * d.Dot(q)
 	if v < 0 || u+v > 1 {
-		return false
+		return maxDist
 	}
 
 	t := f * e2.Dot(q)
-	return t > 1e-6 && t < maxDist
+	if t > 1e-6 && t < maxDist {
+		return t
+	}
+	return maxDist
 }

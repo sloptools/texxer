@@ -69,6 +69,7 @@
         ['V', 'show / hide'],
         ['⌥ click eye', 'solo the layer, again for all'],
         ['⌘G ⇧⌘G', 'into a new folder, dissolve folder'],
+        ['1 – 6', 'add dirt: dust, grime, dirt below, rust edges, streaks, grunge brush'],
         ['⇧M', 'add a material (a folder of layers)'],
         ['C', 'next variant (color, visibility, opacity per layer)'],
         ['drag', 'reorder, drop on a folder to put it in, esc cancels'],
