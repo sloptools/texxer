@@ -14,6 +14,10 @@ export function BridgeConnected() {
   return window['go']['main']['App']['BridgeConnected']();
 }
 
+export function BridgeLayout(arg1, arg2, arg3) {
+  return window['go']['main']['App']['BridgeLayout'](arg1, arg2, arg3);
+}
+
 export function BridgeRequestSync(arg1) {
   return window['go']['main']['App']['BridgeRequestSync'](arg1);
 }

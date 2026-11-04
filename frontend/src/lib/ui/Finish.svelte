@@ -2,6 +2,7 @@
   import * as api from '../../../wailsjs/go/main/App'
   import type { main } from '../../../wailsjs/go/models'
   import { store } from '../store.svelte'
+  import { bridge } from '../bridge.svelte'
   import type { Finish } from '../types'
   import ColorField from './ColorField.svelte'
   import Seg from './Seg.svelte'
@@ -31,18 +32,21 @@
 
 <div class="section">
   <div class="caps">texture <span class="of">{store.project.name}</span> <HelpLink page="uv" /></div>
-  <Seg value={p.size} options={[[128, '128'], [256, '256'], [512, '512'], [1024, '1k']]} onchange={(v) => (p.size = v)} />
+  <Seg value={p.size} options={[[128, '128'], [256, '256'], [512, '512'], [1024, '1k']]} onchange={(v) => ((p.size = v), p.blendUV === 'texxer' && bridge.requestSync())} />
   <div class="row">
     <span>uv</span>
-    <span class="pair">
-      <button class:on={!p.unwrap} title="Paint on the model's own UVs" onclick={() => store.setLayout(0)}>model</button>
-      <button
-        class:on={!!p.unwrap}
-        disabled={!!p.blend && !p.unwrap}
-        title={p.blend ? "Blender's UVs for now; texxer's layout doesn't go back to Blender yet" : 'Let texxer lay the UVs out: cut at hard edges, upright, one texel density'}
-        onclick={() => store.setLayout(p.unwrap || p.size)}>texxer</button
-      >
-    </span>
+    {#if p.blend}
+      <span class="pair">
+        <button class:on={!p.blendUV} title="Paint on Blender's own UVs" onclick={() => bridge.setUV(undefined)}>blender</button>
+        <button class:on={p.blendUV === 'texxer'} title="texxer lays the UVs out on each sync and writes them into Blender, as the UV map 'texxer'" onclick={() => bridge.setUV('texxer')}>texxer</button>
+        <button class:on={p.blendUV === 'locked'} title="Keep texxer's UVs in Blender as they are, so painted masks stay put" onclick={() => bridge.setUV('locked')}>locked</button>
+      </span>
+    {:else}
+      <span class="pair">
+        <button class:on={!p.unwrap} title="Paint on the model's own UVs" onclick={() => store.setLayout(0)}>model</button>
+        <button class:on={!!p.unwrap} title="Let texxer lay the UVs out: cut at hard edges, upright, one texel density" onclick={() => store.setLayout(p.unwrap || p.size)}>texxer</button>
+      </span>
+    {/if}
   </div>
   <Slider label="edge width" bind:value={p.bake.edges} min={0.002} max={0.08} step={0.001} digits={3} def={0.03} />
   <Slider label="cavity width" bind:value={p.bake.cavity} min={0.002} max={0.08} step={0.001} digits={3} def={0.03} />
@@ -57,7 +61,7 @@
       <button class="wide" onclick={() => store.setLayout(p.size)}>lay out for {sizeName(p.size)} <span>now {sizeName(p.unwrap)}</span></button>
     {/if}
   {:else if store.model && store.model.overlap > 0.01}
-    <div class="note warn">{store.model.overlap >= 1 ? 'the model has no UVs' : `${Math.round(store.model.overlap * 100)}% of the UVs overlap`}{p.blend ? ' · unwrap it in Blender' : ''}</div>
+    <div class="note warn">{store.model.overlap >= 1 ? 'the model has no UVs' : `${Math.round(store.model.overlap * 100)}% of the UVs overlap`}{p.blend ? ' · let texxer lay them out' : ''}</div>
   {/if}
 </div>
 

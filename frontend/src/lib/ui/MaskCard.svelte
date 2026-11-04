@@ -2,12 +2,19 @@
   import Icon from '../Icon.svelte'
   import { store } from '../store.svelte'
   import { tools } from '../tools.svelte'
+  import type { GizmoMode } from '../gl/volume'
   import type { Axis, Mask, VolumeShape } from '../types'
   import GrungePicker from './GrungePicker.svelte'
   import Seg from './Seg.svelte'
   import Slider from './Slider.svelte'
 
   let { mask, index, parts, onremove }: { mask: Mask; index: number; parts: string[]; onremove: () => void } = $props()
+
+  const modes: [GizmoMode, string][] = [
+    ['translate', 'move W'],
+    ['rotate', 'turn E'],
+    ['scale', 'size R'],
+  ]
 
   const shapes: [VolumeShape, string][] = [
     ['box', 'box'],
@@ -119,10 +126,13 @@
     {:else if mask.kind === 'volume'}
       <Seg value={mask.volume.shape} options={shapes} onchange={(v) => (mask.volume.shape = v)} />
       <div class="row">
-        <span class="hint">{editing ? 'click the model to put it there · W E R move, turn, size' : 'everything inside it, all around'}</span>
+        <span class="hint">{editing ? 'click the model to put it there · [ ] size' : 'everything inside it, all around'}</span>
         <button class="text" class:on={editing} title="Move it in the view (Q)" onclick={() => (editing ? tools.set('volume') : tools.editVolume(index))}>edit</button>
         <button class="text" class:on={mask.volume.mirror} title="Mirror across X" onclick={() => (mask.volume.mirror = !mask.volume.mirror)}>mirror</button>
       </div>
+      {#if editing}
+        <Seg value={tools.gizmo} options={modes} onchange={(v) => (tools.gizmo = v)} />
+      {/if}
     {/if}
     {#if mask.kind === 'grunge'}
       <GrungePicker value={mask.map} onpick={(name) => (mask.map = name)} />

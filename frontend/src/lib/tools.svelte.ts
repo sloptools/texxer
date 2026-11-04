@@ -121,6 +121,11 @@ class Tools {
   }
 
   resize(factor: number) {
+    const v = this.tool === 'volume' ? this.volume : undefined
+    if (v) {
+      v.volume.size = v.volume.size.map((s) => s * factor) as Vec3
+      return
+    }
     if (this.tool === 'brush' && this.brush.pixel) {
       this.brush.pixels = Math.min(16, Math.max(1, this.brush.pixels + (factor > 1 ? 1 : -1)))
       return

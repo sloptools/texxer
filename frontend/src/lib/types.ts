@@ -177,6 +177,8 @@ export type ModelDoc = Project & {
   // its file is the add-on's copy. Stored like files.
   blend?: string
   target?: string
+  // Its UVs: Blender's own when unset, texxer's laid out on each sync, or texxer's kept.
+  blendUV?: 'texxer' | 'locked'
 }
 
 export type Workspace = {

@@ -6,7 +6,7 @@ import type { ModelDoc } from './types'
 import { link, modelKey, newModel } from './workspace'
 import { newProject } from './project'
 
-type Sync = { blend: string; glb: string; name: string }
+type Sync = { blend: string; glb: string; name: string; prev: string }
 
 const dirName = (path: string) => path.slice(0, path.lastIndexOf('/'))
 
@@ -23,6 +23,7 @@ class Bridge {
   connected = $state<string[]>([])
   private timer = 0
   private sent = ''
+  private layout = ''
 
   start() {
     EventsOn('bridge:sync', (s: Sync) => this.synced(s))
@@ -41,6 +42,7 @@ class Bridge {
     const before = this.connected
     this.connected = await api.BridgeConnected()
     const m = this.model
+    if (m) await this.tellLayout(m)
     // A .blend that just started listening gets the texture as it is.
     if (m && this.isConnected(m) && !before.includes(m.blend!)) this.changed(true)
   }
@@ -58,18 +60,43 @@ class Bridge {
       link(ws)
     }
 
-    if (store.project.id === m.id && store.model) {
-      await store.paint?.flush()
-      store.model = await api.Open(modelKey(m))
-    } else await selectModel(m.id)
+    if (store.project.id !== m.id) await selectModel(m.id)
+    await store.paint?.flush()
+    // Painted masks follow the surface onto the new geometry and UVs.
+    if (s.prev) {
+      try {
+        await api.MovePaint(store.path, s.prev, 0, modelKey(m), 0, store.paintIds())
+      } catch (e) {
+        store.say(String(e))
+      }
+    }
+    store.model = await api.Open(modelKey(m))
     refreshHashes()
     store.say('synced from blender')
   }
 
+  // The add-on reads where the UVs come from on its next sync.
+  private async tellLayout(m: ModelDoc) {
+    const layout = `${m.blend}|${m.blendUV ?? 'blender'}|${m.size}`
+    if (layout === this.layout) return
+    this.layout = layout
+    await api.BridgeLayout(m.blend!, m.blendUV ?? 'blender', m.size)
+  }
+
   // Asks Blender for the objects as they are now.
-  requestSync() {
+  async requestSync() {
     const m = this.model
-    if (m?.blend) api.BridgeRequestSync(m.blend)
+    if (!m?.blend) return
+    await this.tellLayout(m)
+    api.BridgeRequestSync(m.blend)
+  }
+
+  // Where the UVs come from; texxer's need a sync to be laid out.
+  async setUV(uv: ModelDoc['blendUV']) {
+    const m = this.model
+    if (!m) return
+    m.blendUV = uv
+    if (uv === 'texxer') await this.requestSync()
   }
 
   // The texture changed: once it rests, Blender gets it.

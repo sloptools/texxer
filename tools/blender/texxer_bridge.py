@@ -31,7 +31,7 @@ def config_dir():
     return os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
 
 
-def call(path, body=None):
+def call(path, body=None, timeout=0.3):
     """A request to texxer, None when it isn't running."""
     try:
         with open(os.path.join(config_dir(), "texxer", "bridge.json")) as f:
@@ -41,7 +41,7 @@ def call(path, body=None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f"http://127.0.0.1:{info['port']}{path}", data=data, headers={"X-Texxer-Token": info["token"]})
     try:
-        with urllib.request.urlopen(req, timeout=0.3) as res:
+        with urllib.request.urlopen(req, timeout=timeout) as res:
             text = res.read()
             return json.loads(text) if text else {}
     except (OSError, ValueError):
@@ -134,6 +134,13 @@ def update_material(s):
             tex.location = (-400, y)
         links.new(nodes["color"].outputs["Color"], socket(bsdf, "Base Color"))
         mat["texxer"] = 1
+    if "uv" not in nodes:
+        uvmap = nodes.new("ShaderNodeUVMap")
+        uvmap.name = "uv"
+        uvmap.location = (-650, 0)
+        for key in ("color", "emissive"):
+            links.new(uvmap.outputs["UV"], nodes[key].inputs["Vector"])
+    nodes["uv"].uv_map = UV if s.get("uv") in ("texxer", "locked") else ""
 
     bsdf = nodes["bsdf"]
     nodes["color"].image = image(s["color"], nodes["color"].image)
@@ -149,6 +156,13 @@ def update_material(s):
     return mat
 
 
+def set_material_uv(name):
+    """The texxer material reads this UV map; empty for the one Blender renders with."""
+    mat = bpy.data.materials.get(material_name())
+    if mat and mat.node_tree and "uv" in mat.node_tree.nodes:
+        mat.node_tree.nodes["uv"].uv_map = name
+
+
 def on_show(self, context):
     objects = synced_objects(context.scene)
     mat = bpy.data.materials.get(material_name())
@@ -158,13 +172,10 @@ def on_show(self, context):
         restore_materials(objects)
 
 
-def export(context, objects, path):
+def export(context, objects, path, apply=True):
     view_layer = context.view_layer
     selected = [o for o in view_layer.objects if o.select_get()]
     active = view_layer.objects.active
-    mode = context.mode
-    if mode != "OBJECT":
-        bpy.ops.object.mode_set(mode="OBJECT")
     shown = context.scene.texxer_show
     restore_materials(objects)
     try:
@@ -174,7 +185,7 @@ def export(context, objects, path):
             filepath=path,
             export_format="GLB",
             use_selection=True,
-            export_apply=True,
+            export_apply=apply,
             export_materials="EXPORT",
             export_image_format="NONE",
             export_animations=False,
@@ -188,8 +199,66 @@ def export(context, objects, path):
         mat = bpy.data.materials.get(material_name())
         if shown and mat:
             show_material(objects, mat)
-        if mode == "EDIT_MESH" and active:
-            bpy.ops.object.mode_set(mode="EDIT")
+
+
+CORNERS = "texxer corners"
+UV = "texxer"
+
+
+def meshes(objects):
+    """Each object's mesh once, as objects can share one."""
+    seen = {}
+    for o in objects:
+        seen.setdefault(o.data.name, o.data)
+    return seen.values()
+
+
+def unwrap(context, objects, path, size):
+    """texxer lays out the objects without their modifiers, which then carry the
+    UVs through as they do Blender's; they land in the UV map "texxer". The
+    corners go there numbered, so the UVs come back to the right loops."""
+    sets = {}
+    for me in meshes(objects):
+        layer = me.uv_layers.new(name=CORNERS)
+        if layer is None:
+            return f"{me.name} has no room for another UV map"
+        ids = [0.0] * (2 * len(me.loops))
+        ids[0::2] = [float(i) for i in range(len(me.loops))]
+        layer.data.foreach_set("uv", ids)
+    for o in objects:
+        sets[o.name] = o.data.uv_layers.find(CORNERS)
+    try:
+        export(context, objects, path, apply=False)
+    finally:
+        for me in meshes(objects):
+            me.uv_layers.remove(me.uv_layers[CORNERS])
+
+    uvs = call("/unwrap", {"glb": path, "sets": sets, "size": size}, timeout=120)
+    if uvs is None:
+        return "texxer could not lay out the UVs"
+    for o in objects:
+        me = o.data
+        data = uvs.get(o.name)
+        if not data:
+            continue
+        layer = me.uv_layers.get(UV) or me.uv_layers.new(name=UV)
+        if layer is None:
+            return f"{me.name} has no room for another UV map"
+        n = 2 * len(me.loops)
+        layer.data.foreach_set("uv", (data + [0.0] * n)[:n])
+    return None
+
+
+def uv_sets(objects, uv):
+    """The UV set texxer paints on, per object: texxer's map, or Blender's for render."""
+    out = {}
+    for o in objects:
+        layers = o.data.uv_layers
+        at = layers.find(UV) if uv in ("texxer", "locked") else -1
+        if at < 0:
+            at = next((i for i, l in enumerate(layers) if l.active_render), 0)
+        out[o.name] = at
+    return out
 
 
 def sync(context):
@@ -197,6 +266,17 @@ def sync(context):
     blend = blend_path()
     if not blend:
         return "save the .blend first"
+    mode = context.mode
+    if mode != "OBJECT":
+        bpy.ops.object.mode_set(mode="OBJECT")
+    try:
+        return send(context, blend)
+    finally:
+        if mode == "EDIT_MESH" and context.view_layer.objects.active:
+            bpy.ops.object.mode_set(mode="EDIT")
+
+
+def send(context, blend):
     scene = context.scene
     objects = synced_objects(scene)
     if not objects:
@@ -207,10 +287,22 @@ def sync(context):
     if not objects:
         return "no mesh objects"
 
-    path = os.path.join(os.path.dirname(blend), ".texxer", blend_name() + ".glb")
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    export(context, objects, path)
-    if call("/sync", {"blend": blend, "glb": path, "name": blend_name()}) is None:
+    s = call("/state?blend=" + urllib.parse.quote(blend))
+    if s is None:
+        return "texxer is not running"
+    uv = s.get("uv") or "blender"
+    base = os.path.join(os.path.dirname(blend), ".texxer", blend_name())
+    os.makedirs(os.path.dirname(base), exist_ok=True)
+    if uv == "texxer":
+        err = unwrap(context, objects, base + ".corners.glb", s.get("size") or 512)
+        if err:
+            return err
+    set_material_uv(UV if uv in ("texxer", "locked") else "")
+
+    written = base + ".sync.glb"
+    export(context, objects, written)
+    body = {"blend": blend, "glb": base + ".glb", "name": blend_name(), "written": written, "uvSets": uv_sets(objects, uv)}
+    if call("/sync", body, timeout=10) is None:
         return "texxer is not running"
     return None
 

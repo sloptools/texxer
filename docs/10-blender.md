@@ -11,7 +11,12 @@ texxer opens the objects as a model, in the open project or a new one beside the
 - **Objects**: the selected ones on the first sync, all visible meshes if none are. **use selection** sets them anew. They share one texture; each object is a part.
 - **Material**: the objects show one material, `texxer <name>`, with the texture (nearest pixels, no shine) and the emissive map at the export's strength. Their own materials stay remembered on them and come back with **show texture** off. texxer still gets their own, for parts and model colors.
 - **Textures** go to `textures/` beside the `.blend` (the folder on the model changes it), the same PNGs the export writes, so Blender links them and its own export takes them along.
-- **UVs**: Blender's, for now. Unwrap in Blender when they overlap.
+- **UVs** (texture panel, **uv**):
+  - **blender**: the map Blender renders with.
+  - **texxer**: each sync lays the objects out anew, without their modifiers, into the UV map `texxer`; the modifiers carry it through as they do Blender's (bevels get thin strips at the chart edges, mirrored halves share their UVs). The texxer material reads that map.
+  - **locked**: keeps the `texxer` map as it is, once the model stands.
+
+  Painted masks follow the surface onto new geometry and UVs on each sync, a little softer each time; locked UVs keep them sharp.
 
 ## Export
 

@@ -24,4 +24,4 @@ A mask decides where a layer shows. With several masks, the layer shows where al
 
 Use parts or islands for zones, ao, edges and cavity for wear. Volume with grunge puts dirt exactly where you want it.
 
-**Q** edits the layer's volume, adding one if needed: click the model to put it there, drag it over the surface, or use the gizmo. **W E R** move, turn and size, **X** mirrors it across x. Prefer hard cuts: soft masks read as smears once crunched.
+**Q** edits the layer's volume, adding one if needed: click the model to put it there, drag it over the surface, or use the gizmo. **W E R** (or the buttons on the mask) move, turn and size, **[ ]** size it all at once, **X** mirrors it across x. Prefer hard cuts: soft masks read as smears once crunched.

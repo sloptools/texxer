@@ -8,6 +8,8 @@ export function AddPhotos(arg1:string,arg2:string,arg3:Array<string>,arg4:Array<
 
 export function BridgeConnected():Promise<Array<string>>;
 
+export function BridgeLayout(arg1:string,arg2:string,arg3:number):Promise<void>;
+
 export function BridgeRequestSync(arg1:string):Promise<void>;
 
 export function BridgeTexture(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:number):Promise<void>;
