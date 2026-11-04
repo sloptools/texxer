@@ -447,7 +447,8 @@ export class Compositor {
       u['uGrunge' + i].value = m.kind === 'grunge' ? this.grunge(m.map) : null
 
       const list = m.kind === 'stamps' ? expand(m.stamps, this.mirrorX).slice(0, maxStamps - stamps) : []
-      u.uC.value[i].set(stamps, list.length, m.kind === 'volume' ? shapeIndex[m.volume.shape] : m.crisp, m.volume.mirror ? 1 : 0)
+      if (m.kind === 'stamps') u.uC.value[i].set(stamps, list.length, m.depth ?? 0, m.bevel ?? 0.06)
+      else u.uC.value[i].set(stamps, list.length, m.kind === 'volume' ? shapeIndex[m.volume.shape] : m.crisp, m.volume.mirror ? 1 : 0)
       for (const s of list) this.setStamp(stamps++, s)
       if (m.kind === 'volume') u.uV.value[i].copy(this.volumeMatrix(m.volume))
     })

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { imageURL } from '../assets'
   import { colorDecals, reliefDecals } from '../decals'
+  import { newLayer, newMask } from '../project'
   import { shapes } from '../shapes'
   import { store } from '../store.svelte'
   import { tools } from '../tools.svelte'
@@ -43,8 +44,26 @@
     if (aspect !== tools.stamp.aspect) tools.setAspect(aspect)
   })
 
+  const stampMask = $derived(store.layer?.masks.find((m) => m.kind === 'stamps'))
+  const depths: [number, string][] = [
+    [0, 'flat'],
+    [1, 'sunk'],
+    [-1, 'raised'],
+  ]
+
   const textShape = $derived('text:' + tools.text)
   const pixelShape = $derived('pixel:' + tools.text)
+
+  // Relief and color decals need a layer that takes the stamps' colors, or they come
+  // out as plain squares; ⌥ swaps the picked stamp's shape instead.
+  function useDecal(shape: string, e: MouseEvent) {
+    const blend = shape.startsWith('relief:') ? 'relief' : 'normal'
+    const l = store.layer
+    if (!e.altKey && (!l || !l.stampColors || l.blend !== blend)) {
+      store.addLayer(newLayer(blend === 'relief' ? 'relief' : 'decals', '#808080', [newMask('stamps')], { stampColors: true, blend, tone: 0, grain: 0 }))
+    }
+    tools.setShape(shape, undefined, e.altKey)
+  }
 
   async function useImage(name: string, swap = false) {
     const url = await imageURL(`/stamp?name=${encodeURIComponent(name)}`)
@@ -94,6 +113,9 @@
 {:else if tools.tool === 'stamp'}
   <div class="section">
     <div class="caps">{tools.picked ? 'stamp' : 'new stamp'} · {store.layer?.name} <HelpLink page="brush-stamps" /></div>
+    {#if stampMask}
+      <Seg value={stampMask.depth ?? 0} options={depths} onchange={(v) => stampMask && (stampMask.depth = v)} />
+    {/if}
     <div class="shapes">
       {#each shapes as shape}
         <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => tools.setShape(shape, undefined, e.altKey)} />
@@ -102,13 +124,13 @@
     <div class="caps sub">relief · relief blend, colors from stamps</div>
     <div class="shapes">
       {#each reliefDecals as shape}
-        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => tools.setShape(shape, undefined, e.altKey)} />
+        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => useDecal(shape, e)} />
       {/each}
     </div>
     <div class="caps sub">decals · colors from stamps</div>
     <div class="shapes">
       {#each colorDecals as shape}
-        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => tools.setShape(shape, undefined, e.altKey)} />
+        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => useDecal(shape, e)} />
       {/each}
     </div>
     <div class="caps sub">images</div>

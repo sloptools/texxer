@@ -40,6 +40,12 @@
     [2, 'front'],
   ]
 
+  const depths: [number, string][] = [
+    [0, 'flat'],
+    [1, 'sunk'],
+    [-1, 'raised'],
+  ]
+
   const widths: [number, string][] = [
     [0, 'fade'],
     [1, '1 px'],
@@ -106,6 +112,10 @@
       <p class="hint">paint it with the brush (B)</p>
     {:else if mask.kind === 'stamps'}
       <p class="hint">{mask.stamps.length} stamps · place them with the stamp tool (S)</p>
+      <Seg value={mask.depth ?? 0} options={depths} onchange={(v) => (mask.depth = v)} />
+      {#if mask.depth}
+        <Slider label="bevel" bind:value={() => mask.bevel ?? 0.06, (v) => (mask.bevel = v)} min={0.01} max={0.25} step={0.005} digits={3} def={0.06} />
+      {/if}
     {:else if mask.kind === 'volume'}
       <Seg value={mask.volume.shape} options={shapes} onchange={(v) => (mask.volume.shape = v)} />
       <div class="row">

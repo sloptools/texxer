@@ -47,6 +47,10 @@ export type Mask = {
   volume: Volume
   // A built-in grunge map, projected from three sides at `scale` repeats per model size.
   map: string
+  // Stamps shaded as sunk in (1) or raised (-1), lit from their top left, with a bevel
+  // this part of their width.
+  depth?: number
+  bevel?: number
 }
 
 export type ColorSource = 'layer' | 'stamps' | 'paint' | 'model'

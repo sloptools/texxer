@@ -166,6 +166,33 @@ float grunge(int i, vec3 p, vec3 n) {
 // The color under the strongest stamp, for layers that take their color from stamps.
 vec3 gStampRGB = vec3(0.0);
 float gStampA = 0.0;
+// Light and shade of stamps with depth, added to the layer's color.
+float gDepth = 0.0;
+
+float cellAlpha(vec2 origin, float u, float w) {
+  if (abs(u) > 1.0 || abs(w) > 1.0) return 0.0;
+  vec2 local = vec2(u * 0.5 + 0.5, 0.5 - w * 0.5) * (1.0 - 2.0 * uAtlasInset) + uAtlasInset;
+  return texture(uAtlas, (origin + local) / uAtlasGrid).a;
+}
+
+// Walls of a stamp sunk into the surface, or standing out of it, lit by the baked
+// key light (l, in the stamp's u and w): the wall facing it is lit, the other in
+// shade, in two steps. A sunk floor is darker, and the near wall's shadow falls
+// further onto it.
+float depthShade(vec2 origin, float u, float w, float mode, vec2 l) {
+  float lit = 0.0;
+  float shade = 0.0;
+  for (int k = 1; k <= 2; k++) {
+    vec2 d = l * float(k) * 0.5;
+    vec2 far = mode > 0.0 ? d * 2.0 : d;
+    shade += 1.0 - cellAlpha(origin, u + far.x, w + far.y);
+    lit += 1.0 - cellAlpha(origin, u - d.x, w - d.y);
+  }
+  lit *= 0.5;
+  shade *= 0.5;
+  if (mode > 0.0) return 0.32 * lit - 0.3 * shade - 0.16;
+  return 0.3 * shade - 0.32 * lit + 0.04;
+}
 
 float stamps(int i, vec3 p, vec3 n) {
   int first = int(uC[i].x);
@@ -190,6 +217,14 @@ float stamps(int i, vec3 p, vec3 n) {
     if (s.a > gStampA) {
       gStampA = s.a;
       gStampRGB = s.rgb;
+      if (uC[i].z != 0.0) {
+        vec3 sw = cross(sn, st);
+        vec2 l = vec2(dot(uL, st), dot(uL, sw));
+        l = length(l) < 0.15 ? vec2(-0.7, 0.7) : normalize(l);
+        // The bevel as a part of the width, the same across both axes.
+        float b = uC[i].w * 2.0;
+        gDepth = depthShade(origin, u, w, uC[i].z, l * vec2(b, b * uSC[j].w / uST[j].w));
+      }
     }
   }
   return v;
@@ -321,6 +356,7 @@ void main() {
     if (p.a > 0.0) c = clamp(p.rgb / p.a, 0.0, 1.0);
   }
   if (uStampColors == 1 && gStampA > 0.0) c = gStampRGB;
+  c = clamp(c + gDepth, 0.0, 1.0);
   if (uFromSource == 1) c = texelFetch(uSource, t, 0).rgb;
   float v = (fbm(pos.xyz * uToneScale + uSeed) - 0.5) * 2.0 * uTone;
   v += (hash(vec3(vec2(t), uSeed)) - 0.5) * 2.0 * uGrain;
