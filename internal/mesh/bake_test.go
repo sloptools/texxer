@@ -74,3 +74,16 @@ func TestOcclusionInsideBox(t *testing.T) {
 		t.Error("ray away from the cube should miss")
 	}
 }
+
+func TestDripsBelowEdges(t *testing.T) {
+	maps := Bake(cube(), BakeOptions{W: 48, H: 32, EdgeWidth: 0.05, CavityWidth: 0.05, EdgeAngle: 30, DripLength: 0.5})
+
+	// The front face runs from y 0 in row 0 to y 1 in row 15.
+	top, bottom := maps.Drips[15*48+8], maps.Drips[0*48+8]
+	if top < 0.8 || bottom != 0 {
+		t.Errorf("front face: drips %v below the top edge, %v at the bottom", top, bottom)
+	}
+	if v := maps.Drips[(16+8)*48+16+8]; v != 0 {
+		t.Errorf("top face drips %v", v)
+	}
+}

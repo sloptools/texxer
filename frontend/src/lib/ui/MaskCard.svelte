@@ -1,9 +1,9 @@
 <script lang="ts">
   import Icon from '../Icon.svelte'
-  import { imageURL } from '../assets'
   import { store } from '../store.svelte'
   import { tools } from '../tools.svelte'
   import type { Axis, Mask, VolumeShape } from '../types'
+  import GrungePicker from './GrungePicker.svelte'
   import Seg from './Seg.svelte'
   import Slider from './Slider.svelte'
 
@@ -110,15 +110,7 @@
       </div>
     {/if}
     {#if mask.kind === 'grunge'}
-      <div class="maps">
-        {#each store.grungeMaps as name}
-          <button class="map" class:on={mask.map === name} title={name} onclick={() => (mask.map = name)}>
-            {#await imageURL(`/grunge?name=${encodeURIComponent(name)}`) then url}
-              <img src={url} alt={name} />
-            {/await}
-          </button>
-        {/each}
-      </div>
+      <GrungePicker value={mask.map} onpick={(name) => (mask.map = name)} />
     {/if}
     {#if mask.kind === 'edges' || mask.kind === 'cavity'}
       <Seg value={mask.crisp} options={widths} onchange={setCrisp} />
@@ -241,32 +233,6 @@
   .part.on {
     border-color: var(--accent);
     color: var(--strong);
-  }
-
-  .maps {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 3px;
-    max-height: 132px;
-    overflow-y: auto;
-  }
-  .map {
-    aspect-ratio: 1;
-    padding: 0;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    background: var(--bg);
-  }
-  .map.on {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
-  }
-  .map img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    image-rendering: pixelated;
   }
 
   .row {

@@ -17,6 +17,7 @@ A mask decides where a layer shows. With several masks, the layer shows where al
 | ao | the surface is occluded |
 | edges | convex edges, for wear. **1–3 px** gives crisp lines that many texels wide |
 | cavity | creases, gaps and corners where surfaces meet, for grime. **1–3 px** as for edges |
+| drips | below edges, running down walls. **rough** varies their length |
 | gradient | rises from one side: below, above, left, right, back, front (as in a front view) |
 | facing | the surface faces a direction |
 | noise | value noise |

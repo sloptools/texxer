@@ -7,7 +7,7 @@ void main() {
 export const maxMasks = 4
 export const maxStamps = 96
 
-export const kindIndex = { parts: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, facing: 5, noise: 6, paint: 7, stamps: 8, grunge: 9, islands: 10, volume: 11 } as const
+export const kindIndex = { parts: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, facing: 5, noise: 6, paint: 7, stamps: 8, grunge: 9, islands: 10, volume: 11, drips: 12 } as const
 export const shapeIndex = { box: 0, cylinder: 1, sphere: 2 } as const
 
 // Island ids a mask can select; smaller ones are too small to matter.
@@ -233,6 +233,8 @@ float field(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   if (k == 8) return stamps(i, pos.xyz, n);
   if (k == 9) return grunge(i, pos.xyz, n);
   if (k == 11) return volume(i, pos.xyz);
+  // Baked onto the coverage, which is 0 or 1.
+  if (k == 12) return max(geo.a - 1.0, 0.0);
   if (k == 1) return 1.0 - geo.r;
   if (k == 2) return edgeField(i, t, geo.g, uWidths.x, pos.xyz);
   if (k == 3) return edgeField(i, t, geo.b, uWidths.y, pos.xyz);
@@ -257,7 +259,9 @@ float mask(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
     float f = field(i, t, geo, pos, n);
     float rough = uA[i].z;
     if (rough > 0.0 && uKind[i] != 6 && uKind[i] != 9) {
-      f += (fbm(pos.xyz * uA[i].w + uB[i].y * 2.91 + 5.3) - 0.5) * rough;
+      // Drips get noise stretched downwards, so each runs its own length.
+      vec3 q = uKind[i] == 12 ? pos.xyz * vec3(1.0, 0.06, 1.0) : pos.xyz;
+      f += (fbm(q * uA[i].w + uB[i].y * 2.91 + 5.3) - 0.5) * rough;
     }
     float cut = 1.0 - uA[i].x * 1.0001;
     float soft = uA[i].y * 0.5 + 0.0001;

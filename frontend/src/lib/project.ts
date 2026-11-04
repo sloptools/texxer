@@ -16,6 +16,7 @@ const maskDefaults: Record<MaskKind, Partial<Mask>> = {
   gradient: { amount: 0.3, rough: 0.4 },
   facing: { amount: 0.3, rough: 0.2 },
   noise: { amount: 0.4, scale: 8 },
+  drips: { amount: 0.5, rough: 0.5 },
 }
 
 export function newMask(kind: MaskKind): Mask {

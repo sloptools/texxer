@@ -354,6 +354,10 @@ export class Stage {
     return new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion)
   }
 
+  get cameraQuaternion() {
+    return this.camera.quaternion
+  }
+
   get cameraPosition() {
     return this.camera.position.clone()
   }

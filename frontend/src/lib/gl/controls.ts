@@ -8,6 +8,12 @@ type GestureEvent = UIEvent & { scale: number; clientX: number; clientY: number 
 const orbitSpeed = 0.006
 const dragSpeed = 0.008
 const maxPitch = Math.PI / 2 - 0.01
+const perspFov = 35
+// Ortho is a narrow lens from far away, so picking and tools work as they are.
+const orthoFov = 1.5
+
+const onAxis = (yaw: number, pitch: number) =>
+  Math.abs(Math.abs(pitch) - 1.55) < 0.01 || (Math.abs(pitch) < 0.01 && Math.abs(yaw - Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2)) < 0.01)
 
 // Trackpad first: two fingers orbit, shift pans, pinch zooms towards the cursor,
 // option turns the key light. Dragging orbits too, for a mouse.
@@ -15,9 +21,14 @@ export class TrackpadControls {
   target = new THREE.Vector3()
   yaw = 0.8
   pitch = 0.35
+  // How far the camera would be with the normal lens; ortho moves it out to frame the same.
   dist = 3
+  fov = perspFov
+  // An axis view turned ortho on, and orbiting turns it off again, as in Blender.
+  ortho = false
+  private autoOrtho = false
 
-  private goal = { target: new THREE.Vector3(), yaw: 0.8, pitch: 0.35, dist: 3 }
+  private goal = { target: new THREE.Vector3(), yaw: 0.8, pitch: 0.35, dist: 3, fov: perspFov }
   private radius = 1
   private gestureScale = 1
   private drag: { x: number; y: number; moved: boolean; mode: 'orbit' | 'pan' | 'light' } | undefined
@@ -99,12 +110,13 @@ export class TrackpadControls {
   }
 
   orbit(dYaw: number, dPitch: number) {
+    if (this.autoOrtho) this.setOrtho(false)
     this.goal.yaw += dYaw
     this.goal.pitch = THREE.MathUtils.clamp(this.goal.pitch - dPitch, -maxPitch, maxPitch)
   }
 
   pan(dx: number, dy: number) {
-    const perPixel = (2 * this.goal.dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / this.el.clientHeight
+    const perPixel = (2 * this.goal.dist * Math.tan(THREE.MathUtils.degToRad(perspFov / 2))) / this.el.clientHeight
     const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0)
     const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1)
     this.goal.target.addScaledVector(right, dx * perPixel).addScaledVector(up, -dy * perPixel)
@@ -122,10 +134,7 @@ export class TrackpadControls {
     const sphere = box.getBoundingSphere(new THREE.Sphere())
     this.radius = sphere.radius
     this.goal.target.copy(sphere.center)
-    this.goal.dist = sphere.radius / Math.sin(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 1.1
-    this.camera.near = sphere.radius / 200
-    this.camera.far = sphere.radius * 200
-    this.camera.updateProjectionMatrix()
+    this.goal.dist = sphere.radius / Math.sin(THREE.MathUtils.degToRad(perspFov / 2)) * 1.1
   }
 
   focus(point: THREE.Vector3) {
@@ -133,11 +142,27 @@ export class TrackpadControls {
     this.goal.dist = Math.min(this.goal.dist, this.radius * 1.2)
   }
 
-  view(yaw: number, pitch: number) {
+  // Views along an axis go ortho.
+  view(yaw: number, pitch: number, ortho = onAxis(yaw, pitch)) {
     // Turn the short way round.
     const turns = Math.round((this.goal.yaw - yaw) / (Math.PI * 2))
     this.goal.yaw = yaw + turns * Math.PI * 2
     this.goal.pitch = pitch
+    if (ortho && !this.ortho) {
+      this.setOrtho(true)
+      this.autoOrtho = true
+    } else if (!ortho && this.autoOrtho) this.setOrtho(false)
+  }
+
+  setOrtho(on: boolean) {
+    this.ortho = on
+    this.autoOrtho = false
+    this.goal.fov = on ? orthoFov : perspFov
+  }
+
+  // Whether the camera is headed for a view along an axis.
+  get onAxis() {
+    return onAxis(this.goal.yaw, this.goal.pitch)
   }
 
   // Snaps to the goal on the first frame, then eases towards it.
@@ -146,10 +171,21 @@ export class TrackpadControls {
     this.yaw += (this.goal.yaw - this.yaw) * k
     this.pitch += (this.goal.pitch - this.pitch) * k
     this.dist += (this.goal.dist - this.dist) * k
+    this.fov += (this.goal.fov - this.fov) * k
     this.target.lerp(this.goal.target, k)
 
+    // Same framing at any lens: the camera backs off as the lens narrows.
+    const far = this.dist * (Math.tan(THREE.MathUtils.degToRad(perspFov / 2)) / Math.tan(THREE.MathUtils.degToRad(this.fov / 2)))
+    const near = Math.max(this.radius / 200, far - this.radius * 4)
+    if (this.camera.fov !== this.fov || this.camera.near !== near) {
+      this.camera.fov = this.fov
+      this.camera.near = near
+      this.camera.far = far + this.radius * 200
+      this.camera.updateProjectionMatrix()
+    }
+
     const c = Math.cos(this.pitch)
-    this.camera.position.set(Math.sin(this.yaw) * c, Math.sin(this.pitch), Math.cos(this.yaw) * c).multiplyScalar(this.dist).add(this.target)
+    this.camera.position.set(Math.sin(this.yaw) * c, Math.sin(this.pitch), Math.cos(this.yaw) * c).multiplyScalar(far).add(this.target)
     this.camera.lookAt(this.target)
   }
 

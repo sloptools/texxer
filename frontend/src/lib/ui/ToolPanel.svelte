@@ -4,6 +4,7 @@
   import { shapes } from '../shapes'
   import { store } from '../store.svelte'
   import { tools } from '../tools.svelte'
+  import GrungePicker from './GrungePicker.svelte'
   import ShapeTile from './ShapeTile.svelte'
   import Slider from './Slider.svelte'
   import HelpLink from './HelpLink.svelte'
@@ -47,6 +48,11 @@
     <Slider label="hardness" bind:value={tools.brush.hard} def={0.7} />
     <Slider label="strength" bind:value={tools.brush.strength} def={1} />
     <Slider label="grit" bind:value={tools.brush.grit} max={0.9} def={0} />
+    <div class="caps sub">grunge · the brush reveals it, more with strength</div>
+    <GrungePicker value={tools.brush.map} onpick={(name) => (tools.brush.map = name)} none />
+    {#if tools.brush.map}
+      <Slider label="scale" bind:value={tools.brush.mapScale} min={1} max={12} step={0.5} digits={1} def={3} />
+    {/if}
     <p class="hint">paints into the layer's paint mask · [ ] size · ⌥ erases · ⇧click draws a line · grit breaks the brush up for rust and dirt</p>
   </div>
 {:else if tools.tool === 'stamp'}

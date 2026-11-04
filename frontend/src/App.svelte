@@ -168,6 +168,9 @@
         default:
           handled = false
       }
+    } else if (e.shiftKey && /^Digit[1-7]$/.test(e.code)) {
+      // ⇧ digits, as the plain ones are camera views.
+      addDirt(dirt[Number(e.code.slice(5)) - 1])
     } else {
       switch (e.key) {
         case 'n':
@@ -239,14 +242,6 @@
           break
         case 'PageDown':
           cycleModel(1)
-          break
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-          addDirt(dirt[Number(e.key) - 1])
           break
         case 'F1':
           store.openDocs(store.helpPage)

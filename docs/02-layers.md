@@ -27,7 +27,7 @@ Click a folder to give it a **zone**: with **pick** on, clicks in the view add s
 
 ## Dirt
 
-**1** to **6** add one dirt layer above the selected one: dust on top, grime in cavities, dirt from below, rust on edges, streaks on walls, and a grunge brush that paints dirt with the brush (B). They are also at the top of the material menu (**⇧M**).
+**⇧1** to **⇧7** add dirt above the selected layer: dust on top, grime in cavities, dirt from below, rust on edges, drips below edges, chips with rust (two layers sharing one map), and a grunge brush that paints dirt with the brush (B). They are also at the top of the material menu (**⇧M**).
 
 ## Materials
 

@@ -11,6 +11,7 @@ Paints into the layer's paint mask. **[ ]** size, **⌥** or **E** erase, **⇧c
 - **hardness**: how far in from the rim the brush fades.
 - **strength**: the most a stroke paints; painting over it doesn't go further.
 - **grit**: breaks the brush up with noise that sits on the model, for rust, dirt and chips.
+- **grunge**: the brush reveals a grunge map, as grunge masks project it; more strength shows more of it.
 
 The paint mask's **amount** scales what is painted; 0.5 keeps it as it is.
 

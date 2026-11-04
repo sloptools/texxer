@@ -9,7 +9,7 @@ export type Picked = { mask: number; index: number }
 
 class Tools {
   tool = $state<Tool>('nav')
-  brush = $state({ size: 0.03, hard: 0.7, strength: 1, grit: 0, erase: false })
+  brush = $state({ size: 0.03, hard: 0.7, strength: 1, grit: 0, erase: false, map: '', mapScale: 3 })
   // Settings for the next stamp; a picked stamp shares them while it's picked.
   stamp = $state({ shape: 'circle', size: 0.12, rot: 0, aspect: 1 })
   // Spacing of stamp rows, in stamp widths.

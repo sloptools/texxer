@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ViewGizmo from './ui/ViewGizmo.svelte'
   import { onMount, untrack } from 'svelte'
   import * as api from '../../wailsjs/go/main/App'
   import { Compositor, loadBake } from './gl/compositor'
@@ -327,6 +328,9 @@
         c.view(0.8, 0.35)
         stage.frame()
         break
+      case '5':
+        c.setOrtho(!c.ortho)
+        break
       case 'f': {
         const hit = hoverPoint && stage.hit(hoverPoint.x, hoverPoint.y)
         if (hit) c.focus(hit.point)
@@ -343,6 +347,9 @@
 <svelte:window {onkeydown} />
 
 <div class="viewport" class:brush={tools.tool === 'brush'} bind:this={container}></div>
+{#if stage && !store.flat && store.model}
+  <ViewGizmo {stage} />
+{/if}
 
 <style>
   .viewport {

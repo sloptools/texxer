@@ -402,7 +402,7 @@ export class Compositor {
     })
   }
 
-  private grunge(name: string): THREE.Texture {
+  grunge(name: string): THREE.Texture {
     let t = this.grunges.get(name)
     if (!t) {
       const texture = new THREE.Texture()

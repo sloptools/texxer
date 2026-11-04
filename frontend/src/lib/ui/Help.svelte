@@ -20,7 +20,8 @@
     [
       'view',
       [
-        ['1 3 7', 'front, side, top (⌃ opposite)'],
+        ['1 3 7', 'front, side, top (⌃ opposite), ortho'],
+        ['5', 'ortho or perspective'],
         ['0', 'reset view'],
         ['F', 'focus point under cursor'],
         ['L U I M', 'lit, unlit, in game, mask'],
@@ -69,7 +70,7 @@
         ['V', 'show / hide'],
         ['⌥ click eye', 'solo the layer, again for all'],
         ['⌘G ⇧⌘G', 'into a new folder, dissolve folder'],
-        ['1 – 6', 'add dirt: dust, grime, dirt below, rust edges, streaks, grunge brush'],
+        ['⇧1 – ⇧7', 'add dirt: dust, grime, dirt below, rust edges, drips, chips with rust, grunge brush'],
         ['⇧M', 'add a material (a folder of layers)'],
         ['C', 'next variant (color, visibility, opacity per layer)'],
         ['drag', 'reorder, drop on a folder to put it in, esc cancels'],

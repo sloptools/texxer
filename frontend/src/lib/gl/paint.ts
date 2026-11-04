@@ -6,7 +6,8 @@ import { quadVertex } from './shaders'
 // A brush dab: a sphere in model space, painted into every texel whose
 // position lies inside it and whose surface faces the camera. Hardness sets how far
 // in from the rim it fades, strength the most it paints, grit breaks it up with
-// noise that sits on the model, so dabs join into one pattern.
+// noise that sits on the model, so dabs join into one pattern. With a grunge map
+// the dab reveals the map, more of it the stronger the dab.
 const dabFragment = /* glsl */ `
 precision highp float;
 
@@ -19,6 +20,9 @@ uniform float uHard;
 uniform float uStrength;
 uniform float uGrit;
 uniform int uErase;
+uniform sampler2D uMap;
+uniform float uMapScale;
+uniform int uUseMap;
 
 out vec4 outColor;
 
@@ -48,6 +52,14 @@ void main() {
     v *= smoothstep(uGrit - 0.08, uGrit + 0.08, g);
   }
   v *= uStrength;
+  if (uUseMap == 1) {
+    // As the grunge masks project it, so painted dirt matches them.
+    vec3 w = pow(abs(n), vec3(4.0));
+    w /= w.x + w.y + w.z;
+    vec3 q = p * uMapScale;
+    float g = texture(uMap, vec2(q.z, -q.y)).r * w.x + texture(uMap, q.xz).r * w.y + texture(uMap, vec2(q.x, -q.y)).r * w.z;
+    v = v > 0.0 ? smoothstep(1.0 - v - 0.04, 1.0 - v + 0.04, g) : 0.0;
+  }
   outColor = vec4(uErase == 1 ? 1.0 - v : v);
 }
 `
@@ -61,7 +73,18 @@ void main() {
 }
 `
 
-export type Dab = { center: THREE.Vector3; view: THREE.Vector3; radius: number; hard: number; strength: number; grit: number; erase: boolean }
+export type Dab = {
+  center: THREE.Vector3
+  view: THREE.Vector3
+  radius: number
+  hard: number
+  strength: number
+  grit: number
+  erase: boolean
+  // A grunge map the dab reveals, at repeats per model size.
+  map?: THREE.Texture
+  mapScale?: number
+}
 
 // Painted masks, one render target each, kept at the bake's size.
 export class PaintStore {
@@ -96,6 +119,9 @@ export class PaintStore {
         uStrength: { value: 1 },
         uGrit: { value: 0 },
         uErase: { value: 0 },
+        uMap: { value: null },
+        uMapScale: { value: 3 },
+        uUseMap: { value: 0 },
       },
       blending: THREE.CustomBlending,
       blendSrc: THREE.OneFactor,
@@ -172,6 +198,9 @@ export class PaintStore {
     u.uStrength.value = d.strength
     u.uGrit.value = d.grit
     u.uErase.value = d.erase ? 1 : 0
+    u.uMap.value = d.map ?? null
+    u.uMapScale.value = d.mapScale ?? 3
+    u.uUseMap.value = d.map ? 1 : 0
     this.dabMat.blendEquation = d.erase ? THREE.MinEquation : THREE.MaxEquation
     this.draw(this.dabMat, t)
     this.dirty.add(id)

@@ -17,6 +17,8 @@ type BakeOptions struct {
 	EdgeWidth   float64
 	CavityWidth float64
 	EdgeAngle   float64
+	// DripLength is how far drips run down from edges, a fraction of the diagonal.
+	DripLength float64
 	// AORes caps the resolution AO is traced at; it is soft, so a lower
 	// resolution looks the same and is much faster. 0 traces at full size.
 	AORes int
@@ -37,7 +39,7 @@ type BakeOptions struct {
 // Maps are baked per texel. Gray maps hold one value per texel, Normal three.
 type Maps struct {
 	W, H                         int
-	AO, Edges, Cavity, Up        []float32
+	AO, Edges, Cavity, Up, Drips []float32
 	Height, Part, Selected, Mask []float32
 	Normal                       []float32
 	// Position holds world positions as (p - Min) / diagonal, three per texel,
@@ -71,6 +73,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	edges := sharpEdges(m.Tris, o.EdgeAngle, diag*1e-5)
 	reach := diag * max(o.EdgeWidth, o.CavityWidth)
 	grid := newEdgeGrid(edges, reach)
+	drips := dripGrid(edges, o.DripLength*diag)
 
 	selected := map[int]bool{}
 	for i, name := range m.Parts {
@@ -78,8 +81,8 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	}
 
 	n := o.W * o.H
-	sum := struct{ ao, edges, cavity, up, height, part, sel, count []float64 }{
-		make([]float64, n), make([]float64, n), make([]float64, n), make([]float64, n),
+	sum := struct{ ao, edges, cavity, drips, up, height, part, sel, count []float64 }{
+		make([]float64, n), make([]float64, n), make([]float64, n), make([]float64, n), make([]float64, n),
 		make([]float64, n), make([]float64, n), make([]float64, n), make([]float64, n),
 	}
 	normals := make([]Vec, n)
@@ -94,7 +97,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 		return closeness(bvh, s, o.CavityRays, o.CavityWidth*diag), false
 	})
 
-	results := make([][3]float64, len(samples))
+	results := make([][4]float64, len(samples))
 	parallel(len(samples), func(i int) {
 		s := samples[i]
 		ao, flipped := aos[i], flips[i]
@@ -109,7 +112,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 		if s.detail >= 0 {
 			ao, convex, concave, samples[i].n = m.Details[s.detail].apply(samples[i], o.Detail, ao, convex, concave)
 		}
-		results[i] = [3]float64{ao, convex, concave}
+		results[i] = [4]float64{ao, convex, concave, drips.drip(s.p, samples[i].n, o.DripLength*diag, 0.02*diag)}
 	})
 
 	for i, s := range samples {
@@ -117,6 +120,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 		sum.ao[t] += results[i][0]
 		sum.edges[t] += results[i][1]
 		sum.cavity[t] += results[i][2]
+		sum.drips[t] += results[i][3]
 		sum.up[t] += s.n[1]*0.5 + 0.5
 		sum.height[t] += (s.p[1] - m.Min[1]) / max(m.Max[1]-m.Min[1], 1e-9)
 		sum.part[t] += partValue(s.part)
@@ -140,7 +144,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 		}
 		return out
 	}
-	maps.AO, maps.Edges, maps.Cavity = avg(sum.ao), avg(sum.edges), avg(sum.cavity)
+	maps.AO, maps.Edges, maps.Cavity, maps.Drips = avg(sum.ao), avg(sum.edges), avg(sum.cavity), avg(sum.drips)
 	maps.Up, maps.Height, maps.Part, maps.Selected = avg(sum.up), avg(sum.height), avg(sum.part), avg(sum.sel)
 
 	maps.PartID = partID

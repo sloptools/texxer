@@ -59,6 +59,7 @@ func (c *modelCache) bake(path string, size, layout int, b bakeOptions) ([]byte,
 		EdgeWidth:   b.edges,
 		CavityWidth: b.cavity,
 		EdgeAngle:   30,
+		DripLength:  0.25,
 		Padding:     max(4, size/64),
 		Detail:      b.detail,
 	})
@@ -76,7 +77,8 @@ func (c *modelCache) bake(path string, size, layout int, b bakeOptions) ([]byte,
 		put(0, i, 0, maps.AO[i])
 		put(0, i, 1, maps.Edges[i])
 		put(0, i, 2, maps.Cavity[i])
-		put(0, i, 3, maps.Mask[i])
+		// Drips ride on the coverage, which is 0 or 1: 1 to 2 where covered.
+		put(0, i, 3, maps.Mask[i]*(1+maps.Drips[i]))
 		for k := range 3 {
 			put(1, i, k, maps.Position[i*3+k])
 			put(2, i, k, maps.Normal[i*3+k]*2-1)
