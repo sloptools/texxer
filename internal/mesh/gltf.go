@@ -11,7 +11,10 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"math"
+	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 // Tri is a triangle in world space.
@@ -109,7 +112,7 @@ func LoadGLB(path string) (*Model, error) {
 	}
 
 	m := &Model{Min: Vec{math.Inf(1), math.Inf(1), math.Inf(1)}, Max: Vec{math.Inf(-1), math.Inf(-1), math.Inf(-1)}}
-	details, err := m.addDetails(doc, bin)
+	details, err := m.addDetails(doc, bin, filepath.Dir(path))
 	if err != nil {
 		return nil, err
 	}
@@ -160,25 +163,25 @@ func parseGLB(data []byte) (*gltfDoc, []byte, error) {
 }
 
 // addDetails reads each material's maps and returns, per material, its index in
-// m.Details.
-func (m *Model) addDetails(doc *gltfDoc, bin []byte) ([]int, error) {
+// m.Details. Linked images are read from dir; a missing one leaves the map out.
+func (m *Model) addDetails(doc *gltfDoc, bin []byte, dir string) ([]int, error) {
 	out := make([]int, len(doc.Materials))
 	for i, mat := range doc.Materials {
 		d := &Detail{Factor: [4]float64{1, 1, 1, 1}}
 		copy(d.Factor[:], mat.PBR.BaseColorFactor)
 		var err error
 		if mat.PBR.BaseColorTexture != nil {
-			if d.Color, err = decodeTexture(doc, bin, mat.PBR.BaseColorTexture.Index); err != nil {
+			if d.Color, err = decodeTexture(doc, bin, dir, mat.PBR.BaseColorTexture.Index); err != nil {
 				return nil, fmt.Errorf("base color: %w", err)
 			}
 		}
 		if mat.NormalTexture != nil {
-			if d.Normal, err = decodeTexture(doc, bin, mat.NormalTexture.Index); err != nil {
+			if d.Normal, err = decodeTexture(doc, bin, dir, mat.NormalTexture.Index); err != nil {
 				return nil, fmt.Errorf("normal map: %w", err)
 			}
 		}
 		if mat.OcclusionTexture != nil {
-			if d.Occlusion, err = decodeTexture(doc, bin, mat.OcclusionTexture.Index); err != nil {
+			if d.Occlusion, err = decodeTexture(doc, bin, dir, mat.OcclusionTexture.Index); err != nil {
 				return nil, fmt.Errorf("occlusion map: %w", err)
 			}
 		}
@@ -188,16 +191,36 @@ func (m *Model) addDetails(doc *gltfDoc, bin []byte) ([]int, error) {
 	return out, nil
 }
 
-func decodeTexture(doc *gltfDoc, bin []byte, index int) (image.Image, error) {
+func decodeTexture(doc *gltfDoc, bin []byte, dir string, index int) (image.Image, error) {
 	if index >= len(doc.Textures) {
 		return nil, errors.New("missing texture")
 	}
 	img := doc.Images[doc.Textures[index].Source]
 	if img.BufferView == nil {
-		return nil, errors.New("external texture files are not supported yet")
+		return linkedTexture(dir, img.URI)
 	}
 	bv := doc.BufferViews[*img.BufferView]
 	decoded, _, err := image.Decode(bytes.NewReader(bin[bv.ByteOffset : bv.ByteOffset+bv.ByteLength]))
+	return decoded, err
+}
+
+func linkedTexture(dir, uri string) (image.Image, error) {
+	if strings.HasPrefix(uri, "data:") {
+		return nil, errors.New("data uri textures are not supported")
+	}
+	path, err := url.PathUnescape(uri)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(filepath.Join(dir, filepath.FromSlash(path)))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	decoded, _, err := image.Decode(f)
 	return decoded, err
 }
 

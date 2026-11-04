@@ -1,12 +1,12 @@
 import * as THREE from 'three'
 import { newMask } from '../project'
 import { expand, frame } from '../stamps'
-import type { BakeSettings, Layer, Project, Stamp } from '../types'
+import type { BakeSettings, Layer, Project, Stamp, Volume } from '../types'
 import { StampAtlas, atlasGrid, atlasInset } from './atlas'
 import type { PaintStore } from './paint'
 import { fetchBlob, imageURL, track } from '../assets'
-import { medianCut, type RGB } from './mediancut'
-import { blendIndex, finishFragment, kindIndex, layerFragment, lightFragment, lookupRows, maskRows, maxGroups, maxIslands, maxMasks, maxStamps, quadVertex, reduceFragment } from './shaders'
+import { medianCut, refine, type RGB } from './mediancut'
+import { blendIndex, finishFragment, kindIndex, shapeIndex, layerFragment, lightFragment, lookupRows, maskRows, maxGroups, maxIslands, maxMasks, maxStamps, quadVertex, reduceFragment } from './shaders'
 
 // Where the model sits: bake positions are (p - min) / diag.
 export type ModelFrame = { min: number[]; diag: number; extent: number[] }
@@ -80,6 +80,7 @@ export class Compositor {
   private reduceMat: THREE.ShaderMaterial
   // The auto palette, picked from the texture a moment after it changes.
   autoColors: RGB[] = []
+  private autoCount = 0
 
   private scene = new THREE.Scene()
   private camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
@@ -163,6 +164,8 @@ export class Compositor {
         uA: { value: vec4s(maxMasks) },
         uB: { value: vec4s(maxMasks) },
         uC: { value: vec4s(maxMasks) },
+        uV: { value: Array.from({ length: maxMasks }, () => new THREE.Matrix4()) },
+        uMirrorX: { value: model.extent[0] / 2 },
         uPaint0: { value: null },
         uPaint1: { value: null },
         uPaint2: { value: null },
@@ -233,16 +236,6 @@ export class Compositor {
 
     project.layers.forEach((layer, i) => {
       this.setLayer(layer, i)
-      u.uColor.value.set(layer.color).convertLinearToSRGB()
-      u.uTone.value = layer.tone
-      u.uToneScale.value = layer.toneScale
-      u.uGrain.value = layer.grain
-      u.uShine.value = layer.shine
-      u.uSeed.value = (i * 7.31) % 97
-      u.uStampColors.value = layer.stampColors ? 1 : 0
-      u.uFromSource.value = layer.source && this.bake.source ? 1 : 0
-      u.uOpacity.value = layer.opacity
-      u.uBlend.value = blendIndex[layer.blend]
 
       if (i === selected) {
         u.uMaskOnly.value = 1
@@ -317,7 +310,8 @@ export class Compositor {
     this.renderer.setRenderTarget(prev)
   }
 
-  // Picks the auto palette from the texture before quantizing, from a sample of its texels.
+  // Picks the auto palette from the texture before quantizing, from a sample of its
+  // texels. Later picks refine the last one, so colors stay put while editing.
   pickPalette(count: number) {
     const size = this.reduced.width
     const data = new Uint8Array(size * size * 4)
@@ -326,7 +320,9 @@ export class Compositor {
     const step = Math.max(1, Math.floor((size * size) / 24000))
     const pixels: RGB[] = []
     for (let i = 0; i < size * size; i += step) pixels.push([data[i * 4], data[i * 4 + 1], data[i * 4 + 2]])
-    this.autoColors = medianCut(pixels, count)
+    const fresh = count !== this.autoCount || !this.autoColors.length
+    this.autoColors = refine(fresh ? medianCut(pixels, count) : this.autoColors, pixels, fresh ? 10 : 6)
+    this.autoCount = count
   }
 
   private draw(material: THREE.ShaderMaterial, to: THREE.WebGLRenderTarget) {
@@ -336,8 +332,54 @@ export class Compositor {
     this.renderer.render(this.scene, this.camera)
   }
 
+  // Draws one layer's mask into the mask target, for a layer the list is hovering.
+  renderMask(project: Project, index: number) {
+    const layer = project.layers[index]
+    if (!layer) return
+    const prev = this.renderer.getRenderTarget()
+    this.fillParts(project)
+    this.setLayer(layer, index)
+    const u = this.layerMat.uniforms
+    u.uMaskOnly.value = 1
+    this.draw(this.layerMat, this.mask)
+    u.uMaskOnly.value = 0
+    this.renderer.setRenderTarget(prev)
+  }
+
+  // The topmost shown layer covering a texel, for picking layers on the model.
+  layerAt(project: Project, texel: [number, number]): number {
+    const prev = this.renderer.getRenderTarget()
+    const hidden = new Set(project.groups.filter((g) => !g.visible).map((g) => g.id))
+    const px = new Uint8Array(4)
+    const u = this.layerMat.uniforms
+    this.fillParts(project)
+    let found = -1
+    for (let i = project.layers.length - 1; i >= 0 && found < 0; i--) {
+      const layer = project.layers[i]
+      if (!layer.visible || hidden.has(layer.group) || layer.opacity < 0.2) continue
+      this.setLayer(layer, i)
+      u.uMaskOnly.value = 1
+      this.draw(this.layerMat, this.mask)
+      this.renderer.readRenderTargetPixels(this.mask, texel[0], texel[1], 1, 1, px)
+      if (px[0] > 128) found = i
+    }
+    u.uMaskOnly.value = 0
+    this.renderer.setRenderTarget(prev)
+    return found
+  }
+
   private setLayer(layer: Layer, index: number) {
     const u = this.layerMat.uniforms
+    u.uColor.value.set(layer.color).convertLinearToSRGB()
+    u.uTone.value = layer.tone
+    u.uToneScale.value = layer.toneScale
+    u.uGrain.value = layer.grain
+    u.uShine.value = layer.shine
+    u.uSeed.value = (index * 7.31) % 97
+    u.uStampColors.value = layer.stampColors ? 1 : 0
+    u.uFromSource.value = layer.source && this.bake.source ? 1 : 0
+    u.uOpacity.value = layer.opacity
+    u.uBlend.value = blendIndex[layer.blend]
     u.uZone.value = this.zones.get(layer.group) ?? -1
     const masks = layer.masks.slice(0, maxMasks)
     let stamps = 0
@@ -350,8 +392,9 @@ export class Compositor {
       u['uGrunge' + i].value = m.kind === 'grunge' ? this.grunge(m.map) : null
 
       const list = m.kind === 'stamps' ? expand(m.stamps, this.mirrorX).slice(0, maxStamps - stamps) : []
-      u.uC.value[i].set(stamps, list.length, 0, 0)
+      u.uC.value[i].set(stamps, list.length, shapeIndex[m.volume.shape], m.volume.mirror ? 1 : 0)
       for (const s of list) this.setStamp(stamps++, s)
+      if (m.kind === 'volume') u.uV.value[i].copy(this.volumeMatrix(m.volume))
     })
   }
 
@@ -381,6 +424,15 @@ export class Compositor {
       t = texture
     }
     return t
+  }
+
+  // Takes the bake's positions, (p - min) / diagonal, into the volume's unit shape.
+  private volumeMatrix(v: Volume): THREE.Matrix4 {
+    const { min, diag } = this.model
+    const size = new THREE.Vector3(...v.size).max(new THREE.Vector3(1e-6, 1e-6, 1e-6))
+    const world = new THREE.Matrix4().compose(new THREE.Vector3(...v.p), new THREE.Quaternion(...v.q), size)
+    const fromBake = new THREE.Matrix4().makeTranslation(min[0], min[1], min[2]).multiply(new THREE.Matrix4().makeScale(diag, diag, diag))
+    return world.invert().multiply(fromBake)
   }
 
   private setStamp(j: number, s: Stamp) {

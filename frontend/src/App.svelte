@@ -12,6 +12,8 @@
   import Toolbar from './lib/ui/Toolbar.svelte'
   import ToolPanel from './lib/ui/ToolPanel.svelte'
   import { tools } from './lib/tools.svelte'
+  import { nudgeSelection, stepSelection } from './lib/layerRows'
+  import type { GizmoMode } from './lib/gl/volume'
   import Viewport from './lib/Viewport.svelte'
   import VariantBar from './lib/ui/VariantBar.svelte'
   import ModelList from './lib/ui/ModelList.svelte'
@@ -44,8 +46,24 @@
     tools.picked = null
   })
 
-  // Keys for the brush and stamp tools; true when handled.
+  // W E R pick the gizmo's move, turn and size, as in Godot.
+  const gizmoKeys: Record<string, GizmoMode> = { w: 'translate', e: 'rotate', r: 'scale' }
+
+  // Keys for the brush, stamp and volume tools; true when handled.
   function toolKey(e: KeyboardEvent): boolean {
+    if (e.key === 'q') {
+      tools.set('volume')
+      return true
+    }
+    const volume = tools.tool === 'volume' ? tools.volume : undefined
+    if (volume && gizmoKeys[e.key]) {
+      tools.gizmo = gizmoKeys[e.key]
+      return true
+    }
+    if (volume && e.key === 'x') {
+      volume.volume.mirror = !volume.volume.mirror
+      return true
+    }
     const picked = !!tools.pickedStamp
     const step = e.shiftKey ? 0.5 : 0.1
     switch (e.key) {
@@ -162,12 +180,12 @@
           store.deleteLayer()
           break
         case 'ArrowUp':
-          if (e.altKey) store.moveLayer(store.selected, store.selected + 1)
-          else store.select(1)
+          if (e.altKey) nudgeSelection(true)
+          else stepSelection(1)
           break
         case 'ArrowDown':
-          if (e.altKey) store.moveLayer(store.selected, store.selected - 1)
-          else store.select(-1)
+          if (e.altKey) nudgeSelection(false)
+          else stepSelection(-1)
           break
         case 'v':
           if (l) {

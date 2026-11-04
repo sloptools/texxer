@@ -75,6 +75,13 @@ func (a *App) PickModels() ([]string, error) {
 	})
 }
 
+func (a *App) PickFolder() (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:                "Folder for the texture PNGs",
+		CanCreateDirectories: true,
+	})
+}
+
 // FileHashes tells for each model key whether its files changed, empty when one is missing.
 func (a *App) FileHashes(keys []string) map[string]string {
 	out := map[string]string{}

@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,6 +25,12 @@ type Textures struct {
 	EmissiveStrength float64
 	// Normal and Occlusion replace the material's detail maps when set, for a new UV layout.
 	Normal, Occlusion []byte
+	// Files, when set, links the images by these paths relative to the glTF instead of embedding them.
+	Files *TextureFiles
+}
+
+type TextureFiles struct {
+	Color, Emissive, Normal, Occlusion string
 }
 
 // WithTexture returns a copy of a binary glTF whose material uses the
@@ -53,24 +61,32 @@ func WithTexture(glb []byte, t Textures, material string) ([]byte, error) {
 
 	// The new images and textures, with one pixel art sampler.
 	samplers = append(samplers, map[string]any{"magFilter": float64(filterNearest), "minFilter": float64(filterNearestMipNearest)})
-	add := func(png []byte, name string) float64 {
-		data = append(data, png)
-		views = append(views, map[string]any{"buffer": 0.0})
-		images = append(images, map[string]any{"bufferView": float64(len(views) - 1), "mimeType": "image/png", "name": name})
+	files := TextureFiles{}
+	if t.Files != nil {
+		files = *t.Files
+	}
+	add := func(png []byte, file, name string) float64 {
+		if file != "" {
+			images = append(images, map[string]any{"uri": fileURI(file), "name": name})
+		} else {
+			data = append(data, png)
+			views = append(views, map[string]any{"buffer": 0.0})
+			images = append(images, map[string]any{"bufferView": float64(len(views) - 1), "mimeType": "image/png", "name": name})
+		}
 		textures = append(textures, map[string]any{"source": float64(len(images) - 1), "sampler": float64(len(samplers) - 1)})
 		return float64(len(textures) - 1)
 	}
-	tex := add(t.Color, "texxer")
+	tex := add(t.Color, files.Color, "texxer")
 	emit := -1.0
 	if t.Emissive != nil {
-		emit = add(t.Emissive, "texxer_emissive")
+		emit = add(t.Emissive, files.Emissive, "texxer_emissive")
 	}
 	normal, occlusion := -1.0, -1.0
 	if t.Normal != nil {
-		normal = add(t.Normal, "texxer_normal")
+		normal = add(t.Normal, files.Normal, "texxer_normal")
 	}
 	if t.Occlusion != nil {
-		occlusion = add(t.Occlusion, "texxer_occlusion")
+		occlusion = add(t.Occlusion, files.Occlusion, "texxer_occlusion")
 	}
 
 	textured := hasBaseTexture(materials)
@@ -135,6 +151,11 @@ func WithTexture(glb []byte, t Textures, material string) ([]byte, error) {
 
 	doc["bufferViews"], doc["images"], doc["textures"], doc["samplers"] = views, images, textures, samplers
 	return writeGLB(doc, packBuffer(doc, data))
+}
+
+// fileURI escapes a relative file path for a glTF uri.
+func fileURI(path string) string {
+	return (&url.URL{Path: filepath.ToSlash(path)}).String()
 }
 
 // packBuffer lays out the bytes of every buffer view still in use into one buffer,

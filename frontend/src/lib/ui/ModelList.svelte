@@ -1,6 +1,6 @@
 <script lang="ts">
   import Icon from '../Icon.svelte'
-  import { addFiles, exportChanged, removeModel, selectModel, stateOf } from '../projects.svelte'
+  import { addFiles, exportChanged, pickTextureFolder, removeModel, selectModel, stateOf } from '../projects.svelte'
   import { store } from '../store.svelte'
   import HelpLink from './HelpLink.svelte'
   import type { ModelDoc } from '../types'
@@ -70,6 +70,7 @@
         <span class="where">{where(m)}</span>
       </span>
       <span class="actions">
+        <button class="icon" class:set={m.textures} title={m.textures ? `PNGs go to ${m.textures} (cancel to put them beside the files)` : 'Folder for the texture PNGs (beside the files)'} onclick={(e) => (e.stopPropagation(), pickTextureFolder(m.id))}><Icon name="dir" size={11} /></button>
         <button class="icon" title="Add files that share this texture" onclick={(e) => (e.stopPropagation(), addFiles(m.id))}><Icon name="plus" size={11} /></button>
         <button class="icon" class:armed={confirm === m.id} title="Remove from the project (the files stay)" onclick={(e) => (e.stopPropagation(), remove(m))}>
           {#if confirm === m.id}remove?{:else}<Icon name="x" size={11} />{/if}
@@ -184,6 +185,9 @@
   .icon:hover {
     background: var(--hover);
     color: var(--strong);
+  }
+  .icon.set {
+    color: var(--accent);
   }
   .icon.armed {
     color: var(--error);

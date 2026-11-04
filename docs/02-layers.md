@@ -2,7 +2,7 @@
 
 ![](img/layers.png)
 
-Layers stack bottom to top. A layer without masks covers everything.
+Layers stack bottom to top. A new layer starts with an empty paint mask and shows nothing until painted; another mask takes its place. A layer without masks covers everything.
 
 - **color**: the layer's color. Swatches reuse colors of other layers.
 - **tone**, **tone scale**: lighter and darker patches over the color, at a world size.
@@ -13,7 +13,11 @@ Layers stack bottom to top. A layer without masks covers everything.
 - **blend**: normal, multiply, add, overlay, relief. Relief takes gray stamps as bumps: mid gray keeps the surface.
 - **opacity**
 
-**N** new (in the picked folder, if one is), **D** duplicate, **⌫** delete, **V** show or hide, **↑ ↓** select, **⌥↑ ⌥↓** move. Right-click a layer or folder for the same and more.
+**N** new (in the picked folder, if one is), **D** duplicate, **⌫** delete, **V** show or hide, **↩** rename, **↑ ↓** select, **⌥↑ ⌥↓** move, into and out of folders on the way. Right-click a layer or folder for the same and more.
+
+Hovering a layer tints where it shows on the model. **⌥click** the model picks the topmost layer there. Drag over the eyes to show or hide several, **⌥click** an eye to show only that layer, again for all.
+
+When dragging, the line shows where the layer lands: indented inside a folder, at the left edge below it. **Esc** cancels.
 
 ## Folders
 

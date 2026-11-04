@@ -104,6 +104,15 @@ export async function addFiles(id: string, picked?: string[]) {
   refreshHashes()
 }
 
+// Picks the folder the export puts the model's PNGs into; cancelling puts them beside its files again.
+export async function pickTextureFolder(id: string) {
+  const m = store.workspace?.models.find((m) => m.id === id)
+  if (!m) return
+  const dir = await api.PickFolder()
+  if (dir) m.textures = dir
+  else delete m.textures
+}
+
 export function removeModel(id: string) {
   const ws = store.workspace
   if (!ws) return
@@ -165,7 +174,7 @@ export async function exportModel(): Promise<boolean> {
       const s = store.snapshot!(v.id)
       return { name: v.name, color: s.color, emissive: s.emissive }
     })
-    const files = await api.Export(model.path, m.unwrap, m.name, shot.color, shot.emissive, variants, m.finish.glow)
+    const files = await api.Export(model.path, m.unwrap, m.name, m.textures ?? '', shot.color, shot.emissive, variants, m.finish.glow)
     m.exported = { doc: docHash(m), files }
     store.fileHashes = { ...store.fileHashes, [model.path]: files }
     store.say('exported ' + m.name)

@@ -2,11 +2,19 @@
   import Icon from '../Icon.svelte'
   import { imageURL } from '../assets'
   import { store } from '../store.svelte'
-  import type { Axis, Mask } from '../types'
+  import { tools } from '../tools.svelte'
+  import type { Axis, Mask, VolumeShape } from '../types'
   import Seg from './Seg.svelte'
   import Slider from './Slider.svelte'
 
-  let { mask, parts, onremove }: { mask: Mask; parts: string[]; onremove: () => void } = $props()
+  let { mask, index, parts, onremove }: { mask: Mask; index: number; parts: string[]; onremove: () => void } = $props()
+
+  const shapes: [VolumeShape, string][] = [
+    ['box', 'box'],
+    ['cylinder', 'cylinder'],
+    ['sphere', 'sphere'],
+  ]
+  const editing = $derived(tools.tool === 'volume' && tools.volume === mask)
 
   // Directions as seen in a front view, like Blender's. A gradient rises from its
   // side; facing picks surfaces that face that way.
@@ -77,6 +85,13 @@
       <p class="hint">paint it with the brush (B)</p>
     {:else if mask.kind === 'stamps'}
       <p class="hint">{mask.stamps.length} stamps · place them with the stamp tool (S)</p>
+    {:else if mask.kind === 'volume'}
+      <Seg value={mask.volume.shape} options={shapes} onchange={(v) => (mask.volume.shape = v)} />
+      <div class="row">
+        <span class="hint">{editing ? 'click the model to put it there · W E R move, turn, size' : 'everything inside it, all around'}</span>
+        <button class="text" class:on={editing} title="Move it in the view (Q)" onclick={() => (editing ? tools.set('volume') : tools.editVolume(index))}>edit</button>
+        <button class="text" class:on={mask.volume.mirror} title="Mirror across X" onclick={() => (mask.volume.mirror = !mask.volume.mirror)}>mirror</button>
+      </div>
     {/if}
     {#if mask.kind === 'grunge'}
       <div class="maps">

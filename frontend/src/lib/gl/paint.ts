@@ -185,6 +185,14 @@ export class PaintStore {
     return data
   }
 
+  // Whether nothing was painted into the mask.
+  empty(id: string): boolean {
+    if (!this.targets.has(id)) return true
+    const data = this.read(id)
+    for (let i = 0; i < data.length; i += 4) if (data[i]) return false
+    return true
+  }
+
   write(id: string, data: Uint8Array, save = true) {
     const size = this.bake.size
     if (data.length !== size * size * 4) return

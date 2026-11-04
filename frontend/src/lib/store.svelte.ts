@@ -2,7 +2,7 @@ import * as api from '../../wailsjs/go/main/App'
 import type { main } from '../../wailsjs/go/models'
 import type { PaintStore } from './gl/paint'
 import { newLayer, newMask, newProject, uid } from './project'
-import type { Finish, FlatMap, Group, Layer, LayerLook, MaskKind, ModelDoc, Variant, View, Workspace } from './types'
+import type { Finish, FlatMap, Group, Layer, LayerLook, Mask, MaskKind, ModelDoc, Variant, Vec3, View, Workspace } from './types'
 import { serializeWorkspace } from './workspace'
 
 export function load<T>(key: string, fallback: T): T {
@@ -28,6 +28,8 @@ class Store {
   // The project file and what's in it; project is the model being painted.
   path = $state('')
   workspace = $state<Workspace | null>(null)
+  // The layer the list is hovering, -1 for none.
+  hoverLayer = $state(-1)
   model = $state<main.ModelInfo | null>(null)
   project = $state<ModelDoc>({ ...newProject(), id: '', name: '', files: [] })
   // Set by the viewport once the model's texture renders.
@@ -264,7 +266,8 @@ class Store {
 
   // Layers
 
-  // Above the selected layer, or at the top of the picked folder.
+  // Above the selected layer, or at the top of the picked folder. It starts with an
+  // empty paint mask, so it shows nothing until painted or given another mask.
   addLayer() {
     const layers = this.project.layers
     let at = this.selected + 1
@@ -274,7 +277,7 @@ class Store {
       at = Math.max(...layers.map((l, i) => (l.group === group ? i : -1))) + 1
     }
     at = Math.min(at, layers.length)
-    layers.splice(at, 0, newLayer('layer ' + (layers.length + 1), '#8a8578', [], { group }))
+    layers.splice(at, 0, newLayer('layer ' + (layers.length + 1), '#8a8578', [newMask('paint')], { group }))
     this.selected = at
     this.selectedGroup = ''
     this.pickingZone = false
@@ -352,28 +355,33 @@ class Store {
     this.project.groups = this.project.groups.filter((g) => used.has(g.id))
   }
 
-  // One step up or down, joining the folder it moves into.
-  moveLayer(from: number, to: number) {
-    const layers = this.project.layers
-    if (to < 0 || to >= layers.length || from === to) return
-    const [l] = layers.splice(from, 1)
-    layers.splice(to, 0, l)
-    const below = layers[to - 1]
-    const above = layers[to + 1]
-    if (below && above && below.group === above.group) l.group = below.group
-    else if (below?.group !== l.group && above?.group !== l.group) l.group = ''
-    this.selected = to
-    this.dropEmptyGroups()
+  // Added to the selected layer, in place of an empty paint or stamps mask, which
+  // would hide it as masks intersect.
+  addMask(kind: MaskKind): number {
+    const l = this.layer
+    if (!l) return -1
+    const at = l.masks.findIndex((m) => (m.kind === 'stamps' && !m.stamps.length) || (m.kind === 'paint' && this.paint?.empty(m.paint)))
+    if (at >= 0) {
+      l.masks[at] = this.newMask(kind)
+      return at
+    }
+    if (l.masks.length >= 4) {
+      this.say('this layer has 4 masks already')
+      return -1
+    }
+    l.masks.push(this.newMask(kind))
+    return l.masks.length - 1
   }
 
-  select(delta: number) {
-    this.selected = Math.max(0, Math.min(this.project.layers.length - 1, this.selected + delta))
-    this.selectedGroup = ''
-    this.pickingZone = false
-  }
-
-  addMask(kind: MaskKind) {
-    this.layer?.masks.push(newMask(kind))
+  // A volume starts in the middle of the model, a fifth of its size.
+  private newMask(kind: MaskKind): Mask {
+    const m = newMask(kind)
+    const model = this.model
+    if (kind === 'volume' && model) {
+      m.volume.p = [0, 1, 2].map((k) => model.min[k] + (model.extent[k] * model.diag) / 2) as Vec3
+      m.volume.size = [1, 1, 1].map(() => model.diag * 0.1) as Vec3
+    }
+    return m
   }
 
   // The selected layer's first mask of this kind, added if there is room.
@@ -381,20 +389,7 @@ class Store {
     const l = this.layer
     if (!l) return -1
     const at = l.masks.findIndex((m) => m.kind === kind)
-    if (at >= 0) return at
-
-    // An empty stamps mask would hide the paint, as masks intersect; paint takes its place.
-    const empty = l.masks.findIndex((m) => m.kind === 'stamps' && !m.stamps.length)
-    if (kind === 'paint' && empty >= 0) {
-      l.masks[empty] = newMask(kind)
-      return empty
-    }
-    if (l.masks.length >= 4) {
-      this.say('this layer has 4 masks already')
-      return -1
-    }
-    l.masks.push(newMask(kind))
-    return l.masks.length - 1
+    return at >= 0 ? at : this.addMask(kind)
   }
 
   // Toggles a part in the selected layer's parts mask, adding the mask if needed.

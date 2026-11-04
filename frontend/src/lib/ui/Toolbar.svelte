@@ -1,11 +1,18 @@
 <script lang="ts">
   import { tools } from '../tools.svelte'
+  import type { GizmoMode } from '../gl/volume'
   import type { Tool } from '../types'
 
   const list: [Tool, string, string][] = [
     ['nav', 'view', 'esc'],
     ['brush', 'brush', 'B'],
     ['stamp', 'stamp', 'S'],
+    ['volume', 'volume', 'Q'],
+  ]
+  const modes: [GizmoMode, string, string][] = [
+    ['translate', 'move', 'W'],
+    ['rotate', 'turn', 'E'],
+    ['scale', 'size', 'R'],
   ]
 </script>
 
@@ -18,7 +25,17 @@
     {/each}
   </div>
 
-  {#if tools.tool !== 'nav'}
+  {#if tools.tool === 'volume' && tools.volume}
+    {@const v = tools.volume.volume}
+    <div class="group">
+      {#each modes as [mode, label, key]}
+        <button class:on={tools.gizmo === mode} onclick={() => (tools.gizmo = mode)}>{label}<kbd>{key}</kbd></button>
+      {/each}
+    </div>
+    <div class="group">
+      <button class:on={v.mirror} title="Mirror across X (X)" onclick={() => (v.mirror = !v.mirror)}>mirror x<kbd>X</kbd></button>
+    </div>
+  {:else if tools.tool !== 'nav' && tools.tool !== 'volume'}
     <div class="group">
       <button class:on={tools.mirror} title="Mirror across X (X)" onclick={() => tools.toggleMirror()}>mirror x<kbd>X</kbd></button>
       {#if tools.tool === 'brush'}

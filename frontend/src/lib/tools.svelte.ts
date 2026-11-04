@@ -1,8 +1,9 @@
 import * as THREE from 'three'
+import type { GizmoMode } from './gl/volume'
 import { shapeAspect } from './shapes'
 import { moveTo, nudge, place } from './stamps'
 import { store } from './store.svelte'
-import type { Stamp, Tool } from './types'
+import type { Mask, Stamp, Tool, Vec3 } from './types'
 
 export type Picked = { mask: number; index: number }
 
@@ -17,6 +18,9 @@ class Tools {
   mirror = $state(false)
   snap = $state(false)
   picked = $state<Picked | null>(null)
+  // The selected layer's volume mask the volume tool moves.
+  volumeMask = $state(0)
+  gizmo = $state<GizmoMode>('translate')
   ghost = $state<Stamp | null>(null)
 
   // Set by the viewport: the surface point nearest along -n from p, for keeping stamps on curved hulls.
@@ -26,6 +30,24 @@ class Tools {
     this.tool = this.tool === tool ? 'nav' : tool
     this.ghost = null
     if (this.tool !== 'stamp') this.picked = null
+    if (this.tool === 'volume' && !this.volume) this.editVolume(store.ensureMask('volume'))
+  }
+
+  get volume(): Mask | undefined {
+    const masks = store.layer?.masks ?? []
+    const m = masks[this.volumeMask]
+    return m?.kind === 'volume' ? m : masks.find((m) => m.kind === 'volume')
+  }
+
+  editVolume(mask: number) {
+    if (mask < 0) return
+    this.volumeMask = mask
+    this.tool = 'volume'
+  }
+
+  moveVolume(p: Vec3) {
+    const m = this.volume
+    if (m) m.volume.p = p
   }
 
   // The mask a new layer starts with, so it is ready for the current tool.

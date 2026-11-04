@@ -1,5 +1,6 @@
 <script lang="ts">
   import { store } from '../store.svelte'
+  import { tools } from '../tools.svelte'
   import { blends, maskKinds } from '../types'
   import ColorField from './ColorField.svelte'
   import MaskCard from './MaskCard.svelte'
@@ -60,12 +61,12 @@
   <div class="section">
     <div class="caps">masks <HelpLink page="masks" /></div>
     {#each layer.masks as mask, i (i + mask.kind + layer.id)}
-      <MaskCard {mask} parts={store.model?.parts ?? []} onremove={() => layer.masks.splice(i, 1)} />
+      <MaskCard {mask} index={i} parts={store.model?.parts ?? []} onremove={() => layer.masks.splice(i, 1)} />
     {/each}
     {#if layer.masks.length < 4}
       <div class="add">
         {#each maskKinds as kind}
-          <button onclick={() => store.addMask(kind)}>+ {kind}</button>
+          <button onclick={() => { const at = store.addMask(kind); if (kind === 'volume' && at >= 0) tools.editVolume(at) }}>+ {kind}</button>
         {/each}
       </div>
     {/if}

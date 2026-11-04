@@ -6,8 +6,8 @@ export function DeleteMaterial(arg1) {
   return window['go']['main']['App']['DeleteMaterial'](arg1);
 }
 
-export function Export(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
-  return window['go']['main']['App']['Export'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+export function Export(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['Export'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
 export function FileHashes(arg1) {
@@ -48,6 +48,10 @@ export function Open(arg1) {
 
 export function Palette(arg1) {
   return window['go']['main']['App']['Palette'](arg1);
+}
+
+export function PickFolder() {
+  return window['go']['main']['App']['PickFolder']();
 }
 
 export function PickModels() {

@@ -10,8 +10,9 @@ import { TrackpadControls } from './controls'
 import { game, gameDeclarations, gamePatch, gameUniforms, gradePass } from './gamelook'
 import { Flat } from './flat'
 import { Torch, torchDeclarations } from './torch'
+import { VolumeGizmo } from './volume'
 
-export type Hit = { point: THREE.Vector3; normal: THREE.Vector3; part: number; island: number }
+export type Hit = { point: THREE.Vector3; normal: THREE.Vector3; part: number; island: number; uv?: THREE.Vector2 }
 
 // Our textures hold display colors; materials decode them so lighting works in linear.
 const decode = /* glsl */ `
@@ -20,6 +21,8 @@ uniform float uHover;
 uniform float uHoverIsland;
 uniform sampler2D uEmitMap;
 uniform float uEmit;
+uniform sampler2D uMaskMap;
+uniform float uMaskTint;
 vec3 srgbDecode(vec3 c) {
   return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
 }
@@ -29,6 +32,7 @@ const patch = /* glsl */ `
 #include <map_fragment>
 diffuseColor.rgb = srgbDecode(diffuseColor.rgb);
 if (uHover >= 0.0 && abs(texture(uPosMap, vMapUv).w - uHover) < 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 1.0, 0.95), 0.18);
+if (uMaskTint > 0.0) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.21, 0.55, 0.43), texture(uMaskMap, vMapUv).r * uMaskTint);
 if (uHoverIsland >= 0.0 && abs(texture(uNrmMap, vMapUv).w - uHoverIsland) < 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 1.0, 0.95), 0.18);
 `
 
@@ -63,6 +67,7 @@ export class Stage {
   private lines = 0
   readonly torch = new Torch()
   readonly flat: Flat
+  readonly volume: VolumeGizmo
 
   private hemi = new THREE.HemisphereLight(0xfff1e0, 0x2c3038, 1)
   private key = new THREE.DirectionalLight(0xfff6ea, 2)
@@ -82,6 +87,8 @@ export class Stage {
     uHoverIsland: { value: -1 },
     uEmitMap: { value: null as THREE.Texture | null },
     uEmit: { value: 0 },
+    uMaskMap: { value: null as THREE.Texture | null },
+    uMaskTint: { value: 0 },
   }
   private gameShared = gameUniforms()
   private raycaster = new THREE.Raycaster()
@@ -144,6 +151,7 @@ export class Stage {
 
     this.controls = new TrackpadControls(this.camera, renderer.domElement, (x, y) => this.hit(x, y)?.point)
     this.flat = new Flat(renderer, renderer.domElement)
+    this.volume = new VolumeGizmo(this.camera, renderer.domElement, this.scene)
 
     this.resize = new ResizeObserver(() => this.applySize())
     this.resize.observe(container)
@@ -196,9 +204,8 @@ export class Stage {
   }
 
   // Loads a model's files, each moved to its place beside the others.
-  async load(files: { url: string; offset: number[] }[]) {
-    const loader = new GLTFLoader()
-    const scenes = await Promise.all(files.map((f) => loader.loadAsync(f.url)))
+  async load(files: { url: string; images: string; offset: number[] }[]) {
+    const scenes = await Promise.all(files.map((f) => new GLTFLoader().setResourcePath(f.images).loadAsync(f.url)))
     this.clear()
 
     const root = new THREE.Group()
@@ -356,6 +363,12 @@ export class Stage {
     this.shared.uEmit.value = texture ? strength : 0
   }
 
+  // Tints where a layer shows, for the layer the list is hovering; null clears it.
+  setMaskTint(mask: THREE.Texture | null) {
+    this.shared.uMaskMap.value = mask
+    this.shared.uMaskTint.value = mask ? 0.6 : 0
+  }
+
   setHover(part: number, island = -1) {
     this.shared.uHover.value = part
     this.shared.uHoverIsland.value = island
@@ -389,7 +402,7 @@ export class Stage {
       island = this.nrmData?.[(py * s + px) * 4 + 3] ?? -1
     }
     const normal = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3(0, 1, 0)
-    return { point: hit.point, normal, part, island }
+    return { point: hit.point, normal, part, island, uv: hit.uv?.clone() }
   }
 
   // Casts from above p back down along -n, so points off a curved surface land on it.
@@ -422,6 +435,7 @@ export class Stage {
   dispose() {
     this.resize.disconnect()
     this.controls.dispose()
+    this.volume.dispose()
     this.flat.dispose()
     this.composer.dispose()
     this.renderer.dispose()

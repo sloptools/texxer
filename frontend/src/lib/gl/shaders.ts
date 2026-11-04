@@ -7,7 +7,8 @@ void main() {
 export const maxMasks = 4
 export const maxStamps = 96
 
-export const kindIndex = { parts: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, facing: 5, noise: 6, paint: 7, stamps: 8, grunge: 9, islands: 10 } as const
+export const kindIndex = { parts: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, facing: 5, noise: 6, paint: 7, stamps: 8, grunge: 9, islands: 10, volume: 11 } as const
+export const shapeIndex = { box: 0, cylinder: 1, sphere: 2 } as const
 
 // Island ids a mask can select; smaller ones are too small to matter.
 export const maxIslands = 4096
@@ -101,8 +102,11 @@ uniform int uCount;
 uniform int uKind[${maxMasks}];
 uniform vec4 uA[${maxMasks}];
 uniform vec4 uB[${maxMasks}];
-// Stamps of the layer: first index and count per mask.
+// Stamps of the layer: first index and count per mask; volumes: shape and mirror.
 uniform vec4 uC[${maxMasks}];
+// Volumes: from model positions into the volume's own space.
+uniform mat4 uV[${maxMasks}];
+uniform float uMirrorX;
 uniform sampler2D uPaint0;
 uniform sampler2D uPaint1;
 uniform sampler2D uPaint2;
@@ -181,6 +185,22 @@ float stamps(int i, vec3 p, vec3 n) {
   return v;
 }
 
+// 1 in the middle of the volume, 0 on its walls, below outside.
+float inside(int i, vec3 p) {
+  vec3 l = (uV[i] * vec4(p, 1.0)).xyz;
+  int shape = int(uC[i].z);
+  if (shape == 1) return 1.0 - max(length(l.xz), abs(l.y));
+  if (shape == 2) return 1.0 - length(l);
+  vec3 a = abs(l);
+  return 1.0 - max(a.x, max(a.y, a.z));
+}
+
+float volume(int i, vec3 p) {
+  float v = inside(i, p);
+  if (uC[i].w > 0.5) v = max(v, inside(i, vec3(2.0 * uMirrorX - p.x, p.yz)));
+  return v;
+}
+
 float field(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   int k = uKind[i];
   // Axes 3 to 5 are 0 to 2 the other way round.
@@ -189,6 +209,7 @@ float field(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   if (k == 7) return paintAt(i, t);
   if (k == 8) return stamps(i, pos.xyz, n);
   if (k == 9) return grunge(i, pos.xyz, n);
+  if (k == 11) return volume(i, pos.xyz);
   if (k == 1) return 1.0 - geo.r;
   if (k == 2) return geo.g;
   if (k == 3) return geo.b;

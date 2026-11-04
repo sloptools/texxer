@@ -184,10 +184,11 @@ type VariantTextures struct {
 	Emissive string `json:"emissive"`
 }
 
-// Export writes the textures into the model's files in place, and as PNGs beside the
-// first one, named after the model; variants get PNGs of their own. An empty emissive
-// leaves it out. It returns the files' new hash.
-func (a *App) Export(key string, layout int, name, pngBase64, emissiveBase64 string, variants []VariantTextures, emissiveStrength float64) (string, error) {
+// Export writes the textures into the model's files in place, and as PNGs into dir
+// (beside the first file when empty), named after the model; variants get PNGs of
+// their own. The files link the PNGs instead of embedding them, so engines import
+// one texture, not a copy too. An empty emissive leaves it out. It returns the files' new hash.
+func (a *App) Export(key string, layout int, name, dir, pngBase64, emissiveBase64 string, variants []VariantTextures, emissiveStrength float64) (string, error) {
 	t := mesh.Textures{EmissiveStrength: emissiveStrength}
 	var err error
 	if t.Color, err = base64.StdEncoding.DecodeString(pngBase64); err != nil {
@@ -200,8 +201,17 @@ func (a *App) Export(key string, layout int, name, pngBase64, emissiveBase64 str
 	}
 
 	paths := keyPaths(key)
+	if dir == "" {
+		dir = filepath.Dir(paths[0])
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	base := filepath.Join(dir, fileName(name))
+
 	outs := make([][]byte, len(paths))
-	for i := range paths {
+	details := map[string][]byte{}
+	for i, p := range paths {
 		glb, err := a.models.glb(key, layout, i)
 		if err != nil {
 			return "", err
@@ -213,17 +223,41 @@ func (a *App) Export(key string, layout int, name, pngBase64, emissiveBase64 str
 				return "", err
 			}
 		}
+		own := base
+		if len(paths) > 1 {
+			own += "_" + fileName(strings.TrimSuffix(filepath.Base(p), filepath.Ext(p)))
+		}
+		rel := func(f string) string {
+			r, _ := filepath.Rel(filepath.Dir(p), f)
+			return r
+		}
+		ft.Files = &mesh.TextureFiles{
+			Color:     rel(base + ".png"),
+			Emissive:  rel(base + "_emissive.png"),
+			Normal:    rel(own + "_normal.png"),
+			Occlusion: rel(own + "_occlusion.png"),
+		}
+		if ft.Normal != nil {
+			details[own+"_normal.png"] = ft.Normal
+		}
+		if ft.Occlusion != nil {
+			details[own+"_occlusion.png"] = ft.Occlusion
+		}
 		if outs[i], err = withTexture(glb, ft); err != nil {
 			return "", err
 		}
 	}
 
-	base := filepath.Join(filepath.Dir(paths[0]), fileName(name))
 	if err := writePNGs(base, pngBase64, emissiveBase64); err != nil {
 		return "", err
 	}
 	for _, v := range variants {
 		if err := writePNGs(base+"_"+fileName(v.Name), v.Color, v.Emissive); err != nil {
+			return "", err
+		}
+	}
+	for f, png := range details {
+		if err := os.WriteFile(f, png, 0o644); err != nil {
 			return "", err
 		}
 	}

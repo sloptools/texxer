@@ -1,4 +1,4 @@
-export type MaskKind = 'parts' | 'islands' | 'paint' | 'stamps' | 'grunge' | 'ao' | 'edges' | 'cavity' | 'gradient' | 'facing' | 'noise'
+export type MaskKind = 'parts' | 'islands' | 'paint' | 'stamps' | 'volume' | 'grunge' | 'ao' | 'edges' | 'cavity' | 'gradient' | 'facing' | 'noise'
 export type Blend = 'normal' | 'multiply' | 'add' | 'overlay' | 'relief'
 // x, y, z as glTF has them (y up, z towards the front), then the same the other way.
 export type Axis = 0 | 1 | 2 | 3 | 4 | 5
@@ -18,6 +18,12 @@ export type Stamp = {
   mirror: boolean
 }
 
+export type VolumeShape = 'box' | 'cylinder' | 'sphere'
+
+// A projection volume in model space: p its center, q its rotation as a quaternion,
+// size its half extents. A cylinder stands along its own y.
+export type Volume = { shape: VolumeShape; p: Vec3; q: [number, number, number, number]; size: Vec3; mirror: boolean }
+
 // Every mask is a field over the model, cut at 1 - amount. Parts masks are on or off.
 export type Mask = {
   kind: MaskKind
@@ -35,6 +41,8 @@ export type Mask = {
   // Painted masks keep their pixels in a PNG under this id.
   paint: string
   stamps: Stamp[]
+  // Everything inside it, all around, is in the mask, softening towards its walls.
+  volume: Volume
   // A built-in grunge map, projected from three sides at `scale` repeats per model size.
   map: string
 }
@@ -149,6 +157,8 @@ export type ModelDoc = Project & {
   name: string
   // Absolute in memory, relative to the project file on disk.
   files: string[]
+  // Where the export puts the PNGs, beside the first file when unset. Stored like files.
+  textures?: string
   // What the last export wrote, to tell whether it needs another.
   exported?: { doc: string; files: string }
 }
@@ -164,7 +174,7 @@ export type Workspace = {
 export type View = 'lit' | 'unlit' | 'game' | 'mask'
 export type FlatMap = 'texture' | 'mask' | 'glow' | 'ao' | 'edges' | 'cavity' | 'parts'
 
-export type Tool = 'nav' | 'brush' | 'stamp'
+export type Tool = 'nav' | 'brush' | 'stamp' | 'volume'
 
-export const maskKinds: MaskKind[] = ['parts', 'islands', 'paint', 'stamps', 'grunge', 'ao', 'edges', 'cavity', 'gradient', 'facing', 'noise']
+export const maskKinds: MaskKind[] = ['parts', 'islands', 'paint', 'stamps', 'volume', 'grunge', 'ao', 'edges', 'cavity', 'gradient', 'facing', 'noise']
 export const blends: Blend[] = ['normal', 'multiply', 'add', 'overlay', 'relief']

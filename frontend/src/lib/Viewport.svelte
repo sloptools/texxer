@@ -3,7 +3,7 @@
   import * as api from '../../wailsjs/go/main/App'
   import { Compositor, loadBake } from './gl/compositor'
   import { PaintStore } from './gl/paint'
-  import { Stage } from './gl/stage'
+  import { Stage, type Hit } from './gl/stage'
   import { withVariant } from './project'
   import { stateOf } from './projects.svelte'
   import { corners, handles } from './stamps'
@@ -27,12 +27,20 @@
     if (import.meta.env.DEV) Object.assign(window, { stage: s })
     const input = new ToolInput(s, () => compositor, () => (dirty = true))
     tools.surface = (p, n, reach) => s.surface(p, n, reach)
+    s.volume.onChange = (v) => {
+      const m = tools.volume
+      if (m) Object.assign(m.volume, v)
+    }
     s.onError = (m) => store.say(m, true)
 
     s.controls.onLight = (d) => (store.project.light.angle = (store.project.light.angle - d * 0.4 + 360) % 360)
     s.controls.onClick = (e) => {
       if (tools.tool !== 'nav') return
       const hit = s.hit(e.clientX, e.clientY)
+      if (e.altKey) {
+        pickLayer(hit)
+        return
+      }
       if (!hit || hit.part < 0) return
       if (store.selectedGroup && store.pickingZone) store.toggleZone(e.metaKey ? 'parts' : 'islands', e.metaKey ? hit.part : hit.island)
       else if (store.picksIslands || (e.metaKey && e.shiftKey)) store.toggleIsland(hit.island)
@@ -62,7 +70,7 @@
       frame = requestAnimationFrame(loop)
       if (compositor && dirty) {
         const project = withVariant($state.snapshot(store.project), store.variant)
-        compositor.render(project, store.selected, tools.ghost && $state.snapshot(tools.ghost))
+        compositor.render(project, store.hoverLayer >= 0 ? store.hoverLayer : store.selected, tools.ghost && $state.snapshot(tools.ghost))
         if (project.finish.palette === 'auto') schedulePalette(compositor)
         dirty = false
       }
@@ -91,6 +99,23 @@
       stage = undefined
     }
   })
+
+  // ⌥click selects the topmost layer that shows where the model was clicked.
+  function pickLayer(hit: Hit | undefined) {
+    const c = compositor
+    if (!c || !hit?.uv) return
+    const size = c.mask.width
+    const texel: [number, number] = [Math.min(size - 1, Math.floor(hit.uv.x * size)), Math.min(size - 1, Math.floor(hit.uv.y * size))]
+    const i = c.layerAt(withVariant($state.snapshot(store.project), store.variant), texel)
+    c.renderMask(withVariant($state.snapshot(store.project), store.variant), i >= 0 ? i : store.selected)
+    if (i < 0) return
+    store.selected = i
+    store.selectedGroup = ''
+    const l = store.project.layers[i]
+    const g = store.group(l.group)
+    if (g) g.open = true
+    store.say('picked ' + l.name)
+  }
 
   // The auto palette follows the texture once edits pause, so dragging stays fast.
   function schedulePalette(c: Compositor) {
@@ -130,7 +155,7 @@
     store.ready = false
     const project = store.path
     const key = encodeURIComponent(model.path)
-    const files = model.offsets.map((offset, i) => ({ url: `/model?path=${key}&unwrap=${layout}&file=${i}`, offset }))
+    const files = model.offsets.map((offset, i) => ({ url: `/model?path=${key}&unwrap=${layout}&file=${i}`, images: `/linked?path=${key}&file=${i}&uri=`, offset }))
     // The colors come from kept copies of the files, as export overwrites them; a
     // new copy when the files changed outside texxer.
     const doc = store.project
@@ -235,6 +260,28 @@
   $effect(() => {
     if (stage) stage.controls.leftDrag = tools.tool === 'nav'
     if (stage && tools.tool !== 'brush') stage.setRing(null)
+  })
+
+  // Hovering a layer in the list tints where it shows, without a full render.
+  $effect(() => {
+    const c = compositor
+    const hover = store.hoverLayer
+    if (!stage || !c) return
+    const layer = hover >= 0 ? hover : store.selected
+    untrack(() => c.renderMask(withVariant($state.snapshot(store.project), store.variant), layer))
+    stage.setMaskTint(hover >= 0 && store.view !== 'mask' ? c.mask.texture : null)
+  })
+
+  // The edited volume and its gizmo, while the volume tool is on.
+  $effect(() => {
+    const m = tools.tool === 'volume' && !store.flat ? tools.volume : undefined
+    const model = store.model
+    const v = m && $state.snapshot(m.volume)
+    stage?.volume.set(v && model ? v : null, model ? model.min[0] + (model.extent[0] * model.diag) / 2 : 0)
+  })
+
+  $effect(() => {
+    stage?.volume.setMode(tools.gizmo)
   })
 
   // The picked stamp's frame follows edits from the panel and keys.

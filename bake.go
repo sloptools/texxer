@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"texxer/internal/grunge"
 	"texxer/internal/mesh"
@@ -97,6 +99,8 @@ func (c *modelCache) bake(path string, size, layout int, b bakeOptions) ([]byte,
 	return out, nil
 }
 
+var imageExt = map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".webp": true}
+
 func withTexture(glb []byte, t mesh.Textures) ([]byte, error) {
 	return mesh.WithTexture(glb, t, "")
 }
@@ -116,6 +120,18 @@ func (a *App) middleware(next http.Handler) http.Handler {
 			}
 			w.Header().Set("Content-Type", "model/gltf-binary")
 			w.Write(glb)
+
+		case "/linked":
+			// Images a model's file links, relative to it.
+			file, _ := strconv.Atoi(r.URL.Query().Get("file"))
+			paths := keyPaths(path)
+			uri, err := url.PathUnescape(r.URL.Query().Get("uri"))
+			if err != nil || file < 0 || file >= len(paths) || !imageExt[strings.ToLower(filepath.Ext(uri))] {
+				http.Error(w, "bad image", http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Cache-Control", "no-store")
+			http.ServeFile(w, r, filepath.Join(filepath.Dir(paths[file]), filepath.FromSlash(uri)))
 
 		case "/grunge":
 			data, err := grunge.PNG(r.URL.Query().Get("name"))

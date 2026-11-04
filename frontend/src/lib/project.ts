@@ -8,6 +8,7 @@ const maskDefaults: Record<MaskKind, Partial<Mask>> = {
   islands: { amount: 1 },
   paint: { amount: 0.5 },
   stamps: { amount: 0.5 },
+  volume: { amount: 1, soft: 0.3 },
   grunge: { amount: 0.4, scale: 3, map: 'grunge_1' },
   ao: { amount: 0.45, soft: 0.4 },
   edges: { amount: 0.3, rough: 0.6 },
@@ -31,6 +32,7 @@ export function newMask(kind: MaskKind): Mask {
     islands: [],
     paint: kind === 'paint' ? uid() : '',
     stamps: [],
+    volume: { shape: 'box', p: [0, 0, 0], q: [0, 0, 0, 1], size: [0, 0, 0], mirror: false },
     map: '',
     ...maskDefaults[kind],
   }

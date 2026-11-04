@@ -4,7 +4,7 @@ import {main} from '../models';
 
 export function DeleteMaterial(arg1:string):Promise<void>;
 
-export function Export(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:Array<main.VariantTextures>,arg7:number):Promise<string>;
+export function Export(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string,arg7:Array<main.VariantTextures>,arg8:number):Promise<string>;
 
 export function FileHashes(arg1:Array<string>):Promise<Record<string, string>>;
 
@@ -25,6 +25,8 @@ export function NewProject():Promise<string>;
 export function Open(arg1:string):Promise<main.ModelInfo>;
 
 export function Palette(arg1:string):Promise<Array<any>>;
+
+export function PickFolder():Promise<string>;
 
 export function PickModels():Promise<Array<string>>;
 

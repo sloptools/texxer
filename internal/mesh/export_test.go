@@ -165,3 +165,51 @@ func TestWithTextureKeepsExtensionTextures(t *testing.T) {
 		}
 	})
 }
+
+// Linked textures stay out of the file and load from beside it.
+func TestWithTextureLinked(t *testing.T) {
+	src, err := os.ReadFile("../../examples/models/ship_unique.glb")
+	if err != nil {
+		t.Skip("example model missing")
+	}
+	tex := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+	tex.Set(0, 0, color.NRGBA{255, 0, 0, 255})
+	var buf bytes.Buffer
+	png.Encode(&buf, tex)
+
+	out, err := WithTexture(src, Textures{Color: buf.Bytes(), Files: &TextureFiles{Color: "../my textures/ship.png"}}, "albedo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) >= len(src) {
+		t.Errorf("linked export is %d bytes, the source %d", len(out), len(src))
+	}
+
+	dir := t.TempDir()
+	os.MkdirAll(dir+"/model", 0o755)
+	os.MkdirAll(dir+"/my textures", 0o755)
+	os.WriteFile(dir+"/model/ship.glb", out, 0o644)
+	m, err := LoadGLB(dir + "/model/ship.glb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range m.Details {
+		if d.Color != nil {
+			t.Fatal("loaded a texture that is not there yet")
+		}
+	}
+
+	os.WriteFile(dir+"/my textures/ship.png", buf.Bytes(), 0o644)
+	if m, err = LoadGLB(dir + "/model/ship.glb"); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, d := range m.Details {
+		if d.Color != nil && d.Color.Bounds().Dx() == 4 {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("linked texture not loaded")
+	}
+}

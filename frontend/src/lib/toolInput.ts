@@ -42,6 +42,10 @@ export class ToolInput {
 
   private down(e: PointerEvent) {
     if (e.button !== 0 || tools.tool === 'nav') return
+    if (tools.tool === 'volume') {
+      this.pressVolume(e)
+      return
+    }
     if (tools.tool === 'stamp' && (this.grip = this.gripAt(e.clientX, e.clientY))) {
       this.stage.renderer.domElement.setPointerCapture(e.pointerId)
       return
@@ -75,6 +79,8 @@ export class ToolInput {
 
     if (this.stroke) {
       if (hit) this.strokeTo(hit, e.altKey)
+    } else if (this.dragging && tools.tool === 'volume') {
+      if (hit) tools.moveVolume([hit.point.x, hit.point.y, hit.point.z])
     } else if (this.dragging) {
       if (hit) tools.move(hit.point, hit.normal)
     }
@@ -147,6 +153,16 @@ export class ToolInput {
       tools.setRotation(e.shiftKey ? Math.round(deg / 15) * 15 : deg)
     }
     this.changed()
+  }
+
+  // A click beside the gizmo puts the volume there; dragging slides it over the surface.
+  private pressVolume(e: PointerEvent) {
+    if (this.stage.volume.active) return
+    const hit = this.stage.hit(e.clientX, e.clientY)
+    if (!hit) return
+    this.stage.renderer.domElement.setPointerCapture(e.pointerId)
+    tools.moveVolume([hit.point.x, hit.point.y, hit.point.z])
+    this.dragging = true
   }
 
   private pressStamp(hit: Hit) {
