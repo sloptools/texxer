@@ -6,6 +6,14 @@
   import type { Layer } from '../types'
 
   let renaming = $state('')
+
+  // Where a layer shows is tinted while its target is hovered, or with ⌥ over its row.
+  let overRow = $state(-1)
+  let overTarget = $state(-1)
+  let alt = $state(false)
+  $effect(() => {
+    store.hoverLayer = drag?.active ? -1 : overTarget >= 0 ? overTarget : alt ? overRow : -1
+  })
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
 
   // Right click picks the row, then offers what fits it.
@@ -19,6 +27,7 @@
       items.push(
         { label: 'new layer in folder', key: 'N', run: () => store.addLayer() },
         { label: 'rename', run: () => (renaming = id) },
+        { label: 'flatten to paint', run: () => store.flatten() },
         'line',
         { label: 'dissolve folder', key: '⇧⌘G', run: () => store.ungroup(id) },
         { label: 'delete folder and its layers', danger: true, run: () => store.deleteGroup(id) },
@@ -31,6 +40,7 @@
         { label: 'duplicate', key: 'D', run: () => store.duplicateLayer() },
         { label: 'rename', run: () => (renaming = row.key) },
         { label: 'into a new folder', key: '⌘G', run: () => store.groupLayer() },
+        { label: 'flatten to paint', run: () => store.flatten() },
         'line',
         { label: 'delete', key: '⌫', danger: true, run: () => store.deleteLayer() },
       )
@@ -173,7 +183,7 @@
   const dragged = $derived(drag?.active ? rows.find((r) => r.key === drag!.key) : undefined)
 </script>
 
-<svelte:window onpointermove={move} onpointerup={() => ((painting = null), up())} onkeydowncapture={key} />
+<svelte:window onpointermove={move} onpointerup={() => ((painting = null), up())} onkeydowncapture={key} onkeydown={(e) => (alt = e.altKey)} onkeyup={(e) => (alt = e.altKey)} onblur={() => (alt = false)} />
 
 
 <div class="list" class:dragging={drag?.active} bind:this={list} role="tree" tabindex="-1" oncontextmenu={(e) => context(e)}>
@@ -225,8 +235,8 @@
         role="option"
         aria-selected={!store.selectedGroup && row.i === store.selected}
         tabindex="-1"
-        onpointerenter={() => !drag?.active && (store.hoverLayer = row.i)}
-        onpointerleave={() => (store.hoverLayer = -1)}
+        onpointerenter={(e) => ((overRow = row.i), (alt = e.altKey))}
+        onpointerleave={() => (overRow = -1)}
         onpointerdown={(e) => down(e, row)}
         oncontextmenu={(e) => context(e, row)}
         onclick={() => ((store.selected = row.i), (store.selectedGroup = ''), (store.pickingZone = false))}
@@ -234,6 +244,7 @@
         onkeydown={() => {}}
       >
         <button class="eye" title="Show or hide (V) · drag over others · ⌥click solo" onpointerdown={(e) => eyeDown(e, row.l)} onclick={(e) => e.stopPropagation()} onpointerenter={() => eyeOver(row.l)}><Icon name="eye" size={11} /></button>
+        <button class="where" title="Show where it paints (or hold ⌥ over the layer)" onclick={(e) => e.stopPropagation()} onpointerenter={() => (overTarget = row.i)} onpointerleave={() => (overTarget = -1)}><Icon name="where" size={11} /></button>
         <span class="swatch" class:changed={look.changed} style:background={look.color}></span>
         {#if renaming === row.key}
           {@render nameInput(row.l)}
@@ -385,6 +396,7 @@
   }
 
   .eye,
+  .where,
   .caret {
     display: grid;
     place-items: center;
@@ -402,6 +414,17 @@
   .eye:hover,
   .caret:hover {
     color: var(--strong);
+  }
+  .where {
+    width: 16px;
+    margin-left: -6px;
+    opacity: 0;
+  }
+  .row:hover .where {
+    opacity: 1;
+  }
+  .where:hover {
+    color: var(--accent);
   }
   .caret :global(svg) {
     transition: transform 0.12s;

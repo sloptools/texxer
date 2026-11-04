@@ -14,6 +14,11 @@
     ['cylinder', 'cylinder'],
     ['sphere', 'sphere'],
   ]
+  // Soft and rough show when set, or on asking for more.
+  let more = $state(false)
+  const canSoft = $derived(mask.kind !== 'paint')
+  const canRough = $derived(mask.kind !== 'noise' && mask.kind !== 'grunge' && mask.kind !== 'paint')
+
   const editing = $derived(tools.tool === 'volume' && tools.volume === mask)
 
   // Directions as seen in a front view, like Blender's. A gradient rises from its
@@ -122,14 +127,17 @@
       </div>
     {/if}
     <Slider label="amount" bind:value={mask.amount} def={0.5} />
-    {#if mask.kind !== 'paint'}
+    {#if canSoft && (more || mask.soft > 0)}
       <Slider label="soft" bind:value={mask.soft} def={0} />
     {/if}
-    {#if mask.kind !== 'noise' && mask.kind !== 'grunge' && mask.kind !== 'paint'}
+    {#if canRough && (more || mask.rough > 0)}
       <Slider label="rough" bind:value={mask.rough} def={0} />
     {/if}
     {#if mask.kind === 'noise' || mask.kind === 'grunge' || mask.rough > 0}
       <Slider label="scale" bind:value={mask.scale} min={1} max={96} step={1} def={mask.kind === 'grunge' ? 3 : 24} digits={0} />
+    {/if}
+    {#if (canSoft && mask.soft === 0) || (canRough && mask.rough === 0)}
+      <button class="text more" onclick={() => (more = !more)}>{more ? 'less' : 'more'}</button>
     {/if}
   {/if}
 </div>
@@ -162,6 +170,10 @@
     gap: 2px;
   }
 
+  .more {
+    align-self: flex-start;
+    padding: 0;
+  }
   .text {
     height: 20px;
     padding: 0 6px;

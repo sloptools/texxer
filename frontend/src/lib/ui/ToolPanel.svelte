@@ -17,6 +17,11 @@
     [false, 'soft'],
     [true, 'pixel'],
   ]
+  // A brush paints where the layer shows, or the layer's colors themselves.
+  const paintKinds: [boolean, string][] = [
+    [false, 'mask'],
+    [true, 'colors'],
+  ]
 
   // Sliders write here and pass changes on, so a picked stamp follows them.
   let size = $state(tools.stamp.size)
@@ -41,11 +46,11 @@
   const textShape = $derived('text:' + tools.text)
   const pixelShape = $derived('pixel:' + tools.text)
 
-  async function useImage(name: string) {
+  async function useImage(name: string, swap = false) {
     const url = await imageURL(`/stamp?name=${encodeURIComponent(name)}`)
     if (!url) return
     const img = new Image()
-    img.onload = () => tools.setShape('img:' + name, img.naturalHeight / img.naturalWidth)
+    img.onload = () => tools.setShape('img:' + name, img.naturalHeight / img.naturalWidth, swap)
     img.src = url
   }
 </script>
@@ -53,6 +58,9 @@
 {#if tools.tool === 'brush'}
   <div class="section">
     <div class="caps">brush · {store.layer?.name} <HelpLink page="brush-stamps" /></div>
+    {#if store.layer}
+      <Seg value={!!store.layer.paintColors} options={paintKinds} onchange={(v) => store.setColorSource(v ? 'paint' : 'layer')} />
+    {/if}
     {#if store.layer?.paintColors}
       <div class="brushcolor">
         <div class="field"><ColorField bind:value={tools.brush.color} /></div>
@@ -88,38 +96,38 @@
     <div class="caps">{tools.picked ? 'stamp' : 'new stamp'} · {store.layer?.name} <HelpLink page="brush-stamps" /></div>
     <div class="shapes">
       {#each shapes as shape}
-        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={() => tools.setShape(shape)} />
+        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => tools.setShape(shape, undefined, e.altKey)} />
       {/each}
     </div>
     <div class="caps sub">relief · relief blend, colors from stamps</div>
     <div class="shapes">
       {#each reliefDecals as shape}
-        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={() => tools.setShape(shape)} />
+        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => tools.setShape(shape, undefined, e.altKey)} />
       {/each}
     </div>
     <div class="caps sub">decals · colors from stamps</div>
     <div class="shapes">
       {#each colorDecals as shape}
-        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={() => tools.setShape(shape)} />
+        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => tools.setShape(shape, undefined, e.altKey)} />
       {/each}
     </div>
     <div class="caps sub">images</div>
     <div class="shapes">
       {#each store.stampImages as name}
-        <ShapeTile shape={'img:' + name} on={tools.stamp.shape === 'img:' + name} onclick={() => useImage(name)} />
+        <ShapeTile shape={'img:' + name} on={tools.stamp.shape === 'img:' + name} onclick={(e) => useImage(name, e.altKey)} />
       {/each}
       <button class="import" title="Import PNG stamps" onclick={() => store.importStamps()}>+ png</button>
     </div>
     <div class="text">
       <input bind:value={tools.text} placeholder="text" onkeydown={(e) => e.key === 'Enter' && tools.setShape(pixelShape)} />
-      <button class:on={tools.stamp.shape === pixelShape} title="Bitmap font, crisp at low sizes" onclick={() => tools.setShape(pixelShape)}>pixel</button>
-      <button class:on={tools.stamp.shape === textShape} title="Condensed font" onclick={() => tools.setShape(textShape)}>text</button>
+      <button class:on={tools.stamp.shape === pixelShape} title="Bitmap font, crisp at low sizes" onclick={(e) => tools.setShape(pixelShape, undefined, e.altKey)}>pixel</button>
+      <button class:on={tools.stamp.shape === textShape} title="Condensed font" onclick={(e) => tools.setShape(textShape, undefined, e.altKey)}>text</button>
     </div>
     <Slider label="size" bind:value={size} min={0.005} max={1} step={0.005} digits={3} def={0.12} />
     <Slider label="rotation" bind:value={rot} min={0} max={345} step={15} digits={0} def={0} />
     <Slider label="aspect" bind:value={aspect} min={0.05} max={4} step={0.01} def={1} />
     {#if tools.stamp.shape.startsWith('snip:')}
-      <Slider label="tiles" bind:value={() => snipTiles(tools.stamp.shape).cols, (v) => tools.setShape(tiled(tools.stamp.shape, v, tools.stamp.aspect))} min={1} max={12} step={1} digits={0} def={1} />
+      <Slider label="tiles" bind:value={() => snipTiles(tools.stamp.shape).cols, (v) => tools.setShape(tiled(tools.stamp.shape, v, tools.stamp.aspect), undefined, true)} min={1} max={12} step={1} digits={0} def={1} />
     {/if}
     <Slider label="row gap" bind:value={tools.gap} min={0.5} max={4} step={0.05} def={1} />
     {#if tools.picked}

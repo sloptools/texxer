@@ -4,19 +4,19 @@
 
 Layers stack bottom to top. A new layer starts with an empty paint mask and shows nothing until painted; another mask takes its place. A layer without masks covers everything.
 
-- **color**: the layer's color. Swatches reuse colors of other layers; the pipette (**K**) takes one from the model, as the layers show it before baked light.
-- **tone**, **tone scale**: lighter and darker patches over the color, at a world size.
-- **grain**: single texels a bit lighter or darker.
-- **shine**: baked sheen and glints, for glass and gloss.
+- **color** from:
+  - **layer**: its own color. Swatches reuse colors of other layers; the pipette (**K**) takes one from the model, as the layers show it before baked light.
+  - **stamps**: the colors of its image stamps and photo snippets.
+  - **paint**: the brush paints colors (also **colors** in the brush panel), many in one layer, for details on a projected photo. The brush gets its own color (**K** sets it); painted colors keep their own entries in the auto palette, so small details aren't crunched away. **clear** under the swatches forgets them.
+  - **model**: the model's own texture or material colors. One such layer alone just crunches a finished texture; layers above it add to it. texxer keeps a copy of the original beside the project, since the export overwrites it.
 - **glows**: the color also goes into the emissive map.
-- **colors from paint**: the brush paints colors into the layer, not just where it shows: many colors in one layer, for details on a projected photo. The brush gets its own color (the pipette **K** sets it); painted colors keep their own entries in the auto palette, so small details aren't crunched away. **clear** under the swatches forgets them.
-- **colors from the model's texture**: the layer takes the model's own texture or material colors. One such layer alone just crunches a finished texture; layers above it add to it. texxer keeps a copy of the original beside the project, since the export overwrites it, and takes a new one when the file changes outside texxer.
+- **surface** (folded, click to open): **tone** and **tone scale** for lighter and darker patches at a world size, **grain** for single texels a bit lighter or darker, **shine** for baked sheen and glints.
 - **blend**: normal, multiply, add, overlay, relief. Relief takes gray stamps as bumps: mid gray keeps the surface.
 - **opacity**
 
-**N** new (in the picked folder, if one is), **D** duplicate, **⌫** delete, **V** show or hide, **↩** rename, **↑ ↓** select, **⌥↑ ⌥↓** move, into and out of folders on the way. Right-click a layer or folder for the same and more.
+**N** new (in the picked folder, if one is), **D** duplicate, **⌫** delete, **V** show or hide, **↩** rename, **↑ ↓** select, **⌥↑ ⌥↓** move, into and out of folders on the way. Right-click a layer or folder for the same and more: **flatten to paint** bakes the layer or the folder's shown layers into one layer that paints colors, above them, to touch up with the brush; the originals stay, hidden.
 
-Hovering a layer tints where it shows on the model. **⌥click** the model picks the topmost layer there. Drag over the eyes to show or hide several, **⌥click** an eye to show only that layer, again for all.
+A newly selected layer flashes where it shows on the model; the target beside the eye, or **⌥** over the layer, holds it. **⌥click** the model picks the topmost layer there. Drag over the eyes to show or hide several, **⌥click** an eye to show only that layer, again for all.
 
 When dragging, the line shows where the layer lands: indented inside a folder, at the left edge below it. **Esc** cancels.
 

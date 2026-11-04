@@ -333,7 +333,8 @@ void main() {
     c = screen(c, vec3(glint));
   }
 
-  vec3 prev = texelFetch(uPrev, t, 0).rgb;
+  vec4 under = texelFetch(uPrev, t, 0);
+  vec3 prev = under.rgb;
 
   // The emissive pass: glowing layers add their color, others cover it.
   if (uEmitPass == 1) {
@@ -341,7 +342,9 @@ void main() {
     return;
   }
 
-  outColor = vec4(clamp(mix(prev, blend(prev, c), m * uOpacity), 0.0, 1.0), 1.0);
+  // Coverage builds up in alpha, so flattening onto nothing gives premultiplied colors.
+  float k = m * uOpacity;
+  outColor = vec4(clamp(mix(prev, blend(prev, c), k), 0.0, 1.0), under.a + k * (1.0 - under.a));
 }
 `
 

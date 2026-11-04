@@ -31,7 +31,7 @@
 <script lang="ts">
   import { imageURL } from '../assets'
 
-  let { shape, on, onclick }: { shape: string; on: boolean; onclick: () => void } = $props()
+  let { shape, on, onclick }: { shape: string; on: boolean; onclick: (e: MouseEvent) => void } = $props()
 </script>
 
 <button class:on title={shape.replace(/^(img|relief|decal):/, '')} {onclick}>

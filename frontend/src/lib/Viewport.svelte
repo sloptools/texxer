@@ -19,6 +19,8 @@
   let compositor = $state<Compositor>()
   let dirty = true
   let hoverPoint: { x: number; y: number } | undefined
+  // When the selected layer last changed, to flash where it shows.
+  let flashed = -Infinity
   const size = $derived(store.project.size)
   const factor = $derived(store.project.finish.supersample)
   let paletteTimer = 0
@@ -86,6 +88,9 @@
         dirty = false
       }
       if (compositor) {
+        const t = (performance.now() - flashed) / 500
+        const tint = store.hoverLayer >= 0 ? 0.6 : t < 1 ? 0.6 * (1 - t * t) : 0
+        s.setMaskTint(tint > 0 && store.view !== 'mask' ? compositor.mask.texture : null, tint)
         const glow = compositor.hasEmission && store.view !== 'mask' ? compositor.emission!.texture : null
         s.setEmission(glow, store.project.finish.glow)
       }
@@ -217,6 +222,7 @@
         s.nrmData = bake.nrmData
         s.posSize = bake.size
         compositor = c
+        store.flattened = (indices) => c.flatten(withVariant($state.snapshot(store.project), store.variant), indices)
         store.snapshot = (variant) => {
           const project = withVariant($state.snapshot(store.project), variant)
           c.render(project, store.selected)
@@ -298,14 +304,16 @@
     if (stage && tools.tool !== 'brush') stage.setRing(null)
   })
 
-  // Hovering a layer in the list tints where it shows, without a full render.
+  // A newly selected layer flashes where it shows, a shown one in the list holds it.
+  let selectedBefore = -1
   $effect(() => {
     const c = compositor
     const hover = store.hoverLayer
+    const selected = store.selected
     if (!stage || !c) return
-    const layer = hover >= 0 ? hover : store.selected
-    untrack(() => c.renderMask(withVariant($state.snapshot(store.project), store.variant), layer))
-    stage.setMaskTint(hover >= 0 && store.view !== 'mask' ? c.mask.texture : null)
+    untrack(() => c.renderMask(withVariant($state.snapshot(store.project), store.variant), hover >= 0 ? hover : selected))
+    if (selectedBefore >= 0 && selected !== selectedBefore) flashed = performance.now()
+    selectedBefore = selected
   })
 
   // The edited volume and its gizmo, while the volume tool is on.

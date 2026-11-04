@@ -4,7 +4,7 @@
 
 A mask decides where a layer shows. With several masks, the layer shows where all of them do. **M** shows the selected layer's mask.
 
-**+ mask** adds one; it replaces an empty paint or stamps mask. Most masks have **amount** (how much shows), **soft** (edge falloff), **rough** (a noisy edge) and **invert**.
+**+ mask** adds one; it replaces an empty paint or stamps mask. Most masks have **amount** (how much shows), **soft** (edge falloff), **rough** (a noisy edge) and **invert**. Soft and rough show once set, or under **more**.
 
 | mask | shows where |
 |---|---|

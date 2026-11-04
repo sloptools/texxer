@@ -78,6 +78,22 @@ void main() {
 }
 `
 
+// One surface, bounded by hard edges, filled: with a color, or as coverage.
+const fillFragment = /* glsl */ `
+precision highp float;
+uniform sampler2D uNrm;
+uniform float uIsland;
+uniform int uColored;
+uniform int uErase;
+uniform vec3 uBrush;
+out vec4 outColor;
+void main() {
+  vec4 n = texelFetch(uNrm, ivec2(gl_FragCoord.xy), 0);
+  if (dot(n.xyz, n.xyz) < 0.01 || abs(n.w - uIsland) > 0.5) discard;
+  outColor = uColored == 1 ? vec4(uBrush, 1.0) : vec4(uErase == 1 ? 0.0 : 1.0);
+}
+`
+
 const copyFragment = /* glsl */ `
 precision highp float;
 uniform sampler2D uSrc;
@@ -130,6 +146,7 @@ export class PaintStore {
   private quad: THREE.Mesh
   private dabMat: THREE.ShaderMaterial
   private copyMat: THREE.ShaderMaterial
+  private fillMat: THREE.ShaderMaterial
   private saveTimer = 0
 
   onChange: () => void = () => {}
@@ -175,6 +192,15 @@ export class PaintStore {
       fragmentShader: copyFragment,
       uniforms: { uSrc: { value: null } },
       blending: THREE.NoBlending,
+      depthTest: false,
+      depthWrite: false,
+    })
+    this.fillMat = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: quadVertex,
+      fragmentShader: fillFragment,
+      uniforms: { uNrm: { value: bake.nrm }, uIsland: { value: 0 }, uColored: { value: 0 }, uErase: { value: 0 }, uBrush: { value: new THREE.Color() } },
+      blending: THREE.CustomBlending,
       depthTest: false,
       depthWrite: false,
     })
@@ -260,6 +286,26 @@ export class PaintStore {
     this.dirty.add(id)
   }
 
+  // Fills an island; erase empties it.
+  fill(id: string, island: number, color: THREE.Color | undefined, erase: boolean) {
+    const t = this.targets.get(id) ?? this.create(id)
+    const m = this.fillMat
+    m.uniforms.uIsland.value = island
+    m.uniforms.uColored.value = color ? 1 : 0
+    m.uniforms.uErase.value = erase ? 1 : 0
+    if (color) {
+      m.uniforms.uBrush.value.copy(color)
+      this.colored.add(id)
+    }
+    // Colors replace what is there; coverage goes to full, or to nothing.
+    m.blendEquation = color ? THREE.AddEquation : erase ? THREE.MinEquation : THREE.MaxEquation
+    m.blendSrc = color && erase ? THREE.ZeroFactor : THREE.OneFactor
+    m.blendDst = color ? THREE.OneMinusSrcAlphaFactor : THREE.OneFactor
+    this.draw(m, t)
+    this.dirty.add(id)
+    this.onChange()
+  }
+
   read(id: string): Uint8Array {
     const size = this.bake.size
     const data = new Uint8Array(size * size * 4)
@@ -342,6 +388,7 @@ export class PaintStore {
     for (const t of this.targets.values()) t.dispose()
     this.dabMat.dispose()
     this.copyMat.dispose()
+    this.fillMat.dispose()
     this.quad.geometry.dispose()
   }
 }

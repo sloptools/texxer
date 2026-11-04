@@ -9,7 +9,7 @@ texxer paints textures for GLB models: a stack of layers, each a color limited b
 3. Judge the look in the views: **L** lit, **U** unlit, **I** in game, **Tab** flat texture.
 4. **⌘E** writes the texture into the model's file.
 
-Everything saves on its own. **?** shows all shortcuts.
+Everything saves on its own. **?** shows all shortcuts. Sliders: drag sideways (**⇧** finer), click to type a value, double-click resets.
 
 ## View
 

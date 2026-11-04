@@ -298,6 +298,30 @@ export class Compositor {
   }
 
   hasEmission = false
+
+  // Some layers alone, on nothing: their colors premultiplied by coverage, as a
+  // painted color layer keeps them.
+  flatten(project: Project, indices: number[]): Uint8Array {
+    const r = this.renderer
+    const prev = r.getRenderTarget()
+    const u = this.layerMat.uniforms
+    this.fillParts(project)
+    r.setRenderTarget(this.ping[0])
+    r.setClearColor(0x000000, 0)
+    r.clear()
+    let src = 0
+    for (const i of indices) {
+      this.setLayer(project.layers[i], i)
+      u.uPrev.value = this.ping[src].texture
+      this.draw(this.layerMat, this.ping[1 - src])
+      src = 1 - src
+    }
+    const size = this.bake.size
+    const data = new Uint8Array(size * size * 4)
+    r.readRenderTargetPixels(this.ping[src], 0, 0, size, size, data)
+    r.setRenderTarget(prev)
+    return data
+  }
   // The ping target holding the layers before baked light, for sampling colors.
   private layered = 0
 

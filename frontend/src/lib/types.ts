@@ -49,6 +49,8 @@ export type Mask = {
   map: string
 }
 
+export type ColorSource = 'layer' | 'stamps' | 'paint' | 'model'
+
 // A folder for layers. Its layers sit next to each other in the stack and
 // point to it by id.
 export type Group = {

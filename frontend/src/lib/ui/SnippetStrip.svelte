@@ -16,7 +16,7 @@
   </select>
   <div class="cuts">
     {#each cuts as cut (cut.id)}
-      <button class="cut" class:on={tools.stamp.shape === 'snip:' + cut.id} title={cut.name} onclick={() => snippets.pick(cut)}>
+      <button class="cut" class:on={tools.stamp.shape === 'snip:' + cut.id} title={cut.name} onclick={(e) => snippets.pick(cut, e.altKey && !!tools.picked)}>
         <img src={libraryURL('snippet', cut.id, snippets.category, snippets.versions[cut.id])} alt={cut.name} />
       </button>
     {:else}

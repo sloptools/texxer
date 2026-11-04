@@ -41,7 +41,7 @@
   </div>
   <div class="section">
     <div class="caps">look</div>
-    <Slider label="pixels" bind:value={cut.look.px} min={8} max={256} step={1} digits={0} def={64} />
+    <Slider label="pixels" bind:value={cut.look.px} min={8} max={256} step={1} digits={0} def={256} />
     <Slider label="width" bind:value={() => cut.look.width ?? 1, (v) => (cut.look.width = v)} min={0.25} max={4} def={1} />
     <Slider label="calm" bind:value={cut.look.calm} def={0.3} />
     <Slider label="saturation" bind:value={cut.look.sat} max={1.5} def={0.85} />

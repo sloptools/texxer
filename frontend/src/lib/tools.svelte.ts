@@ -134,8 +134,10 @@ class Tools {
     if (this.ghost) this.ghost = { ...this.ghost, size: this.stamp.size * this.diag }
   }
 
-  // Text and images bring their own aspect, so they don't come out squashed.
-  setShape(shape: string, aspect = shapeAspect(shape)) {
+  // Text and images bring their own aspect, so they don't come out squashed. A new
+  // shape is for the next stamp, unless it swaps the picked one's.
+  setShape(shape: string, aspect = shapeAspect(shape), swap = false) {
+    if (!swap) this.picked = null
     this.stamp.shape = shape
     if (aspect) this.stamp.aspect = Math.round(aspect * 100) / 100
     this.update((s) => ({ ...s, shape, aspect: this.stamp.aspect }))

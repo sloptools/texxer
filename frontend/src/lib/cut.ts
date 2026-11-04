@@ -11,7 +11,7 @@ export type CutLook = { px: number; calm: number; sat: number; bright: number; m
 // Corners in photo pixels: top left, top right, bottom right, bottom left.
 export type Cut = { id: string; name: string; corners: [Corner, Corner, Corner, Corner]; look: CutLook; aspect: number }
 
-export const defaultLook: CutLook = { px: 64, calm: 0.3, sat: 0.85, bright: 0, mono: false, width: 1 }
+export const defaultLook: CutLook = { px: 256, calm: 0.3, sat: 0.85, bright: 0, mono: false, width: 1 }
 
 // A photo's pixels, halved again and again, so any cut samples a level near its size.
 export type Levels = { width: number; height: number; data: ImageData[] }

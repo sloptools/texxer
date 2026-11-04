@@ -3,7 +3,7 @@ import * as api from '../../wailsjs/go/main/App'
 import type { main } from '../../wailsjs/go/models'
 import type { PaintStore } from './gl/paint'
 import { newLayer, newMask, newProject, uid } from './project'
-import type { Finish, FlatMap, Group, Layer, LayerLook, Mask, MaskKind, ModelDoc, Variant, Vec3, View, Workspace } from './types'
+import type { ColorSource, Finish, FlatMap, Group, Layer, LayerLook, Mask, MaskKind, ModelDoc, Variant, Vec3, View, Workspace } from './types'
 import { serializeWorkspace } from './workspace'
 
 export function load<T>(key: string, fallback: T): T {
@@ -70,6 +70,8 @@ class Store {
 
   // Set by the viewport: renders a variant's ('' for the base) finished textures as base64 PNGs; emissive is empty when nothing glows.
   snapshot: ((variant: string) => { color: string; emissive: string }) | null = null
+  // Set by the viewport: layers rendered alone, premultiplied, at the bake's size.
+  flattened: ((indices: number[]) => Uint8Array) | null = null
   paint: PaintStore | null = null
 
   past: Entry[] = []
@@ -285,6 +287,48 @@ class Store {
     this.selected = at
     this.selectedGroup = ''
     this.pickingZone = false
+  }
+
+  // The selected layer, or the picked folder's shown layers, baked into one layer
+  // that paints colors, above them; they stay, hidden, to go back to.
+  flatten() {
+    const layers = this.project.layers
+    const group = this.selectedGroup
+    const indices = group ? layers.flatMap((l, i) => (l.group === group && l.visible ? [i] : [])) : this.layer ? [this.selected] : []
+    if (!indices.length || !this.paint || !this.flattened) return
+    const data = this.flattened(indices)
+
+    const top = indices[indices.length - 1]
+    const name = group ? (this.group(group)?.name ?? 'folder') : layers[top].name
+    const mask = newMask('paint')
+    const flat = newLayer(name + ' flat', '#808080', [mask], { paintColors: true, tone: 0, grain: 0, group: group ? '' : layers[top].group })
+    for (const i of indices) layers[i].visible = false
+    // Out of the folder, which would hide it again by its zone, right above it.
+    const at = group ? Math.max(...layers.map((l, i) => (l.group === group ? i : -1))) + 1 : top + 1
+    layers.splice(at, 0, flat)
+    this.selected = at
+    this.selectedGroup = ''
+
+    this.paint.colored.add(mask.paint)
+    const before = new Uint8Array(data.length)
+    this.paint.write(mask.paint, data)
+    this.pushPaint(mask.paint, before, data)
+    this.say('flattened into ' + flat.name)
+  }
+
+  // Where the selected layer's colors come from: its own color, its image stamps,
+  // its paint, or the model's texture.
+  colorSource(l: Layer): ColorSource {
+    return l.source ? 'model' : l.paintColors ? 'paint' : l.stampColors ? 'stamps' : 'layer'
+  }
+
+  setColorSource(kind: ColorSource) {
+    const l = this.layer
+    if (!l) return
+    if (l.paintColors && kind !== 'paint') this.setPaintColors(false)
+    l.stampColors = kind === 'stamps'
+    l.source = kind === 'model'
+    if (kind === 'paint' && !l.paintColors) this.setPaintColors(true)
   }
 
   // Painted colors on or off for the selected layer; what is painted carries over,

@@ -2,7 +2,7 @@
   import Icon from '../Icon.svelte'
   import { store } from '../store.svelte'
   import { tools } from '../tools.svelte'
-  import { blends, type MaskKind } from '../types'
+  import { blends, type ColorSource, type MaskKind } from '../types'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import ColorField from './ColorField.svelte'
   import MaskCard from './MaskCard.svelte'
@@ -35,6 +35,26 @@
   }
 
   const layer = $derived(store.layer)
+  // Tone, grain and shine stay folded to a line; photos and presets rarely need them.
+  let surface = $state(false)
+  const surfaceSummary = $derived(
+    layer
+      ? [layer.tone > 0 && `tone ${layer.tone.toFixed(2)}`, layer.grain > 0 && `grain ${layer.grain.toFixed(2)}`, layer.shine > 0 && `shine ${layer.shine.toFixed(2)}`].filter(Boolean).join(' · ') || 'flat'
+      : '',
+  )
+  const source = $derived(layer ? store.colorSource(layer) : 'layer')
+  const sources = $derived<[ColorSource, string][]>([
+    ['layer', 'layer'],
+    ['stamps', 'stamps'],
+    ['paint', 'paint'],
+    ...(store.model?.texture || layer?.source ? [['model', 'model'] as [ColorSource, string]] : []),
+  ])
+  const sourceHints: Record<ColorSource, string> = {
+    layer: '',
+    stamps: 'colors of its image stamps and photo snippets',
+    paint: "the brush paints colors; pick the brush's color in the brush panel (B)",
+    model: "the model's texture as it was before texxer; a copy is kept beside the project",
+  }
   const look = $derived(layer && store.look(layer))
 
   // Colors of the other layers and variants, for quick reuse.
@@ -52,33 +72,35 @@
 {:else if layer && look}
   <div class="section">
     <div class="caps">color{#if store.activeVariant}<span class="variant">{store.activeVariant.name}</span>{/if}</div>
-    <div class="colorrow">
-      <div class="field"><ColorField bind:value={look.color} /></div>
-      <button class="pipette" class:on={store.sampling} title="Take a color from the model (K)" onclick={() => (store.sampling = !store.sampling)}><Icon name="pipette" size={11} /></button>
-    </div>
+    <Seg value={source} options={sources} onchange={(v) => store.setColorSource(v)} />
+    {#if source === 'layer'}
+      <div class="colorrow">
+        <div class="field"><ColorField bind:value={look.color} /></div>
+        <button class="pipette" class:on={store.sampling} title="Take a color from the model (K)" onclick={() => (store.sampling = !store.sampling)}><Icon name="pipette" size={11} /></button>
+      </div>
+      <div class="swatches">
+        {#each used as c}
+          <button class="sw" class:on={c === look.color.toLowerCase()} style:background={c} title={c} aria-label={c} onclick={() => (look.color = c)}></button>
+        {/each}
+      </div>
+    {:else}
+      <p class="hint">{sourceHints[source]}</p>
+    {/if}
     <label class="check"><input type="checkbox" bind:checked={layer.glow} /> glows (emissive)</label>
-    <label class="check"><input type="checkbox" checked={!!layer.paintColors} onchange={(e) => store.setPaintColors((e.currentTarget as HTMLInputElement).checked)} /> colors from paint (the brush's color)</label>
-    {#if layer.masks.some((m) => m.kind === 'stamps')}
-      <label class="check"><input type="checkbox" bind:checked={layer.stampColors} /> colors from image stamps</label>
-    {/if}
-    {#if store.model?.texture || layer.source}
-      <label class="check" title="The model's texture as it was before texxer; texxer keeps a copy of it beside the project"><input type="checkbox" bind:checked={layer.source} /> colors from the model's texture</label>
-    {/if}
-    <div class="swatches">
-      {#each used as c}
-        <button class="sw" class:on={c === look.color.toLowerCase()} style:background={c} title={c} aria-label={c} onclick={() => (look.color = c)}></button>
-      {/each}
-    </div>
   </div>
 
   <div class="section">
-    <div class="caps">surface</div>
-    <Slider label="tone" bind:value={layer.tone} def={0.08} />
-    {#if layer.tone > 0}
-      <Slider label="tone scale" bind:value={layer.toneScale} min={1} max={64} step={1} digits={0} def={12} />
+    <button class="caps fold" onclick={() => (surface = !surface)} title="Tone, grain and shine of the layer">
+      surface<span class="summary">{surface ? '' : surfaceSummary}</span>
+    </button>
+    {#if surface}
+      <Slider label="tone" bind:value={layer.tone} def={0.08} />
+      {#if layer.tone > 0}
+        <Slider label="tone scale" bind:value={layer.toneScale} min={1} max={64} step={1} digits={0} def={12} />
+      {/if}
+      <Slider label="grain" bind:value={layer.grain} max={0.3} def={0.02} />
+      <Slider label="shine" bind:value={layer.shine} def={0} />
     {/if}
-    <Slider label="grain" bind:value={layer.grain} max={0.3} def={0.02} />
-    <Slider label="shine" bind:value={layer.shine} def={0} />
   </div>
 
   <div class="section">
@@ -150,6 +172,22 @@
   .pipette.on {
     border-color: var(--accent);
     color: var(--accent);
+  }
+  .fold {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+  }
+  .summary {
+    font: 11px var(--mono);
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--faint);
   }
   .check {
     display: flex;

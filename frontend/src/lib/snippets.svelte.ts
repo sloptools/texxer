@@ -167,7 +167,7 @@ class Snippets {
 
   // Stamps the snippet: a layer that takes its colors from stamps, relief for mono
   // ones, and the stamp tool with the snippet as its shape.
-  async pick(cut: Cut) {
+  async pick(cut: Cut, swap = false) {
     try {
       await api.UseSnippet(store.path, this.category, cut.id)
     } catch (e) {
@@ -176,10 +176,10 @@ class Snippets {
     }
     const blend = cut.look.mono ? 'relief' : 'normal'
     const l = store.layer
-    if (!l || !l.stampColors || l.blend !== blend) {
+    if (!swap && (!l || !l.stampColors || l.blend !== blend)) {
       store.addLayer(newLayer(cut.look.mono ? 'photo relief' : 'photo', '#808080', [newMask('stamps')], { stampColors: true, blend, tone: 0, grain: 0 }))
     }
-    tools.setShape('snip:' + cut.id, cut.aspect)
+    tools.setShape('snip:' + cut.id, cut.aspect, swap)
     if (tools.tool !== 'stamp') tools.set('stamp')
   }
 }

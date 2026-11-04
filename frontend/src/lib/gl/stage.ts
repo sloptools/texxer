@@ -392,9 +392,9 @@ export class Stage {
   }
 
   // Tints where a layer shows, for the layer the list is hovering; null clears it.
-  setMaskTint(mask: THREE.Texture | null) {
+  setMaskTint(mask: THREE.Texture | null, strength = 0.6) {
     this.shared.uMaskMap.value = mask
-    this.shared.uMaskTint.value = mask ? 0.6 : 0
+    this.shared.uMaskTint.value = mask ? strength : 0
   }
 
   setHover(part: number, island = -1) {
