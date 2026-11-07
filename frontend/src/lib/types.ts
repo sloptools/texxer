@@ -80,6 +80,10 @@ export type Layer = {
   grain: number
   // Baked sheen and glints from the light direction, for glass and gloss.
   shine: number
+  // Applied to whatever color the layer takes: hue in degrees, saturation as a factor, brightness added.
+  hue: number
+  saturation: number
+  brightness: number
   // Take the color from image stamps instead of the layer color.
   stampColors: boolean
   // Paint colors, not just where: the first paint mask keeps color and coverage.

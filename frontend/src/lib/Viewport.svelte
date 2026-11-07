@@ -12,6 +12,7 @@
   import { ToolInput } from './toolInput'
   import { bridge } from './bridge.svelte'
   import { tools } from './tools.svelte'
+  import { hexRGB, matchAdjust } from './adjust'
   import type { FlatMap, Project } from './types'
   import type { RGB } from './gl/mediancut'
 
@@ -68,10 +69,11 @@
 
     // Ahead of the tools and the camera, so sampling works with any tool.
     const onSample = (e: PointerEvent) => {
-      if (!store.sampling || e.button !== 0) return
+      if ((!store.sampling && !store.matching) || e.button !== 0) return
       e.stopImmediatePropagation()
       e.preventDefault()
-      sampleColor(s.hit(e.clientX, e.clientY))
+      if (store.matching) matchColor(s.hit(e.clientX, e.clientY))
+      else sampleColor(s.hit(e.clientX, e.clientY))
     }
 
     s.renderer.domElement.addEventListener('pointerdown', onSample, { capture: true })
@@ -141,6 +143,23 @@
     }
     store.look(l).color = color
     store.say(`${l.name} takes ${color}`)
+  }
+
+  // Adjusts the selected layer so its mean color becomes the one clicked.
+  function matchColor(hit: Hit | undefined) {
+    store.matching = false
+    const c = compositor
+    const l = store.layer
+    if (!c || !l || !hit?.uv) return
+    const size = c.mask.width
+    const target = c.colorAt([Math.min(size - 1, Math.floor(hit.uv.x * size)), Math.min(size - 1, Math.floor(hit.uv.y * size))])
+    const from = c.layerColor(withVariant($state.snapshot(store.project), store.variant), store.selected)
+    if (!from) {
+      store.say(`${l.name} shows nowhere`)
+      return
+    }
+    Object.assign(l, matchAdjust(from, hexRGB(target)))
+    store.say(`${l.name} matches ${target}`)
   }
 
   // ⌥click selects the topmost layer that shows where the model was clicked.
@@ -401,7 +420,7 @@
 
 <svelte:window {onkeydown} />
 
-<div class="viewport" class:brush={tools.tool === 'brush'} class:sampling={store.sampling} bind:this={container}></div>
+<div class="viewport" class:brush={tools.tool === 'brush'} class:sampling={store.sampling || store.matching} bind:this={container}></div>
 {#if stage && !store.flat && store.model}
   <ViewGizmo {stage} />
 {/if}

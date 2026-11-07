@@ -101,6 +101,8 @@ uniform float uTone;
 uniform float uToneScale;
 uniform float uGrain;
 uniform float uShine;
+// Hue shift in turns, saturation factor, lightness offset.
+uniform vec3 uAdjust;
 uniform float uSeed;
 uniform int uStampColors;
 // The mask whose paint holds colors (coverage in alpha), or -1.
@@ -361,6 +363,28 @@ float mask(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   return uB[i].z > 0.5 ? 1.0 - m : m;
 }
 
+vec3 rgb2hsl(vec3 c) {
+  float hi = max(max(c.r, c.g), c.b);
+  float lo = min(min(c.r, c.g), c.b);
+  float l = (hi + lo) * 0.5;
+  float d = hi - lo;
+  if (d < 1e-5) return vec3(0.0, 0.0, l);
+  float h = hi == c.r ? mod((c.g - c.b) / d, 6.0) : hi == c.g ? (c.b - c.r) / d + 2.0 : (c.r - c.g) / d + 4.0;
+  return vec3(h / 6.0, d / (1.0 - abs(2.0 * l - 1.0)), l);
+}
+
+vec3 hsl2rgb(vec3 hsl) {
+  vec3 k = clamp(abs(mod(hsl.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+  return hsl.z + (k - 0.5) * (1.0 - abs(2.0 * hsl.z - 1.0)) * hsl.y;
+}
+
+vec3 adjust(vec3 c) {
+  if (uAdjust == vec3(0.0, 1.0, 0.0)) return c;
+  vec3 hsl = rgb2hsl(c);
+  hsl = vec3(fract(hsl.x + uAdjust.x), clamp(hsl.y * uAdjust.y, 0.0, 1.0), clamp(hsl.z + uAdjust.z, 0.0, 1.0));
+  return hsl2rgb(hsl);
+}
+
 vec3 blend(vec3 a, vec3 b) {
   if (uBlend == 1) return a * b;
   if (uBlend == 2) return a + b;
@@ -402,6 +426,14 @@ void main() {
   if (uStampColors == 1 && gStampA > 0.0) c = gStampRGB;
   c = clamp(c + gDepth, 0.0, 1.0);
   if (uFromSource == 1) c = texelFetch(uSource, t, 0).rgb;
+
+  // The layer's colors before adjusting, weighted by its mask, for matching them.
+  if (uMaskOnly == 2) {
+    outColor = vec4(c * m, m);
+    return;
+  }
+  c = adjust(c);
+
   float v = (noiseAt(pos.xyz, vec3(uToneScale), uSeed) - 0.5) * 2.0 * uTone;
   v += (hash(vec3(vec2(t), uSeed)) - 0.5) * 2.0 * uGrain;
   c = clamp(c * (1.0 + v), 0.0, 1.0);

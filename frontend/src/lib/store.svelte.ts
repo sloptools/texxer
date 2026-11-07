@@ -33,6 +33,8 @@ class Store {
   hoverLayer = $state(-1)
   // The next click on the model takes its color into the selected layer.
   sampling = $state(false)
+  // The next click on the model sets the selected layer's adjustments to match its color.
+  matching = $state(false)
   model = $state<main.ModelInfo | null>(null)
   project = $state<ModelDoc>({ ...newProject(), id: '', name: '', files: [] })
   // Set by the viewport once the model's texture renders.

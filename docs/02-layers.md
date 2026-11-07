@@ -10,6 +10,7 @@ Layers stack bottom to top. A new layer starts with an empty paint mask and show
   - **paint**: the brush paints colors (also **colors** in the brush panel), many in one layer, for details on a projected photo. The brush gets its own color (**K** sets it); painted colors keep their own entries in the auto palette, so small details aren't crunched away. **clear** under the swatches forgets them.
   - **model**: the model's own texture or material colors. One such layer alone just crunches a finished texture; layers above it add to it. texxer keeps a copy of the original beside the project, since the export overwrites it.
 - **glows**: the color also goes into the emissive map.
+- **adjust** (folded): **hue**, **saturation** and **brightness** of whatever color the layer takes, photos and model colors too. **match**, then click the model where the color is right: the layer's mean color shifts to it, for pieces from different photos.
 - **surface** (folded, click to open): **tone** and **tone scale** for lighter and darker patches at a world size, **grain** for single texels a bit lighter or darker, **shine** for baked sheen and glints.
 - **blend**: normal, multiply, add, overlay, relief. Relief takes gray stamps as bumps: mid gray keeps the surface.
 - **opacity**

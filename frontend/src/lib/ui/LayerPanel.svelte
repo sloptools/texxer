@@ -42,6 +42,13 @@
       ? [layer.tone > 0 && `tone ${layer.tone.toFixed(2)}`, layer.grain > 0 && `grain ${layer.grain.toFixed(2)}`, layer.shine > 0 && `shine ${layer.shine.toFixed(2)}`].filter(Boolean).join(' · ') || 'flat'
       : '',
   )
+  // Hue, saturation and brightness fold the same way.
+  let adjust = $state(false)
+  const adjustSummary = $derived(
+    layer
+      ? [layer.hue !== 0 && `hue ${layer.hue}°`, layer.saturation !== 1 && `sat ${layer.saturation.toFixed(2)}`, layer.brightness !== 0 && `bright ${layer.brightness.toFixed(2)}`].filter(Boolean).join(' · ') || 'none'
+      : '',
+  )
   const source = $derived(layer ? store.colorSource(layer) : 'layer')
   const sources = $derived<[ColorSource, string][]>([
     ['layer', 'layer'],
@@ -87,6 +94,20 @@
       <p class="hint">{sourceHints[source]}</p>
     {/if}
     <label class="check"><input type="checkbox" bind:checked={layer.glow} /> glows (emissive)</label>
+  </div>
+
+  <div class="section">
+    <div class="caps head">
+      <button class="caps fold" onclick={() => (adjust = !adjust)} title="Hue, saturation and brightness of whatever color the layer takes">
+        adjust<span class="summary">{adjust ? '' : adjustSummary}</span>
+      </button>
+      <button class="text" class:on={store.matching} title="Click the model where the color is right: the layer's colors shift to it (Esc cancels)" onclick={() => (store.matching = !store.matching)}>match</button>
+    </div>
+    {#if adjust}
+      <Slider label="hue" bind:value={layer.hue} min={-180} max={180} step={1} digits={0} def={0} />
+      <Slider label="saturation" bind:value={layer.saturation} max={2} def={1} />
+      <Slider label="brightness" bind:value={layer.brightness} min={-0.5} max={0.5} def={0} />
+    {/if}
   </div>
 
   <div class="section">
@@ -182,6 +203,28 @@
     background: none;
     text-align: left;
     cursor: pointer;
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .text {
+    height: 20px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    font: 11px var(--mono);
+    color: var(--faint);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .text:hover {
+    color: var(--strong);
+  }
+  .text.on {
+    color: var(--accent);
   }
   .summary {
     font: 11px var(--mono);

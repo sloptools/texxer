@@ -35,6 +35,7 @@ function toolKey(e: KeyboardEvent): boolean {
       return true
     case 'Escape':
       if (store.sampling) store.sampling = false
+      else if (store.matching) store.matching = false
       else if (store.pickingZone) store.pickingZone = false
       else if (tools.picked) tools.picked = null
       else if (store.marked.length) store.marked = []

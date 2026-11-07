@@ -167,6 +167,7 @@ export class Compositor {
         uToneScale: { value: 12 },
         uGrain: { value: 0 },
         uShine: { value: 0 },
+        uAdjust: { value: new THREE.Vector3(0, 1, 0) },
         uSeed: { value: 0 },
         uStampColors: { value: 0 },
         uPaintColor: { value: -1 },
@@ -413,6 +414,28 @@ export class Compositor {
     this.renderer.setRenderTarget(prev)
   }
 
+  // The layer's mean color (0 to 1) before its adjustments, where it shows; undefined where it shows nowhere.
+  layerColor(project: Project, index: number): RGB | undefined {
+    const layer = project.layers[index]
+    if (!layer) return
+    const prev = this.renderer.getRenderTarget()
+    const size = this.mask.width
+    const px = new Uint8Array(size * size * 4)
+    const u = this.layerMat.uniforms
+    this.fillParts(project)
+    this.setLayer(layer, index)
+    u.uMaskOnly.value = 2
+    this.draw(this.layerMat, this.mask)
+    u.uMaskOnly.value = 0
+    this.renderer.readRenderTargetPixels(this.mask, 0, 0, size, size, px)
+    this.renderer.setRenderTarget(prev)
+
+    const sum = [0, 0, 0, 0]
+    for (let i = 0; i < px.length; i += 4) for (let c = 0; c < 4; c++) sum[c] += px[i + c]
+    if (sum[3] < 255) return
+    return [sum[0] / sum[3], sum[1] / sum[3], sum[2] / sum[3]]
+  }
+
   // The topmost shown layer covering a texel, for picking layers on the model.
   layerAt(project: Project, texel: [number, number]): number {
     const prev = this.renderer.getRenderTarget()
@@ -442,6 +465,7 @@ export class Compositor {
     u.uToneScale.value = layer.toneScale
     u.uGrain.value = layer.grain
     u.uShine.value = layer.shine
+    u.uAdjust.value.set(layer.hue / 360, layer.saturation, layer.brightness)
     u.uSeed.value = (index * 7.31) % 97
     u.uStampColors.value = layer.stampColors ? 1 : 0
     const colorMask = layer.paintColors ? layer.masks.slice(0, maxMasks).findIndex((m) => m.kind === 'paint') : -1
