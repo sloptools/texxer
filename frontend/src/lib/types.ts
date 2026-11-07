@@ -1,4 +1,4 @@
-export type MaskKind = 'surfaces' | 'paint' | 'stamps' | 'volume' | 'grunge' | 'ao' | 'edges' | 'cavity' | 'gradient' | 'facing' | 'noise' | 'drips'
+export type MaskKind = 'surfaces' | 'paint' | 'stamps' | 'volume' | 'grunge' | 'ao' | 'edges' | 'cavity' | 'gradient' | 'facing' | 'drips'
 export type Blend = 'normal' | 'multiply' | 'add' | 'overlay' | 'relief'
 // x, y, z as glTF has them (y up, z towards the front), then the same the other way.
 export type Axis = 0 | 1 | 2 | 3 | 4 | 5
@@ -34,7 +34,7 @@ export type Mask = {
   soft: number
   // Edges and cavities this many texels wide; 0 fades over the baked width.
   crisp: number
-  // Noise that roughens the cut, at the given scale; noise masks use scale as their frequency.
+  // Noise that roughens the cut, at the given scale; grunge masks use it as repeats.
   rough: number
   scale: number
   axis: Axis
@@ -206,5 +206,5 @@ export type FlatMap = 'texture' | 'mask' | 'glow' | 'ao' | 'edges' | 'cavity' | 
 
 export type Tool = 'nav' | 'brush' | 'stamp' | 'volume'
 
-export const maskKinds: MaskKind[] = ['surfaces', 'paint', 'stamps', 'volume', 'grunge', 'ao', 'edges', 'cavity', 'gradient', 'facing', 'noise', 'drips']
+export const maskKinds: MaskKind[] = ['surfaces', 'paint', 'stamps', 'volume', 'grunge', 'ao', 'edges', 'cavity', 'gradient', 'facing', 'drips']
 export const blends: Blend[] = ['normal', 'multiply', 'add', 'overlay', 'relief']

@@ -7,7 +7,7 @@ Layers stack bottom to top. A new layer starts with an empty paint mask and show
 - **color** from:
   - **layer**: its own color. Swatches reuse colors of other layers; the pipette (**K**) takes one from the model, as the layers show it before baked light.
   - **stamps**: the colors of its image stamps and photo snippets.
-  - **paint**: the brush paints colors (also **colors** in the brush panel), many in one layer, for details on a projected photo. The brush gets its own color (**K** sets it); painted colors keep their own entries in the auto palette, so small details aren't crunched away. **clear** under the swatches forgets them.
+  - **paint**: the brush paints colors, many in one layer, for details on a projected photo. The brush gets its own color (**K** sets it); painted colors keep their own entries in the auto palette, so small details aren't crunched away. **clear** under the swatches forgets them.
   - **model**: the model's own texture or material colors. One such layer alone just crunches a finished texture; layers above it add to it. texxer keeps a copy of the original beside the project, since the export overwrites it.
 - **glows**: the color also goes into the emissive map.
 - **adjust** (folded): **hue**, **saturation** and **brightness** of whatever color the layer takes, photos and model colors too. **match**, then click the model where the color is right: the layer's mean color shifts to it, for pieces from different photos.

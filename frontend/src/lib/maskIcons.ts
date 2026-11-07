@@ -106,16 +106,6 @@ const art: Record<MaskKind, string> = {
     ...#.......
     ...........
     ...#.......`,
-  noise: `
-    .#.##..#.#.
-    ..#..##.#..
-    .##.#...##.
-    ...#.##.#..
-    .#..#..#.#.
-    .##.##.#...
-    ..#...#.##.
-    .#.##.#..#.
-    ..#..#.##..`,
 }
 
 // Rows of # into an svg path on the 11×11 grid, vertically centered.

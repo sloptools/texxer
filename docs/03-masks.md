@@ -19,7 +19,6 @@ A mask decides where a layer shows. With several masks, the layer shows where al
 | drips | below edges, running down walls. **rough** varies their length |
 | gradient | rises from one side: below, above, left, right, back, front (as in a front view) |
 | facing | the surface faces a direction |
-| noise | value noise |
 
 Use surfaces for zones, ao, edges and cavity for wear. Volume with grunge puts dirt exactly where you want it.
 

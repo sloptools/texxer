@@ -5,9 +5,8 @@ import { quadVertex } from './shaders'
 
 // A brush dab: a sphere in model space, painted into every texel whose
 // position lies inside it and whose surface faces the camera. Hardness sets how far
-// in from the rim it fades, strength the most it paints, grit breaks it up with
-// noise that sits on the model, so dabs join into one pattern. With a grunge map
-// the dab reveals the map, more of it the stronger the dab.
+// in from the rim it fades, strength the most it paints. With a grunge map the dab
+// reveals the map, more of it the stronger the dab.
 const dabFragment = /* glsl */ `
 precision highp float;
 
@@ -18,7 +17,6 @@ uniform vec3 uView;
 uniform float uRadius;
 uniform float uHard;
 uniform float uStrength;
-uniform float uGrit;
 uniform int uErase;
 uniform sampler2D uMap;
 uniform float uMapScale;
@@ -39,20 +37,6 @@ float reach(vec3 p) {
   return length(d - uPeriod * floor(d / max(uPeriod, 1e-9) + 0.5));
 }
 
-float hash(vec3 p) {
-  return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-}
-
-float noise(vec3 p) {
-  vec3 i = floor(p);
-  vec3 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(
-    mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
-    mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y),
-    f.z);
-}
-
 void main() {
   ivec2 t = ivec2(gl_FragCoord.xy);
   vec3 p = texelFetch(uPos, t, 0).xyz;
@@ -66,10 +50,6 @@ void main() {
     p = texelFetch(uPos, b, 0).xyz;
     n = texelFetch(uNrm, b, 0).xyz;
     v = step(reach(p), (uPixels * 0.5 + 0.05) * uTexel) * step(0.05, dot(n, uView));
-  }
-  if (uGrit > 0.0) {
-    float g = noise(p * 8.0 / uRadius) * 0.6 + noise(p * 23.0 / uRadius) * 0.4;
-    v *= smoothstep(uGrit - 0.08, uGrit + 0.08, g);
   }
   v *= uStrength;
   if (uUseMap == 1) {
@@ -116,7 +96,6 @@ export type Dab = {
   radius: number
   hard: number
   strength: number
-  grit: number
   erase: boolean
   // A grunge map the dab reveals, at repeats per model size.
   map?: THREE.Texture
@@ -177,7 +156,6 @@ export class PaintStore {
         uRadius: { value: 0.01 },
         uHard: { value: 0.8 },
         uStrength: { value: 1 },
-        uGrit: { value: 0 },
         uErase: { value: 0 },
         uMap: { value: null },
         uMapScale: { value: 3 },
@@ -273,7 +251,6 @@ export class PaintStore {
     u.uRadius.value = d.radius
     u.uHard.value = d.hard
     u.uStrength.value = d.strength
-    u.uGrit.value = d.grit
     u.uErase.value = d.erase ? 1 : 0
     u.uMap.value = d.map ?? null
     u.uMapScale.value = d.mapScale ?? 3

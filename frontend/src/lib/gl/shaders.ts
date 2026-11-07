@@ -7,7 +7,7 @@ void main() {
 export const maxMasks = 4
 export const maxStamps = 96
 
-export const kindIndex = { surfaces: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, facing: 5, noise: 6, paint: 7, stamps: 8, grunge: 9, volume: 11, drips: 12 } as const
+export const kindIndex = { surfaces: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, facing: 5, paint: 7, stamps: 8, grunge: 9, volume: 11, drips: 12 } as const
 export const shapeIndex = { box: 0, cylinder: 1, sphere: 2 } as const
 
 // Island ids a mask can select; smaller ones are too small to matter.
@@ -329,8 +329,7 @@ float field(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
     float g = (pos.xyz / uExtent)[axis];
     return flip ? g : 1.0 - g;
   }
-  if (k == 5) return (flip ? -n[axis] : n[axis]) * 0.5 + 0.5;
-  return noiseAt(pos.xyz, vec3(uA[i].w), uB[i].y * 1.37);
+  return (flip ? -n[axis] : n[axis]) * 0.5 + 0.5;
 }
 
 // Picked parts and islands, by their row in the lookups: masks first, then folder zones.
@@ -351,7 +350,7 @@ float mask(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   } else {
     float f = field(i, t, geo, pos, n);
     float rough = uA[i].z;
-    if (rough > 0.0 && uKind[i] != 6 && uKind[i] != 9) {
+    if (rough > 0.0 && uKind[i] != 9) {
       // Drips get noise stretched downwards, so each runs its own length.
       vec3 s = uKind[i] == 12 ? vec3(1.0, 0.06, 1.0) : vec3(1.0);
       f += (noiseAt(pos.xyz, s * uA[i].w, uB[i].y * 2.91 + 5.3) - 0.5) * rough;

@@ -12,7 +12,7 @@
   import FolderPanel from './FolderPanel.svelte'
 
   // Picked areas, then geometry, then textures.
-  const kinds: (MaskKind | 'line')[] = ['surfaces', 'paint', 'stamps', 'volume', 'line', 'ao', 'edges', 'cavity', 'drips', 'gradient', 'facing', 'line', 'grunge', 'noise']
+  const kinds: (MaskKind | 'line')[] = ['surfaces', 'paint', 'stamps', 'volume', 'line', 'ao', 'edges', 'cavity', 'drips', 'gradient', 'facing', 'line', 'grunge']
 
   let menu = $state<{ x: number; y: number }>()
 

@@ -6,13 +6,12 @@
 
 ## Brush
 
-Paints into the layer's paint mask, or with **colors** the layer's own colors, many in one layer (see layers). **[ ]** size, **⌥** or **E** erase, **⇧click** a straight line from the last stroke, along the nearest axis (**⇧⌘click** free; holding **⇧** shows it in the axis color), **⌘click** fills the surface under the cursor, bounded by hard edges (with **⌥** empties it), **X** mirror across x.
+Paints into the layer's paint mask; on a layer whose color is **paint**, colors, many in one layer (see layers). **[ ]** size, **⌥** or **E** erase, **⇧click** a straight line from the last stroke, along the nearest axis (**⇧⌘click** free; holding **⇧** shows it in the axis color), **⌘click** fills the surface under the cursor, bounded by hard edges (with **⌥** empties it), **X** mirror across x.
 
 - **hardness**: how far in from the rim the brush fades.
 - **strength**: the most a stroke paints; painting over it doesn't go further.
 - **soft** or **pixel**: pixel paints whole texels of the texture, hard, **pixels** across (**[ ]** one more or less), for details that follow a projected photo.
-- **grit**: breaks the brush up with noise that sits on the model, for rust, dirt and chips.
-- **grunge**: the brush reveals a grunge map, as grunge masks project it; more strength shows more of it.
+- **grunge**: the brush reveals a grunge map, as grunge masks project it, for rust, dirt and chips; more strength shows more of it.
 
 The paint mask's **amount** scales what is painted; 0.5 keeps it as it is.
 

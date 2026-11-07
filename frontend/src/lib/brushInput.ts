@@ -153,7 +153,6 @@ export class BrushInput {
       radius: tools.brush.size,
       hard: tools.brush.hard,
       strength: tools.brush.strength,
-      grit: tools.brush.grit,
       erase: tools.brush.erase !== alt,
       map: tools.brush.map ? c.grunge(tools.brush.map) : undefined,
       mapScale: tools.brush.mapScale,

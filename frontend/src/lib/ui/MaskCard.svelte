@@ -25,7 +25,7 @@
   // Soft and rough show when set, or on asking for more.
   let more = $state(false)
   const canSoft = $derived(mask.kind !== 'paint')
-  const canRough = $derived(mask.kind !== 'noise' && mask.kind !== 'grunge' && mask.kind !== 'paint')
+  const canRough = $derived(mask.kind !== 'grunge' && mask.kind !== 'paint')
 
   const editing = $derived(tools.tool === 'volume' && tools.volume === mask)
 
@@ -87,7 +87,7 @@
       {#if mask.kind === 'paint'}
         <button class="text" title="Clear the painted mask" onclick={clearPaint}>clear</button>
       {/if}
-      {#if mask.kind === 'noise' || mask.kind === 'grunge' || mask.rough > 0}
+      {#if mask.kind === 'grunge' || mask.rough > 0}
         <button class="text" title="New random seed" onclick={() => (mask.seed = Math.floor(Math.random() * 1000))}>seed</button>
       {/if}
       <button class="text" class:on={mask.invert} title="Invert" onclick={() => (mask.invert = !mask.invert)}>invert</button>
@@ -136,7 +136,7 @@
     {#if canRough && (more || mask.rough > 0)}
       <Slider label="rough" bind:value={mask.rough} def={0} />
     {/if}
-    {#if mask.kind === 'noise' || mask.kind === 'grunge' || mask.rough > 0}
+    {#if mask.kind === 'grunge' || mask.rough > 0}
       <Slider label="scale" bind:value={mask.scale} min={1} max={96} step={1} def={mask.kind === 'grunge' ? 3 : 24} digits={0} />
     {/if}
     {#if (canSoft && mask.soft === 0) || (canRough && mask.rough === 0)}

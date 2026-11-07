@@ -18,11 +18,6 @@
     [false, 'soft'],
     [true, 'pixel'],
   ]
-  // A brush paints where the layer shows, or the layer's colors themselves.
-  const paintKinds: [boolean, string][] = [
-    [false, 'mask'],
-    [true, 'colors'],
-  ]
 
   // Sliders write here and pass changes on, so a picked stamp follows them.
   let size = $state(tools.stamp.size)
@@ -96,9 +91,6 @@
 {#if tools.tool === 'brush'}
   <div class="section">
     <div class="caps">brush · {store.layer?.name} <HelpLink page="brush-stamps" /></div>
-    {#if store.layer}
-      <Seg value={!!store.layer.paintColors} options={paintKinds} onchange={(v) => store.setColorSource(v ? 'paint' : 'layer')} />
-    {/if}
     {#if store.layer?.paintColors}
       <div class="brushcolor">
         <div class="field"><ColorField bind:value={tools.brush.color} /></div>
@@ -121,7 +113,6 @@
       <Slider label="hardness" bind:value={tools.brush.hard} def={0.7} />
     {/if}
     <Slider label="strength" bind:value={tools.brush.strength} def={1} />
-    <Slider label="grit" bind:value={tools.brush.grit} max={0.9} def={0} />
     <div class="caps sub">grunge · revealed by strength</div>
     <GrungePicker value={tools.brush.map} onpick={(name) => (tools.brush.map = name)} none />
     {#if tools.brush.map}

@@ -14,7 +14,6 @@ const maskDefaults: Record<MaskKind, Partial<Mask>> = {
   cavity: { amount: 0.5, rough: 0.3 },
   gradient: { amount: 0.3, rough: 0.4 },
   facing: { amount: 0.3, rough: 0.2 },
-  noise: { amount: 0.4, scale: 8 },
   drips: { amount: 0.5, rough: 0.5 },
 }
 
@@ -91,7 +90,8 @@ export function normalize(p: Partial<Project>): Project {
       ...newLayer(l.name, l.color),
       ...l,
       masks: (l.masks ?? []).map((m) => {
-        // Parts and islands masks became one.
+        // Parts and islands masks became one; noise masks became soft grunge.
+        if ((m.kind as string) === 'noise') return { ...newMask('grunge'), ...m, kind: 'grunge' as const, map: 'blotches_1', scale: 3 }
         const kind = ['parts', 'islands'].includes(m.kind) ? 'surfaces' : m.kind
         return { ...newMask(kind), ...m, kind }
       }),
