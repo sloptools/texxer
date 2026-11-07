@@ -41,6 +41,8 @@ class Store {
   fileHashes = $state<Record<string, string>>({})
   quickOpen = $state(false)
   selected = $state(0)
+  // Layers marked besides the selected one (⌘ and ⇧ click), by id, to delete or move together.
+  marked = $state<string[]>([])
   // A folder picked in the list shows its panel instead of the layer's.
   selectedGroup = $state('')
   // Clicks on the model add to the picked folder's zone only while this is on.
@@ -180,6 +182,7 @@ class Store {
     Object.assign(m, { size: p.size, layers: p.layers, groups: p.groups, variants: p.variants })
     this.last = JSON.stringify(m)
     this.selected = Math.min(this.selected, this.project.layers.length - 1)
+    this.marked = []
   }
 
   // Lays the UVs out for `to` (0: the model's own) and carries the painted masks over.
@@ -286,6 +289,7 @@ class Store {
     layers.splice(at, 0, { ...l, group })
     this.selected = at
     this.selectedGroup = ''
+    this.marked = []
     this.pickingZone = false
   }
 
@@ -372,10 +376,20 @@ class Store {
     this.selected++
   }
 
+  // The selected layer and the marked ones, in stack order.
+  pickedLayers(): Layer[] {
+    const ids = new Set(this.marked)
+    if (this.layer) ids.add(this.layer.id)
+    return this.project.layers.filter((l) => ids.has(l.id))
+  }
+
   deleteLayer() {
-    if (!this.layer) return
-    this.project.layers.splice(this.selected, 1)
-    this.selected = Math.max(0, Math.min(this.selected, this.project.layers.length - 1))
+    const ids = this.pickedLayers().map((l) => l.id)
+    if (!ids.length) return
+    const first = this.project.layers.findIndex((l) => ids.includes(l.id))
+    this.project.layers = this.project.layers.filter((l) => !ids.includes(l.id))
+    this.marked = []
+    this.selected = Math.max(0, Math.min(first, this.project.layers.length - 1))
     this.dropEmptyGroups()
   }
 
@@ -421,6 +435,7 @@ class Store {
     const selectedId = this.layer?.id
     this.project.layers = keep
     this.selected = Math.max(0, keep.findIndex((l) => l.id === selectedId))
+    this.marked = this.marked.filter((id) => keep.some((l) => l.id === id))
     if (this.selectedGroup === id) this.selectedGroup = ''
     this.dropEmptyGroups()
   }

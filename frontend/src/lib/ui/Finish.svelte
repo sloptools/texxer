@@ -3,13 +3,15 @@
   import type { main } from '../../../wailsjs/go/models'
   import { store } from '../store.svelte'
   import { bridge } from '../bridge.svelte'
-  import type { Finish } from '../types'
+  import { setTileSize } from '../projects.svelte'
+  import type { Finish, GameTone } from '../types'
   import ColorField from './ColorField.svelte'
   import Seg from './Seg.svelte'
   import Slider from './Slider.svelte'
   import HelpLink from './HelpLink.svelte'
 
   const p = $derived(store.project)
+  const tones: GameTone[] = ['standard', 'reinhard', 'filmic', 'aces', 'agx', 'substratum']
   const sh = $derived(store.project.shading)
 
   let stats = $state<main.UnwrapStats | null>(null)
@@ -21,6 +23,8 @@
   })
 
   const sizeName = (s: number) => (s === 1024 ? '1k' : String(s))
+  // Powers of two, so the tile takes whole texels and its mipmaps repeat too.
+  const meters: [number, string][] = [0.5, 1, 2, 4].map((m) => [m, String(m)])
 
   const palettes: [Finish['palette'], string][] = [
     ['none', 'none'],
@@ -33,35 +37,42 @@
 <div class="section">
   <div class="caps">texture <span class="of">{store.project.name}</span> <HelpLink page="uv" /></div>
   <Seg value={p.size} options={[[128, '128'], [256, '256'], [512, '512'], [1024, '1k']]} onchange={(v) => ((p.size = v), p.blendUV === 'texxer' && bridge.requestSync())} />
-  <div class="row">
-    <span>uv</span>
-    {#if p.blend}
-      <span class="pair">
-        <button class:on={!p.blendUV} title="Paint on Blender's own UVs" onclick={() => bridge.setUV(undefined)}>blender</button>
-        <button class:on={p.blendUV === 'texxer'} title="texxer lays the UVs out on each sync and writes them into Blender, as the UV map 'texxer'" onclick={() => bridge.setUV('texxer')}>texxer</button>
-        <button class:on={p.blendUV === 'locked'} title="Keep texxer's UVs in Blender as they are, so painted masks stay put" onclick={() => bridge.setUV('locked')}>locked</button>
-      </span>
-    {:else}
-      <span class="pair">
-        <button class:on={!p.unwrap} title="Paint on the model's own UVs" onclick={() => store.setLayout(0)}>model</button>
-        <button class:on={!!p.unwrap} title="Let texxer lay the UVs out: cut at hard edges, upright, one texel density" onclick={() => store.setLayout(p.unwrap || p.size)}>texxer</button>
-      </span>
-    {/if}
-  </div>
-  <Slider label="edge width" bind:value={p.bake.edges} min={0.002} max={0.08} step={0.001} digits={3} def={0.03} />
-  <Slider label="cavity width" bind:value={p.bake.cavity} min={0.002} max={0.08} step={0.001} digits={3} def={0.03} />
-  {#if store.model?.details}
-    <Slider label="detail maps" bind:value={p.bake.detail} min={0} max={2} step={0.05} def={1} />
-  {/if}
-  {#if p.unwrap}
-    <div class="note">
-      {#if stats}{stats.charts} charts · {Math.round(stats.fill * 100)}% filled · {Math.round(stats.density)} px/m{:else}laying out…{/if}
+  {#if p.tile}
+    {@const [w, h] = p.tile}
+    <div class="row"><span>width m</span><Seg value={w} options={meters} onchange={(v) => setTileSize(v, h)} /></div>
+    <div class="row"><span>height m</span><Seg value={h} options={meters} onchange={(v) => setTileSize(w, v)} /></div>
+    <div class="note">{p.size * w / Math.max(w, h)} × {p.size * h / Math.max(w, h)} px · {Math.round(p.size / Math.max(w, h))} px/m · tiles seamlessly</div>
+  {:else}
+    <div class="row">
+      <span>uv</span>
+      {#if p.blend}
+        <span class="pair">
+          <button class:on={!p.blendUV} title="Paint on Blender's own UVs" onclick={() => bridge.setUV(undefined)}>blender</button>
+          <button class:on={p.blendUV === 'texxer'} title="texxer lays the UVs out on each sync and writes them into Blender, as the UV map 'texxer'" onclick={() => bridge.setUV('texxer')}>texxer</button>
+          <button class:on={p.blendUV === 'locked'} title="Keep texxer's UVs in Blender as they are, so painted masks stay put" onclick={() => bridge.setUV('locked')}>locked</button>
+        </span>
+      {:else}
+        <span class="pair">
+          <button class:on={!p.unwrap} title="Paint on the model's own UVs" onclick={() => store.setLayout(0)}>model</button>
+          <button class:on={!!p.unwrap} title="Let texxer lay the UVs out: cut at hard edges, upright, one texel density" onclick={() => store.setLayout(p.unwrap || p.size)}>texxer</button>
+        </span>
+      {/if}
     </div>
-    {#if p.unwrap !== p.size}
-      <button class="wide" onclick={() => store.setLayout(p.size)}>lay out for {sizeName(p.size)} <span>now {sizeName(p.unwrap)}</span></button>
+    <Slider label="edge width" bind:value={p.bake.edges} min={0.002} max={0.08} step={0.001} digits={3} def={0.03} />
+    <Slider label="cavity width" bind:value={p.bake.cavity} min={0.002} max={0.08} step={0.001} digits={3} def={0.03} />
+    {#if store.model?.details}
+      <Slider label="detail maps" bind:value={p.bake.detail} min={0} max={2} step={0.05} def={1} />
     {/if}
-  {:else if store.model && store.model.overlap > 0.01}
-    <div class="note warn">{store.model.overlap >= 1 ? 'the model has no UVs' : `${Math.round(store.model.overlap * 100)}% of the UVs overlap`}{p.blend ? ' · let texxer lay them out' : ''}</div>
+    {#if p.unwrap}
+      <div class="note">
+        {#if stats}{stats.charts} charts · {Math.round(stats.fill * 100)}% filled · {Math.round(stats.density)} px/m{:else}laying out…{/if}
+      </div>
+      {#if p.unwrap !== p.size}
+        <button class="wide" onclick={() => store.setLayout(p.size)}>lay out for {sizeName(p.size)} <span>now {sizeName(p.unwrap)}</span></button>
+      {/if}
+    {:else if store.model && store.model.overlap > 0.01}
+      <div class="note warn">{store.model.overlap >= 1 ? 'the model has no UVs' : `${Math.round(store.model.overlap * 100)}% of the UVs overlap`}{p.blend ? ' · let texxer lay them out' : ''}</div>
+    {/if}
   {/if}
 </div>
 
@@ -110,6 +121,12 @@
 
 <div class="section">
   <div class="caps">game light</div>
+  <label class="tone">
+    <span>tone</span>
+    <select bind:value={p.light.gameTone} title="Tone mapping of the game view (I), as Godot's; substratum adds its grade">
+      {#each tones as t}<option value={t}>{t}</option>{/each}
+    </select>
+  </label>
   <ColorField label="ambient" bind:value={p.light.gameAmbient} />
   <Slider label="energy" bind:value={p.light.gameEnergy} max={4} def={1} />
   <Slider label="top light" bind:value={p.light.gameTop} max={3} def={0.6} />
@@ -117,6 +134,23 @@
 </div>
 
 <style>
+  .tone {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 26px;
+    font-size: 12px;
+    color: var(--dim);
+  }
+  .tone select {
+    height: 24px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--bg);
+    font: 11px var(--mono);
+    color: var(--fg);
+  }
+
   .section {
     display: flex;
     flex-direction: column;

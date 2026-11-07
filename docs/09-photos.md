@@ -27,4 +27,4 @@ The finish crunches snippets like everything else, auto palette included.
 
 ## Stamping
 
-With the stamp tool (**S**) the snippets show at the bottom. Click one: it becomes the stamp shape, on a **photo** layer that takes its colors from the stamps (**photo relief** for monochrome ones). Place, size and turn it as any stamp. **⌘click** fills the surface under the cursor, bounded by hard edges, with it; **tiles** repeats it across, rows following so tiles keep their shape. Axis views from the gizmo are ortho, which keeps projected snippets true.
+With the stamp tool (**S**) the snippets show at the bottom. Click one: it becomes the stamp shape, on a **photo** layer that takes its colors from the stamps (**photo relief** for monochrome ones). Place, size and turn it as any stamp. **⌘click** fills the surface under the cursor, bounded by hard edges, with it, and it stays on that surface only; **tiles** repeats it across, rows following so tiles keep their shape. Axis views from the gizmo are ortho, which keeps projected snippets true.

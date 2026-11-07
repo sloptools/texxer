@@ -23,6 +23,7 @@
   const pending = $derived(models.filter((m) => ['edited', 'changed', 'new'].includes(stateOf(m))).length)
 
   function where(m: ModelDoc) {
+    if (m.tile) return `tile · ${m.tile[0]} × ${m.tile[1]} m`
     if (m.blend) return `blender · ${m.blend.split('/').pop()} · ${bridge.isConnected(m) ? 'live' : 'not connected'}`
     const parts = m.files[0]?.split('/') ?? []
     return parts.slice(-3, -1).join('/') + (m.files.length > 1 ? ` · ${m.files.length} files` : '')
@@ -75,7 +76,7 @@
         <button class="icon" class:set={m.textures} title={m.textures ? `PNGs go to ${m.textures} (cancel to put them beside the files)` : 'Folder for the texture PNGs (beside the files)'} onclick={(e) => (e.stopPropagation(), pickTextureFolder(m.id))}><Icon name="dir" size={11} /></button>
         {#if m.blend}
           <button class="sync" disabled={m.id !== store.project.id || !bridge.isConnected(m)} title="Get the objects from Blender as they are now" onclick={(e) => (e.stopPropagation(), bridge.requestSync())}>sync</button>
-        {:else}
+        {:else if !m.tile}
           <button class="icon" title="Add files that share this texture" onclick={(e) => (e.stopPropagation(), addFiles(m.id))}><Icon name="plus" size={11} /></button>
         {/if}
         <button class="icon" class:armed={confirm === m.id} title="Remove from the project (the files stay)" onclick={(e) => (e.stopPropagation(), remove(m))}>

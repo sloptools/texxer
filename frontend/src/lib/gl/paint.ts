@@ -29,8 +29,15 @@ uniform int uColored;
 uniform vec3 uBrush;
 uniform float uTexel;
 uniform int uBlock;
+// A tile's size in bake positions: dabs reach across its seams.
+uniform vec3 uPeriod;
 
 out vec4 outColor;
+
+float reach(vec3 p) {
+  vec3 d = p - uCenter;
+  return length(d - uPeriod * floor(d / max(uPeriod, 1e-9) + 0.5));
+}
 
 float hash(vec3 p) {
   return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
@@ -51,14 +58,14 @@ void main() {
   vec3 p = texelFetch(uPos, t, 0).xyz;
   vec3 n = texelFetch(uNrm, t, 0).xyz;
 
-  float v = 1.0 - smoothstep(uHard * uRadius * 0.999, uRadius, distance(p, uCenter));
+  float v = 1.0 - smoothstep(uHard * uRadius * 0.999, uRadius, reach(p));
   v *= step(0.05, dot(n, uView));
   if (uPixels > 0.0) {
     // Whole texels of the texture: every bake texel of a block decides by the block's middle.
     ivec2 b = min((t / uBlock) * uBlock + uBlock / 2, textureSize(uPos, 0) - 1);
     p = texelFetch(uPos, b, 0).xyz;
     n = texelFetch(uNrm, b, 0).xyz;
-    v = step(distance(p, uCenter), (uPixels * 0.5 + 0.05) * uTexel) * step(0.05, dot(n, uView));
+    v = step(reach(p), (uPixels * 0.5 + 0.05) * uTexel) * step(0.05, dot(n, uView));
   }
   if (uGrit > 0.0) {
     float g = noise(p * 8.0 / uRadius) * 0.6 + noise(p * 23.0 / uRadius) * 0.4;
@@ -156,6 +163,7 @@ export class PaintStore {
     private bake: Bake,
     private url: (id: string) => string,
     private save: (id: string, png: string) => Promise<unknown>,
+    period = new THREE.Vector3(),
   ) {
     this.dabMat = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
@@ -177,6 +185,7 @@ export class PaintStore {
         uPixels: { value: 0 },
         uTexel: { value: 0 },
         uBlock: { value: 1 },
+        uPeriod: { value: period },
         uColored: { value: 0 },
         uBrush: { value: new THREE.Color() },
       },

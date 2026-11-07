@@ -24,7 +24,7 @@
   import PhotoView from './lib/ui/PhotoView.svelte'
   import CutPanel from './lib/ui/CutPanel.svelte'
   import SnippetStrip from './lib/ui/SnippetStrip.svelte'
-  import { addModels, createProject, exportModel, openProject, pickProject, projectName, recent, refreshHashes } from './lib/projects.svelte'
+  import { addModels, addTile, createProject, exportModel, openProject, pickProject, projectName, recent, refreshHashes } from './lib/projects.svelte'
 
   let materials = $state(false)
   type Side = 'models' | 'layers' | 'settings'
@@ -105,6 +105,7 @@
         {#if side === 'models'}
           <span class="icons">
             <button class="icon" title="Add models (each file its own model)" onclick={() => addModels()}><Icon name="plus" size={11} /></button>
+            <button class="text" title="Add a tile for a tileable texture, like walls and floors" onclick={addTile}>tile</button>
           </span>
         {/if}
       </div>
@@ -370,9 +371,19 @@
     background: none;
     color: var(--dim);
   }
-  .icon:hover {
+  .icon:hover,
+  .text:hover {
     background: var(--hover);
     color: var(--strong);
+  }
+  .text {
+    height: 22px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    font: 11px var(--mono);
+    color: var(--dim);
   }
   .right {
     border-left: 1px solid var(--line);

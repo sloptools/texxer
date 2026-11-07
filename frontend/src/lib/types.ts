@@ -16,6 +16,8 @@ export type Stamp = {
   size: number
   aspect: number
   mirror: boolean
+  // Only on this island, for stamps fitted to a surface.
+  island?: number
 }
 
 export type VolumeShape = 'box' | 'cylinder' | 'sphere'
@@ -122,6 +124,8 @@ export type Shading = {
   bothSides: boolean
 }
 
+export type GameTone = 'standard' | 'reinhard' | 'filmic' | 'aces' | 'agx' | 'substratum'
+
 export type Light = {
   key: number
   ambient: number
@@ -132,6 +136,8 @@ export type Light = {
   gameAmbient: string
   gameEnergy: number
   gameTop: number
+  // Tone mapping of the game view, as Godot's; substratum adds its grade.
+  gameTone: GameTone
   torch: number
   // How strongly glowing parts bloom in the views.
   bloom: number
@@ -179,6 +185,8 @@ export type ModelDoc = Project & {
   target?: string
   // Its UVs: Blender's own when unset, texxer's laid out on each sync, or texxer's kept.
   blendUV?: 'texxer' | 'locked'
+  // A tile texxer made itself, its width and height in meters; its file is texxer's too.
+  tile?: [number, number]
 }
 
 export type Workspace = {

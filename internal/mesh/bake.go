@@ -34,6 +34,8 @@ type BakeOptions struct {
 	// Detail is how strongly the model's normal and occlusion maps shape normals, AO,
 	// edges and cavities; 0 ignores them.
 	Detail float64
+	// Seamless leaves open borders out of the edges, for tiles that repeat across them.
+	Seamless bool
 }
 
 // Maps are baked per texel. Gray maps hold one value per texel, Normal three.
@@ -70,7 +72,7 @@ func Bake(m *Model, o BakeOptions) *Maps {
 	samples := rasterize(m, o)
 
 	bvh := NewBVH(m.Tris)
-	edges := sharpEdges(m.Tris, o.EdgeAngle, diag*1e-5)
+	edges := sharpEdges(m.Tris, o.EdgeAngle, diag*1e-5, !o.Seamless)
 	reach := diag * max(o.EdgeWidth, o.CavityWidth)
 	grid := newEdgeGrid(edges, reach)
 	drips := dripGrid(edges, o.DripLength*diag)

@@ -86,8 +86,13 @@ class Tools {
     store.layer!.masks[p.mask].stamps[p.index] = fn($state.snapshot(s))
   }
 
-  move(point: THREE.Vector3, normal: THREE.Vector3) {
-    this.update((s) => moveTo(s, point, normal, this.snap))
+  // A stamp kept to an island goes to the island it is moved onto.
+  move(point: THREE.Vector3, normal: THREE.Vector3, island = -1) {
+    this.update((s) => {
+      const moved = moveTo(s, point, normal, this.snap)
+      if (s.island !== undefined) moved.island = island >= 0 ? island : undefined
+      return moved
+    })
   }
 
   rotate(deg: number) {
@@ -165,7 +170,8 @@ class Tools {
       const at = from.clone().lerp(point, t)
       const n = n0.clone().lerp(normal, t).normalize()
       const hit = this.surface(at, n, s.size)
-      list.push(hit ? moveTo($state.snapshot(s), hit.point, hit.normal, false) : { ...$state.snapshot(s), p: [at.x, at.y, at.z] })
+      const copy = { ...$state.snapshot(s), island: undefined }
+      list.push(hit ? moveTo(copy, hit.point, hit.normal, false) : { ...copy, p: [at.x, at.y, at.z] })
     }
     this.picked = { mask: p.mask, index: list.length - 1 }
   }
@@ -195,7 +201,7 @@ class Tools {
     const s = this.pickedStamp
     if (!p || !s) return
     const list = store.layer!.masks[p.mask].stamps
-    list.push(this.onSurface(nudge($state.snapshot(s), 1, 0)))
+    list.push(this.onSurface(nudge({ ...$state.snapshot(s), island: undefined }, 1, 0)))
     this.picked = { mask: p.mask, index: list.length - 1 }
   }
 

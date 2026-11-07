@@ -20,7 +20,7 @@ The paint mask's **amount** scales what is painted; 0.5 keeps it as it is.
 
 Click to place, drag to move, **⌥click** places a new one over others. A shape you pick is for the next stamp; **⌥click** a shape to swap the picked stamp's. Shapes, relief stamps (for the relief blend), decals, your PNGs (**+ png**) and text: **pixel** is a 5×7 font that stays readable at low sizes.
 
-The picked stamp has grips: drag the one above it to turn it (**⇧** in 15° steps), a corner to pull it over the surface while the opposite corner stays (**⇧** keeps its aspect). **R** rotate 15° (**⇧R** back), **G** snap to a grid on the surface, arrows nudge, **D** duplicate, **⇧click** a row from the picked stamp, **⌘click** fill the surface under the cursor, **⌫** delete.
+The picked stamp has grips: drag the one above it to turn it (**⇧** in 15° steps), a corner to pull it over the surface while the opposite corner stays (**⇧** keeps its aspect). **R** rotate 15° (**⇧R** back), **G** snap to a grid on the surface, arrows nudge, **D** duplicate, **⇧click** a row from the picked stamp, **⌘click** fill the surface under the cursor (the stamp then keeps to that surface, also when sized past it, and to the one it is dragged onto), **⌫** delete.
 
 Layers with **colors from image stamps** take the colors of decals and images instead of their own. Picking a relief or color decal on a layer that doesn't take them starts one that does (**relief** or **decals**).
 

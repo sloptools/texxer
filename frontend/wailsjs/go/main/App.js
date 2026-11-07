@@ -42,6 +42,10 @@ export function Export(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
   return window['go']['main']['App']['Export'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
 }
 
+export function ExportTile(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['ExportTile'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function FileHashes(arg1) {
   return window['go']['main']['App']['FileHashes'](arg1);
 }
@@ -60,6 +64,10 @@ export function KeepOriginals(arg1, arg2, arg3, arg4) {
 
 export function LoadProject(arg1) {
   return window['go']['main']['App']['LoadProject'](arg1);
+}
+
+export function MakeTile(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['MakeTile'](arg1, arg2, arg3, arg4);
 }
 
 export function Materials() {

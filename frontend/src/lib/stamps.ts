@@ -49,6 +49,7 @@ export function mirrored(s: Stamp, cx: number): Stamp {
     up: [-s.up[0], s.up[1], s.up[2]],
     rot: -s.rot,
     mirror: false,
+    island: undefined,
   }
 }
 

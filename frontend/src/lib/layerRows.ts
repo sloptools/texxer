@@ -30,6 +30,12 @@ export function layerRows(): Row[] {
 
 const folderOf = (rows: Row[], l: Layer) => rows.find((r): r is Extract<Row, { kind: 'group' }> => r.kind === 'group' && r.key === l.group)
 
+// A marked layer takes the other picked ones along.
+export function dragged(key: string): string[] {
+  const picked = store.pickedLayers().map((l) => l.id)
+  return picked.includes(key) ? picked : [key]
+}
+
 // Moves a row to a drop place; folders move as a block and never land in another one.
 export function place(rows: Row[], sourceKey: string, at: Drop) {
   const target = rows.find((r) => r.key === at.key)
@@ -37,13 +43,15 @@ export function place(rows: Row[], sourceKey: string, at: Drop) {
   if (!target || !source || target.key === source.key) return
 
   if (source.kind === 'layer') {
+    const ids = dragged(source.key)
+    if (target.kind === 'layer' && ids.includes(target.key)) return
     if (target.kind === 'group') {
-      if (at.where === 'below') store.moveLayers([source.key], target.first, '')
-      else store.moveLayers([source.key], target.last + 1, at.where === 'into' ? target.g.id : '')
+      if (at.where === 'below') store.moveLayers(ids, target.first, '')
+      else store.moveLayers(ids, target.last + 1, at.where === 'into' ? target.g.id : '')
     } else if (at.out) {
       const folder = folderOf(rows, target.l)
-      if (folder) store.moveLayers([source.key], folder.first, '')
-    } else store.moveLayers([source.key], at.where === 'above' ? target.i + 1 : target.i, target.l.group)
+      if (folder) store.moveLayers(ids, folder.first, '')
+    } else store.moveLayers(ids, at.where === 'above' ? target.i + 1 : target.i, target.l.group)
     return
   }
 
@@ -68,7 +76,29 @@ export function selectRow(row: Row) {
     store.selected = row.i
     store.selectedGroup = ''
   }
+  store.marked = []
   store.pickingZone = false
+}
+
+// ⌘ toggles a layer's mark, ⇧ marks the layers between the selected one and it.
+export function markRow(rows: Row[], row: Extract<Row, { kind: 'layer' }>, range: boolean) {
+  const selected = store.layer
+  if (store.selectedGroup || !selected) return selectRow(row)
+  if (range) {
+    const a = rows.findIndex((r) => r.key === selected.id)
+    const b = rows.findIndex((r) => r.key === row.key)
+    const span = rows.slice(Math.min(a, b), Math.max(a, b) + 1)
+    store.marked = span.flatMap((r) => (r.kind === 'layer' && r.key !== selected.id ? [r.key] : []))
+    return
+  }
+  if (row.key === selected.id) {
+    // The selection passes to a marked layer, if any.
+    const next = store.marked[0]
+    if (!next) return
+    store.selected = store.project.layers.findIndex((l) => l.id === next)
+    store.marked = store.marked.slice(1)
+  } else if (store.marked.includes(row.key)) store.marked = store.marked.filter((id) => id !== row.key)
+  else store.marked = [...store.marked, row.key]
 }
 
 // Steps the selection through the rows as shown, so closed folders are one row.

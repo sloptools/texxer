@@ -2,7 +2,7 @@
   import ViewGizmo from './ui/ViewGizmo.svelte'
   import { onMount, untrack } from 'svelte'
   import * as api from '../../wailsjs/go/main/App'
-  import { Compositor, loadBake } from './gl/compositor'
+  import { Compositor, loadBake, tilePeriod } from './gl/compositor'
   import { PaintStore } from './gl/paint'
   import { Stage, type Hit } from './gl/stage'
   import { withVariant } from './project'
@@ -191,6 +191,8 @@
     const layout = store.project.unwrap
     const settings = bakeSettings
     const source = wantsSource
+    const texels = size * factor
+    const ss = factor
     if (!s || !model) return
 
     let cancelled = false
@@ -206,7 +208,7 @@
     const refresh = untrack(() => !doc.exported || stateOf(doc) === 'changed')
     const originals = source ? api.KeepOriginals(project, doc.id, model.path, refresh) : Promise.resolve('')
     // Strokes in flight are saved first, so the new paint store loads them.
-    Promise.all([s.load(files), originals.then((kept) => loadBake(model.path, size * factor, layout, settings, kept)), store.paint?.flush()])
+    Promise.all([s.load(files, model.tile), originals.then((kept) => loadBake(model.path, texels, layout, settings, kept)), store.paint?.flush()])
       .then(([, bake]) => {
         if (cancelled) return
         compositor?.dispose()
@@ -216,10 +218,11 @@
           bake,
           (id) => `/paint?project=${encodeURIComponent(project)}&id=${id}`,
           (id, png) => api.SavePaint(project, id, png).catch((e) => store.say(String(e))),
+          tilePeriod(model),
         )
         paint.onChange = () => (dirty = true)
         store.paint = paint
-        const c = new Compositor(s.renderer, bake, model, paint, factor)
+        const c = new Compositor(s.renderer, bake, model, paint, ss)
         c.onLoad = () => (dirty = true)
         s.posData = bake.posData
         s.nrmData = bake.nrmData

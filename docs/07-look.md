@@ -7,6 +7,6 @@ Settings in **crunch**, **baked light** and the lights are the project's, shared
 - **detail maps**: for models with a normal or occlusion map (baked from a high-poly model), how much its grooves, bevels and shading count. The export carries both maps into texxer's layout.
 - **palette**: none, auto (the best colors for the texture, kept steady while you edit; painted colors always get theirs), Quake, or a palette file. **dither** mixes neighbor colors.
 - **baked light**: light and AO painted into the texture, so it reads in any engine light.
-- **game light**: the in-game view (**I**): flat ambient, AO, a light from above, tone mapping like Godot.
+- **game light**: the in-game view (**I**): flat ambient, AO, a light from above. **tone** picks Godot's tone mapping: standard (linear, the default), reinhard, filmic, aces, agx; **substratum** is ACES with that game's grade and background.
 
 **P** renders at game resolution (480, 360, 240 lines), with mipmaps like in the game. **T** holds a torch at the cursor. **H** headlight, **⇧B** bloom on and off; its strength is under view light.

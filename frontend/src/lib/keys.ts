@@ -39,6 +39,7 @@ function toolKey(e: KeyboardEvent): boolean {
       if (store.sampling) store.sampling = false
       else if (store.pickingZone) store.pickingZone = false
       else if (tools.picked) tools.picked = null
+      else if (store.marked.length) store.marked = []
       else if (tools.tool !== 'nav') tools.set(tools.tool)
       return true
     case '[':
@@ -156,8 +157,8 @@ export function handleKey(e: KeyboardEvent, openMaterials: () => void) {
         break
       case 'v':
         if (l) {
-          const look = store.look(l)
-          look.visible = !look.visible
+          const visible = !store.look(l).visible
+          for (const p of store.pickedLayers()) store.look(p).visible = visible
         }
         break
       case 'l':

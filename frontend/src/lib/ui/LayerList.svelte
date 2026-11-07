@@ -2,7 +2,7 @@
   import Icon from '../Icon.svelte'
   import { store } from '../store.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
-  import { layerRows, place, selectedKey, type Drop, type Row, type Where } from '../layerRows'
+  import { dragged as draggedIds, layerRows, markRow, place, selectRow, selectedKey, type Drop, type Row, type Where } from '../layerRows'
   import type { Layer } from '../types'
 
   let renaming = $state('')
@@ -32,9 +32,11 @@
         { label: 'dissolve folder', key: '⇧⌘G', run: () => store.ungroup(id) },
         { label: 'delete folder and its layers', danger: true, run: () => store.deleteGroup(id) },
       )
+    } else if (row?.kind === 'layer' && draggedIds(row.key).length > 1) {
+      const n = store.pickedLayers().length
+      items.push({ label: `delete ${n} layers`, key: '⌫', danger: true, run: () => store.deleteLayer() })
     } else if (row?.kind === 'layer') {
-      store.selected = row.i
-      store.selectedGroup = ''
+      selectRow(row)
       items.push(
         { label: 'new layer', key: 'N', run: () => store.addLayer() },
         { label: 'duplicate', key: 'D', run: () => store.duplicateLayer() },
@@ -97,7 +99,7 @@
       t = 1
     }
     const target = rows.find((r) => r.key === el?.dataset.row)
-    if (!el || !target || target.key === source.key) return null
+    if (!el || !target || draggedIds(source.key).includes(target.key)) return null
     const r = el.getBoundingClientRect()
     t ??= (y - r.top) / r.height
 
@@ -206,7 +208,7 @@
         tabindex="-1"
         onpointerdown={(e) => down(e, row)}
         oncontextmenu={(e) => context(e, row)}
-        onclick={() => store.selectedGroup !== row.g.id && ((store.selectedGroup = row.g.id), (store.pickingZone = false))}
+        onclick={() => store.selectedGroup !== row.g.id && selectRow(row)}
         onkeydown={() => {}}
         ondblclick={() => (renaming = row.key)}
       >
@@ -226,6 +228,7 @@
         class="row"
         class:nested={row.nested}
         class:on={!store.selectedGroup && row.i === store.selected}
+        class:marked={store.marked.includes(row.key)}
         class:hidden={!look.visible || store.group(row.l.group)?.visible === false}
         class:lifted={drag?.active && drag.key === row.key}
         class:drop-above={dropWhere === 'above'}
@@ -239,7 +242,7 @@
         onpointerleave={() => (overRow = -1)}
         onpointerdown={(e) => down(e, row)}
         oncontextmenu={(e) => context(e, row)}
-        onclick={() => ((store.selected = row.i), (store.selectedGroup = ''), (store.pickingZone = false))}
+        onclick={(e) => (e.metaKey || e.shiftKey ? markRow(rows, row, e.shiftKey) : selectRow(row))}
         ondblclick={() => (renaming = row.key)}
         onkeydown={() => {}}
       >
@@ -266,7 +269,9 @@
     {#if dragged.kind === 'group'}
       <Icon name="dir" size={11} />{dragged.g.name}<span class="meta">{dragged.count}</span>
     {:else}
+      {@const n = draggedIds(dragged.key).length}
       <span class="swatch" style:background={store.look(dragged.l).color}></span>{dragged.l.name}
+      {#if n > 1}<span class="meta">+{n - 1}</span>{/if}
     {/if}
   </div>
 {/if}
@@ -321,6 +326,9 @@
   .row.on {
     background: var(--active);
     color: var(--strong);
+  }
+  .row.marked {
+    background: var(--active);
   }
   .row.on::before {
     content: '';

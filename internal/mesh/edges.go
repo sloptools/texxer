@@ -12,7 +12,7 @@ type edge struct {
 
 // sharpEdges finds edges where the faces meet at more than minAngle degrees,
 // after welding vertices that share a position. Open borders count as convex.
-func sharpEdges(tris []Tri, minAngle, weldDist float64) []edge {
+func sharpEdges(tris []Tri, minAngle, weldDist float64, open bool) []edge {
 	type key [3]int64
 	quant := func(p Vec) key {
 		return key{int64(math.Round(p[0] / weldDist)), int64(math.Round(p[1] / weldDist)), int64(math.Round(p[2] / weldDist))}
@@ -58,7 +58,9 @@ func sharpEdges(tris []Tri, minAngle, weldDist float64) []edge {
 		a, b := pos[p[0]], pos[p[1]]
 
 		if len(fs) == 1 {
-			out = append(out, edge{a, b, true, 1})
+			if open {
+				out = append(out, edge{a, b, true, 1})
+			}
 			continue
 		}
 		if len(fs) != 2 {

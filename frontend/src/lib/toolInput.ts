@@ -91,7 +91,7 @@ export class ToolInput {
     } else if (this.dragging && tools.tool === 'volume') {
       if (hit) tools.moveVolume([hit.point.x, hit.point.y, hit.point.z])
     } else if (this.dragging) {
-      if (hit) tools.move(hit.point, hit.normal)
+      if (hit) tools.move(hit.point, hit.normal, hit.island)
     }
     this.hover(hit, e)
   }
@@ -206,6 +206,8 @@ export class ToolInput {
     if (points.length < 4) return
     const stamp = fitted(points, hit.normal, s.cameraUp, { shape: tools.stamp.shape, mirror: tools.mirror })
     if (stamp.shape.startsWith('snip:')) stamp.shape = tiled(stamp.shape, snipTiles(stamp.shape).cols, stamp.aspect)
+    // A mirrored copy lands on another island, so only unmirrored ones keep to theirs.
+    if (!tools.mirror) stamp.island = hit.island
     tools.placeStamp(stamp)
     this.changed()
   }

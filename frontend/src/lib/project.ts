@@ -73,7 +73,7 @@ export function newProject(): Project {
       rim: 0.3,
       bothSides: true,
     },
-    light: { key: 2.2, ambient: 1, headlight: 0.6, angle: 35, gameAmbient: '#ffffff', gameEnergy: 1, gameTop: 0.6, torch: 1, bloom: 0.05 },
+    light: { key: 2.2, ambient: 1, headlight: 0.6, angle: 35, gameAmbient: '#ffffff', gameEnergy: 1, gameTop: 0.6, gameTone: 'standard', torch: 1, bloom: 0.05 },
   }
 }
 
@@ -93,6 +93,14 @@ export function normalize(p: Partial<Project>): Project {
       ...l,
       masks: (l.masks ?? []).map((m) => ({ ...newMask(m.kind), ...m })),
     })),
+  }
+}
+
+// A tile starts plain with some grime: its edges, cavities and gradients would repeat.
+export function newTileProject(): Project {
+  return {
+    ...newProject(),
+    layers: [newLayer('base', '#6b6a62'), newLayer('grime', '#4a4234', [newMask('grunge')], { opacity: 0.8 })],
   }
 }
 

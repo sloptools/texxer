@@ -8,7 +8,17 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
-import type { Light, View } from '../types'
+import type { GameTone, Light, View } from '../types'
+
+// Godot's tone mappings; Linear is no mapping, Filmic comes closest as Cineon.
+const toneMappings: Record<GameTone, THREE.ToneMapping> = {
+  standard: THREE.NoToneMapping,
+  reinhard: THREE.ReinhardToneMapping,
+  filmic: THREE.CineonToneMapping,
+  aces: THREE.ACESFilmicToneMapping,
+  agx: THREE.AgXToneMapping,
+  substratum: THREE.ACESFilmicToneMapping,
+}
 import { TrackpadControls } from './controls'
 import { game, gameDeclarations, gamePatch, gameUniforms, gradePass } from './gamelook'
 import { Flat } from './flat'
@@ -61,6 +71,7 @@ export class Stage {
   private bloom: UnrealBloomPass
   private grade: ShaderPass
   private game = false
+  private tone: GameTone = 'standard'
   private background = new THREE.Color()
   private grid: THREE.GridHelper | undefined
   private gridColor = new THREE.Color(0x555555)
@@ -79,6 +90,8 @@ export class Stage {
   private root: THREE.Object3D | undefined
   private box = new THREE.Box3()
   private textured: THREE.Mesh[] = []
+  // A tile's neighbors, to see it repeat; they take its material but no clicks.
+  private neighbors: THREE.Group | undefined
   private lit: THREE.MeshLambertMaterial
   private unlit: THREE.MeshBasicMaterial
   private gameMat: THREE.MeshBasicMaterial
@@ -211,8 +224,9 @@ export class Stage {
     return m
   }
 
-  // Loads a model's files, each moved to its place beside the others.
-  async load(files: { url: string; images: string; offset: number[] }[]) {
+  // Loads a model's files, each moved to its place beside the others. A tile (w, h
+  // in meters) shows with its eight neighbors.
+  async load(files: { url: string; images: string; offset: number[] }[], tile = [0, 0]) {
     const scenes = await Promise.all(files.map((f) => new GLTFLoader().setResourcePath(f.images).loadAsync(f.url)))
     this.clear()
 
@@ -251,10 +265,13 @@ export class Stage {
     this.root = root
     this.scene.add(root)
     this.box.setFromObject(root)
+    if (tile[0] > 0) this.addNeighbors(tile[0], tile[1])
     this.radius = this.box.getBoundingSphere(new THREE.Sphere()).radius
     this.torch.uniforms.uMin.value.copy(this.box.min)
     this.torch.uniforms.uDiag.value = this.box.getSize(new THREE.Vector3()).length()
     this.controls.frame(this.box)
+    // A wall, seen from the front a little to the side.
+    if (tile[0] > 0) this.controls.view(0.3, 0.12)
     this.snap = true
 
     const size = this.box.getSize(new THREE.Vector3())
@@ -270,7 +287,26 @@ export class Stage {
     this.scene.add(this.grid)
   }
 
+  private addNeighbors(w: number, h: number) {
+    const group = new THREE.Group()
+    for (let y = -1; y <= 1; y++) {
+      for (let x = -1; x <= 1; x++) {
+        if (!x && !y) continue
+        for (const mesh of this.textured) {
+          const copy = new THREE.Mesh(mesh.geometry, mesh.material)
+          copy.applyMatrix4(mesh.matrixWorld)
+          copy.position.add(new THREE.Vector3(x * w, y * h, 0))
+          group.add(copy)
+        }
+      }
+    }
+    this.neighbors = group
+    this.scene.add(group)
+  }
+
   private clear() {
+    if (this.neighbors) this.scene.remove(this.neighbors)
+    this.neighbors = undefined
     if (this.root) this.scene.remove(this.root)
     if (this.grid) this.scene.remove(this.grid)
     this.root = undefined
@@ -287,20 +323,29 @@ export class Stage {
     }
     const material = view === 'lit' ? this.lit : view === 'game' ? this.gameMat : this.unlit
     for (const mesh of this.textured) mesh.material = material
+    this.neighbors?.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = material
+    })
     this.setGame(view === 'game')
   }
 
-  // The game view also takes Substratum's tone mapping, grade and dark water background.
+  // The game view also takes a tone mapping like Godot's; Substratum's adds its grade
+  // and dark water background.
   private setGame(on: boolean) {
     this.game = on
     this.gameShared.uGame.value = on ? 1 : 0
-    this.renderer.toneMapping = on ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping
-    this.renderer.toneMappingExposure = on ? game.exposure : 1
-    this.grade.enabled = on
-    this.scene.background = on ? new THREE.Color(game.background) : this.background
+    const substratum = on && this.tone === 'substratum'
+    this.renderer.toneMapping = on ? toneMappings[this.tone] : THREE.NoToneMapping
+    this.renderer.toneMappingExposure = substratum ? game.exposure : 1
+    this.grade.enabled = substratum
+    this.scene.background = substratum ? new THREE.Color(game.background) : this.background
   }
 
   setLight(l: Light) {
+    if (l.gameTone !== this.tone) {
+      this.tone = l.gameTone
+      this.setGame(this.game)
+    }
     // Godot takes the ambient color as sRGB and lights in linear.
     this.gameShared.uAmbient.value.set(l.gameAmbient).multiplyScalar(l.gameEnergy)
     this.gameShared.uTop.value.setRGB(1, 0.95, 0.88).multiplyScalar(l.gameTop)
