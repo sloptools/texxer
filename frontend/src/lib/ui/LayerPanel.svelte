@@ -12,7 +12,7 @@
   import FolderPanel from './FolderPanel.svelte'
 
   // Picked areas, then geometry, then textures.
-  const kinds: (MaskKind | 'line')[] = ['parts', 'islands', 'paint', 'stamps', 'volume', 'line', 'ao', 'edges', 'cavity', 'drips', 'gradient', 'facing', 'line', 'grunge', 'noise']
+  const kinds: (MaskKind | 'line')[] = ['surfaces', 'paint', 'stamps', 'volume', 'line', 'ao', 'edges', 'cavity', 'drips', 'gradient', 'facing', 'line', 'grunge', 'noise']
 
   let menu = $state<{ x: number; y: number }>()
 
@@ -112,7 +112,7 @@
   <div class="section">
     <div class="caps">masks <HelpLink page="masks" /></div>
     {#each layer.masks as mask, i (i + mask.kind + layer.id)}
-      <MaskCard {mask} index={i} parts={store.model?.parts ?? []} onremove={() => layer.masks.splice(i, 1)} />
+      <MaskCard {mask} index={i} onremove={() => layer.masks.splice(i, 1)} />
     {/each}
     {#if layer.masks.length < 4}
       <button class="add" onclick={openMenu}>+ mask</button>

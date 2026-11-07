@@ -46,10 +46,9 @@
         pickLayer(hit)
         return
       }
-      if (!hit || hit.part < 0) return
-      if (store.selectedGroup && store.pickingZone) store.toggleZone(e.metaKey ? 'parts' : 'islands', e.metaKey ? hit.part : hit.island)
-      else if (store.picksIslands || (e.metaKey && e.shiftKey)) store.toggleIsland(hit.island)
-      else if (e.metaKey || store.layer?.masks.some((m) => m.kind === 'parts')) store.togglePart(hit.part)
+      if (!hit || hit.part < 0 || !picksSurfaces(e)) return
+      if (e.shiftKey || store.onePart) store.toggleSurface('islands', hit.island)
+      else store.toggleSurface('parts', hit.part)
     }
 
     const onMove = (e: PointerEvent) => {
@@ -64,7 +63,7 @@
       store.hoverPart = part
     }
     s.flat.onClick = (e, part) => {
-      if (part >= 0 && tools.tool === 'nav' && (e.metaKey || store.layer?.masks.some((m) => m.kind === 'parts'))) store.togglePart(part)
+      if (part >= 0 && tools.tool === 'nav' && picksSurfaces(e)) store.toggleSurface('parts', part)
     }
 
     // Ahead of the tools and the camera, so sampling works with any tool.
@@ -120,6 +119,13 @@
   })
 
   // The color the layers show where the model was clicked, into the selected layer.
+  // Plain clicks pick surfaces while a folder's zone is picked or the layer has a
+  // surfaces mask; ⌘ adds one.
+  function picksSurfaces(e: MouseEvent) {
+    if (e.metaKey || (store.pickingZone && store.selectedGroup)) return true
+    return !!store.layer?.masks.some((m) => m.kind === 'surfaces')
+  }
+
   function sampleColor(hit: Hit | undefined) {
     store.sampling = false
     const c = compositor
@@ -301,7 +307,7 @@
 
   $effect(() => {
     const nav = tools.tool === 'nav'
-    const islands = store.picksIslands
+    const islands = store.onePart
     stage?.setHover(nav && !islands ? store.hoverPart : -1, nav && islands ? store.hoverIsland : -1)
   })
 

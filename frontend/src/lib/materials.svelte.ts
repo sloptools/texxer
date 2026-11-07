@@ -88,7 +88,7 @@ export async function loadLibrary() {
 }
 
 // Masks that point at one model's surfaces don't travel; the folder's zone takes their place.
-const local = new Set<Mask['kind']>(['parts', 'islands', 'paint', 'stamps'])
+const local = new Set<Mask['kind']>(['surfaces', 'paint', 'stamps'])
 
 export async function saveMaterial(group: Group, name: string) {
   const layers: MaterialLayer[] = store.project.layers

@@ -3,6 +3,9 @@
   import { tools } from '../tools.svelte'
   import type { View } from '../types'
   import Seg from './Seg.svelte'
+  import ViewLight from './ViewLight.svelte'
+
+  let lightOpen = $state(false)
 
   const views: [View, string][] = [
     ['lit', 'lit'],
@@ -12,7 +15,7 @@
   ]
 
   const hover = $derived(
-    store.picksIslands && store.hoverIsland >= 0 && !store.flat
+    store.onePart && store.hoverIsland >= 0 && !store.flat
       ? 'island ' + store.hoverIsland
       : store.hoverPart >= 0
         ? store.model?.parts[store.hoverPart] || 'part ' + store.hoverPart
@@ -39,7 +42,7 @@
       {#if hover}<span>{hover}</span>{/if}
     {:else if hover && tools.tool === 'nav'}
       <span>{hover}</span>
-      <span class="faint">{store.picksIslands ? 'click adds or removes it' : '⌘click adds it to the layer, ⇧⌘click its island'}</span>
+      <span class="faint">⌘click adds it to the layer, ⇧⌘click its island</span>
     {/if}
   </span>
 
@@ -47,12 +50,17 @@
     <button class:on={store.flat} title="Flat texture and UVs (tab)" onclick={() => (store.flat = !store.flat)}>2d</button>
     <Seg value={store.view} options={views} onchange={(v) => (store.view = v)} />
     <button title="Render at game resolution (P)" class:on={store.lines > 0} onclick={() => store.cycleLines()}>{store.lines ? store.lines + 'p' : 'full res'}</button>
+    <button class:on={lightOpen} title="Lights of the view (not the texture)" onclick={() => (lightOpen = !lightOpen)}>light</button>
     <button class:on={store.torch} title="Flashlight at the cursor (T)" onclick={() => (store.torch = !store.torch)}>torch</button>
     <button class:on={store.grid} title="Grid (⇧G)" onclick={() => (store.grid = !store.grid)}>grid</button>
     <button class:on={store.bloom} title="Bloom (⇧B)" onclick={() => (store.bloom = !store.bloom)}>bloom</button>
     <button title="Shortcuts (?)" onclick={() => (store.help = true)}>?</button>
   </span>
 </footer>
+
+{#if lightOpen}
+  <ViewLight onclose={() => (lightOpen = false)} />
+{/if}
 
 <style>
   footer {

@@ -4,8 +4,7 @@ let counter = 0
 export const uid = () => Date.now().toString(36) + (counter++).toString(36)
 
 const maskDefaults: Record<MaskKind, Partial<Mask>> = {
-  parts: { amount: 1 },
-  islands: { amount: 1 },
+  surfaces: { amount: 1 },
   paint: { amount: 0.5 },
   stamps: { amount: 0.5 },
   volume: { amount: 1, soft: 0.3 },
@@ -91,7 +90,11 @@ export function normalize(p: Partial<Project>): Project {
     layers: (p.layers ?? base.layers).map((l) => ({
       ...newLayer(l.name, l.color),
       ...l,
-      masks: (l.masks ?? []).map((m) => ({ ...newMask(m.kind), ...m })),
+      masks: (l.masks ?? []).map((m) => {
+        // Parts and islands masks became one.
+        const kind = ['parts', 'islands'].includes(m.kind) ? 'surfaces' : m.kind
+        return { ...newMask(kind), ...m, kind }
+      }),
     })),
   }
 }

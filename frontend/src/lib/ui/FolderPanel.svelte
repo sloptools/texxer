@@ -2,18 +2,14 @@
   import { saveMaterial } from '../materials.svelte'
   import { store } from '../store.svelte'
   import HelpLink from './HelpLink.svelte'
+  import Surfaces from './Surfaces.svelte'
 
   const group = $derived(store.group(store.selectedGroup))
-  const parts = $derived(store.model?.parts ?? [])
   let name = $state('')
 
   $effect(() => {
     name = group?.name ?? ''
   })
-
-  function togglePart(i: number) {
-    store.toggleZone('parts', i)
-  }
 </script>
 
 {#if group}
@@ -26,22 +22,10 @@
     <div class="caps head">
       zone
       <span class="actions">
-        {#if group.zone.parts.length || group.zone.islands.length}
-          <button class="text" title="Remove all parts and islands" onclick={() => (group.zone = { parts: [], islands: [] })}>clear</button>
-        {/if}
         <button class="text" class:on={store.pickingZone} title="While on, clicks on the model add or remove surfaces (Esc ends)" onclick={() => (store.pickingZone = !store.pickingZone)}>pick</button>
       </span>
     </div>
-    <p class="hint">
-      {group.zone.islands.length}
-      {group.zone.islands.length === 1 ? 'island' : 'islands'} ·
-      {store.pickingZone ? 'click surfaces in the view, ⌘click whole parts' : 'pick to add surfaces from the view'}
-    </p>
-    <div class="parts">
-      {#each parts as part, i}
-        <button class="part" class:on={group.zone.parts.includes(i)} onclick={() => togglePart(i)}>{part || 'part ' + i}</button>
-      {/each}
-    </div>
+    <Surfaces picked={group.zone} />
     {#if !group.zone.parts.length && !group.zone.islands.length}
       <p class="hint">no zone: the folder covers everything</p>
     {/if}
@@ -53,7 +37,7 @@
       <input bind:value={name} placeholder="name" onkeydown={(e) => e.key === 'Enter' && name.trim() && saveMaterial(group, name.trim())} />
       <button disabled={!name.trim()} title="Save the folder's layers to use them on other models" onclick={() => saveMaterial(group, name.trim())}>save</button>
     </div>
-    <p class="hint">parts, islands, paint and stamps stay with this model</p>
+    <p class="hint">surfaces, paint and stamps stay with this model</p>
   </div>
 {/if}
 
@@ -78,31 +62,6 @@
     color: var(--faint);
   }
 
-  .parts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .part {
-    height: 22px;
-    max-width: 100%;
-    padding: 0 8px;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    background: var(--bg);
-    font: 11px var(--mono);
-    color: var(--dim);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .part:hover {
-    color: var(--strong);
-  }
-  .part.on {
-    border-color: var(--accent);
-    color: var(--strong);
-  }
 
   .text {
     height: 20px;

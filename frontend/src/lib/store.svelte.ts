@@ -482,48 +482,29 @@ class Store {
     return at >= 0 ? at : this.addMask(kind)
   }
 
-  // Toggles a part in the selected layer's parts mask, adding the mask if needed.
-  togglePart(part: number) {
-    const l = this.layer
-    if (!l || part < 0) return
-    let m = l.masks.find((m) => m.kind === 'parts')
-    if (!m) {
-      m = newMask('parts')
-      l.masks.unshift(m)
-      m = l.masks[0]
+  // Clicks take whole parts, islands with ⇧; a model of one part has only islands.
+  get onePart() {
+    return (this.model?.parts.length ?? 0) <= 1
+  }
+
+  // Toggles a part or an island in the picked folder's zone while picking, else in the
+  // selected layer's surfaces mask, adding the mask if needed.
+  toggleSurface(kind: 'parts' | 'islands', id: number) {
+    if (id < 0) return
+    let target = this.pickingZone ? this.group(this.selectedGroup)?.zone : undefined
+    if (!target) {
+      const l = this.layer
+      if (!l) return
+      target = l.masks.find((m) => m.kind === 'surfaces')
+      if (!target) {
+        l.masks.unshift(newMask('surfaces'))
+        target = l.masks[0]
+      }
     }
-    const i = m.parts.indexOf(part)
-    if (i >= 0) m.parts.splice(i, 1)
-    else m.parts.push(part)
-  }
-
-  // Clicks pick islands while a folder is picked or the layer has an islands mask.
-  get picksIslands() {
-    return (!!this.selectedGroup && this.pickingZone) || !!this.layer?.masks.some((m) => m.kind === 'islands')
-  }
-
-  // Toggles a part or an island in the picked folder's zone.
-  toggleZone(kind: 'parts' | 'islands', id: number) {
-    const g = this.group(this.selectedGroup)
-    if (!g || id < 0) return
-    const list = g.zone[kind]
+    const list = target[kind]
     const i = list.indexOf(id)
     if (i >= 0) list.splice(i, 1)
     else list.push(id)
-  }
-
-  // Toggles an island in the selected layer's islands mask, adding the mask if needed.
-  toggleIsland(island: number) {
-    const l = this.layer
-    if (!l || island < 0) return
-    let m = l.masks.find((m) => m.kind === 'islands')
-    if (!m) {
-      l.masks.unshift(newMask('islands'))
-      m = l.masks[0]
-    }
-    const i = m.islands.indexOf(island)
-    if (i >= 0) m.islands.splice(i, 1)
-    else m.islands.push(island)
   }
 
   // Finish and export

@@ -26,8 +26,6 @@ function toolKey(e: KeyboardEvent): boolean {
     volume.volume.mirror = !volume.volume.mirror
     return true
   }
-  const picked = !!tools.pickedStamp
-  const step = e.shiftKey ? 0.5 : 0.1
   switch (e.key) {
     case 'b':
       tools.set('brush')
@@ -42,18 +40,34 @@ function toolKey(e: KeyboardEvent): boolean {
       else if (store.marked.length) store.marked = []
       else if (tools.tool !== 'nav') tools.set(tools.tool)
       return true
+  }
+
+  if (tools.tool === 'nav') return false
+  switch (e.key) {
     case '[':
       tools.resize(1 / 1.2)
       return true
     case ']':
       tools.resize(1.2)
       return true
+  }
+
+  const brush = tools.tool === 'brush'
+  const stamp = tools.tool === 'stamp'
+  if (!brush && !stamp) return false
+
+  switch (e.key) {
     case 'x':
       tools.toggleMirror()
       return true
-    case 'e':
-      tools.brush.erase = !tools.brush.erase
-      return true
+  }
+  if (brush && e.key === 'e') {
+    tools.brush.erase = !tools.brush.erase
+    return true
+  }
+  if (!stamp) return false
+
+  switch (e.key) {
     case 'g':
       tools.snap = !tools.snap
       return true
@@ -62,8 +76,12 @@ function toolKey(e: KeyboardEvent): boolean {
       tools.rotate(e.shiftKey ? -15 : 15)
       return true
   }
-  if (!picked) return false
 
+  // Without a picked stamp these do nothing, rather than reach the layers.
+  const picked = !!tools.pickedStamp
+  if (!picked) return ['d', 'Backspace', 'Delete'].includes(e.key)
+
+  const step = e.shiftKey ? 0.5 : 0.1
   switch (e.key) {
     case 'ArrowLeft':
       tools.nudge(-step, 0)

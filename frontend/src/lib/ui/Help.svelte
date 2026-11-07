@@ -12,7 +12,7 @@
         ['pinch', 'zoom to cursor'],
         ['⌥ two fingers', 'turn key light'],
         ['drag / ⇧ drag', 'orbit / pan'],
-        ['⌘ click', 'add part to layer'],
+        ['⌘ click', 'add part to the surfaces mask'],
         ['⌥ click', 'pick the topmost layer there'],
         ['⇧⌘ click', 'add island (surface up to hard edges)'],
         ['click slider', 'type a value (double-click resets)'],

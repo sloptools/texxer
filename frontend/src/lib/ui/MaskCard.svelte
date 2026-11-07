@@ -5,10 +5,11 @@
   import type { GizmoMode } from '../gl/volume'
   import type { Axis, Mask, VolumeShape } from '../types'
   import GrungePicker from './GrungePicker.svelte'
+  import Surfaces from './Surfaces.svelte'
   import Seg from './Seg.svelte'
   import Slider from './Slider.svelte'
 
-  let { mask, index, parts, onremove }: { mask: Mask; index: number; parts: string[]; onremove: () => void } = $props()
+  let { mask, index, onremove }: { mask: Mask; index: number; onremove: () => void } = $props()
 
   const modes: [GizmoMode, string][] = [
     ['translate', 'move W'],
@@ -77,12 +78,6 @@
     paint.write(mask.paint, after)
     store.pushPaint(mask.paint, before, after)
   }
-
-  function toggle(i: number) {
-    const at = mask.parts.indexOf(i)
-    if (at >= 0) mask.parts.splice(at, 1)
-    else mask.parts.push(i)
-  }
 </script>
 
 <div class="card">
@@ -100,20 +95,8 @@
     </span>
   </div>
 
-  {#if mask.kind === 'parts'}
-    <div class="parts">
-      {#each parts as name, i}
-        <button class="part" class:on={mask.parts.includes(i)} onclick={() => toggle(i)}>{name || 'part ' + i}</button>
-      {/each}
-    </div>
-    <p class="hint">click parts in the view to add or remove them</p>
-  {:else if mask.kind === 'islands'}
-    <div class="row">
-      <span class="hint">{mask.islands.length} {mask.islands.length === 1 ? 'island' : 'islands'} · click surfaces in the view</span>
-      {#if mask.islands.length}
-        <button class="text" title="Remove all islands" onclick={() => (mask.islands = [])}>clear</button>
-      {/if}
-    </div>
+  {#if mask.kind === 'surfaces'}
+    <Surfaces picked={mask} />
   {:else}
     {#if mask.kind === 'paint'}
       <p class="hint">paint it with the brush (B)</p>
@@ -241,31 +224,6 @@
     font-size: 11px;
   }
 
-  .parts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .part {
-    height: 22px;
-    max-width: 100%;
-    padding: 0 8px;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    background: var(--bg);
-    font: 11px var(--mono);
-    color: var(--dim);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .part:hover {
-    color: var(--strong);
-  }
-  .part.on {
-    border-color: var(--accent);
-    color: var(--strong);
-  }
 
   .row {
     display: flex;

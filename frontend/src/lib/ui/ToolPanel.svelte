@@ -51,6 +51,25 @@
     [-1, 'raised'],
   ]
 
+  type Group = 'shapes' | 'relief' | 'decals' | 'images' | 'text'
+  const groups: [Group, string][] = [
+    ['shapes', 'shapes'],
+    ['relief', 'relief'],
+    ['decals', 'decals'],
+    ['images', 'png'],
+    ['text', 'text'],
+  ]
+
+  function groupOf(shape: string): Group {
+    if (shape.startsWith('relief:')) return 'relief'
+    if (colorDecals.includes(shape)) return 'decals'
+    if (shape.startsWith('img:')) return 'images'
+    if (shape.startsWith('text:') || shape.startsWith('pixel:')) return 'text'
+    return 'shapes'
+  }
+
+  let group = $state(groupOf(tools.stamp.shape))
+
   const textShape = $derived('text:' + tools.text)
   const pixelShape = $derived('pixel:' + tools.text)
 
@@ -103,12 +122,11 @@
     {/if}
     <Slider label="strength" bind:value={tools.brush.strength} def={1} />
     <Slider label="grit" bind:value={tools.brush.grit} max={0.9} def={0} />
-    <div class="caps sub">grunge · the brush reveals it, more with strength</div>
+    <div class="caps sub">grunge · revealed by strength</div>
     <GrungePicker value={tools.brush.map} onpick={(name) => (tools.brush.map = name)} none />
     {#if tools.brush.map}
       <Slider label="scale" bind:value={tools.brush.mapScale} min={1} max={12} step={0.5} digits={1} def={3} />
     {/if}
-    <p class="hint">paints into the layer's paint mask · [ ] size · ⌥ erases · ⇧click draws a line along an axis from the last stroke, ⇧⌘ free, ⇧ shows it · pixel paints whole texels of the texture · grit breaks the brush up for rust and dirt</p>
   </div>
 {:else if tools.tool === 'stamp'}
   <div class="section">
@@ -116,35 +134,41 @@
     {#if stampMask}
       <Seg value={stampMask.depth ?? 0} options={depths} onchange={(v) => stampMask && (stampMask.depth = v)} />
     {/if}
-    <div class="shapes">
-      {#each shapes as shape}
-        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => tools.setShape(shape, undefined, e.altKey)} />
-      {/each}
-    </div>
-    <div class="caps sub">relief · relief blend, colors from stamps</div>
-    <div class="shapes">
-      {#each reliefDecals as shape}
-        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => useDecal(shape, e)} />
-      {/each}
-    </div>
-    <div class="caps sub">decals · colors from stamps</div>
-    <div class="shapes">
-      {#each colorDecals as shape}
-        <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => useDecal(shape, e)} />
-      {/each}
-    </div>
-    <div class="caps sub">images</div>
-    <div class="shapes">
-      {#each store.stampImages as name}
-        <ShapeTile shape={'img:' + name} on={tools.stamp.shape === 'img:' + name} onclick={(e) => useImage(name, e.altKey)} />
-      {/each}
-      <button class="import" title="Import PNG stamps" onclick={() => store.importStamps()}>+ png</button>
-    </div>
-    <div class="text">
-      <input bind:value={tools.text} placeholder="text" onkeydown={(e) => e.key === 'Enter' && tools.setShape(pixelShape)} />
-      <button class:on={tools.stamp.shape === pixelShape} title="Bitmap font, crisp at low sizes" onclick={(e) => tools.setShape(pixelShape, undefined, e.altKey)}>pixel</button>
-      <button class:on={tools.stamp.shape === textShape} title="Condensed font" onclick={(e) => tools.setShape(textShape, undefined, e.altKey)}>text</button>
-    </div>
+    <Seg value={group} options={groups} onchange={(v) => (group = v)} />
+    {#if group === 'shapes'}
+      <div class="shapes">
+        {#each shapes as shape}
+          <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => tools.setShape(shape, undefined, e.altKey)} />
+        {/each}
+      </div>
+    {:else if group === 'relief'}
+      <div class="shapes">
+        {#each reliefDecals as shape}
+          <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => useDecal(shape, e)} />
+        {/each}
+      </div>
+      <div class="note">bumps on a relief layer</div>
+    {:else if group === 'decals'}
+      <div class="shapes">
+        {#each colorDecals as shape}
+          <ShapeTile {shape} on={tools.stamp.shape === shape} onclick={(e) => useDecal(shape, e)} />
+        {/each}
+      </div>
+      <div class="note">with their own colors, on a decals layer</div>
+    {:else if group === 'images'}
+      <div class="shapes">
+        {#each store.stampImages as name}
+          <ShapeTile shape={'img:' + name} on={tools.stamp.shape === 'img:' + name} onclick={(e) => useImage(name, e.altKey)} />
+        {/each}
+        <button class="import" title="Import PNG stamps" onclick={() => store.importStamps()}>+ png</button>
+      </div>
+    {:else}
+      <div class="text">
+        <input bind:value={tools.text} placeholder="text" onkeydown={(e) => e.key === 'Enter' && tools.setShape(pixelShape)} />
+        <button class:on={tools.stamp.shape === pixelShape} title="Bitmap font, crisp at low sizes" onclick={(e) => tools.setShape(pixelShape, undefined, e.altKey)}>pixel</button>
+        <button class:on={tools.stamp.shape === textShape} title="Condensed font" onclick={(e) => tools.setShape(textShape, undefined, e.altKey)}>text</button>
+      </div>
+    {/if}
     <Slider label="size" bind:value={size} min={0.005} max={1} step={0.005} digits={3} def={0.12} />
     <Slider label="rotation" bind:value={rot} min={0} max={345} step={15} digits={0} def={0} />
     <Slider label="aspect" bind:value={aspect} min={0.05} max={4} step={0.01} def={1} />
@@ -158,7 +182,6 @@
         <button onclick={() => tools.remove()}>delete <kbd>⌫</kbd></button>
       </div>
     {/if}
-    <p class="hint">sits flat and upright on the face · ⌘click fills the surface · ⇧click makes a row from the picked stamp · arrows nudge · R rotates 15° · esc deselects</p>
   </div>
 {/if}
 
@@ -284,8 +307,7 @@
     color: var(--strong);
   }
 
-  .hint {
-    margin: 0;
+  .note {
     font-size: 11px;
     color: var(--faint);
   }

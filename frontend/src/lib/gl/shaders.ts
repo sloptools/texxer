@@ -7,7 +7,7 @@ void main() {
 export const maxMasks = 4
 export const maxStamps = 96
 
-export const kindIndex = { parts: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, facing: 5, noise: 6, paint: 7, stamps: 8, grunge: 9, islands: 10, volume: 11, drips: 12 } as const
+export const kindIndex = { surfaces: 0, ao: 1, edges: 2, cavity: 3, gradient: 4, facing: 5, noise: 6, paint: 7, stamps: 8, grunge: 9, volume: 11, drips: 12 } as const
 export const shapeIndex = { box: 0, cylinder: 1, sphere: 2 } as const
 
 // Island ids a mask can select; smaller ones are too small to matter.
@@ -331,15 +331,21 @@ float field(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   return noiseAt(pos.xyz, vec3(uA[i].w), uB[i].y * 1.37);
 }
 
+// Picked parts and islands, by their row in the lookups: masks first, then folder zones.
+float surfaces(int row, ivec2 t, vec4 pos) {
+  float p = texelFetch(uParts, ivec2(int(pos.w), row), 0).r;
+  int island = int(texelFetch(uNrm, t, 0).w);
+  if (island < 0 || island >= ${maxIslands}) return p;
+  return max(p, texelFetch(uIslands, ivec2(island, row), 0).r);
+}
+
 float mask(int i, ivec2 t, vec4 geo, vec4 pos, vec3 n) {
   float m;
   if (uKind[i] == 0) {
-    m = texelFetch(uParts, ivec2(int(pos.w), int(uB[i].w)), 0).r;
+    m = surfaces(int(uB[i].w), t, pos);
   } else if (uKind[i] == 7) {
     // Painted values are coverage as they are, so soft brushes stay soft.
     m = clamp(paintAt(i, t) * uA[i].x * 2.0, 0.0, 1.0);
-  } else if (uKind[i] == 10) {
-    m = texelFetch(uIslands, ivec2(int(texelFetch(uNrm, t, 0).w), int(uB[i].w)), 0).r;
   } else {
     float f = field(i, t, geo, pos, n);
     float rough = uA[i].z;
@@ -364,13 +370,9 @@ vec3 blend(vec3 a, vec3 b) {
   return b;
 }
 
-// The folder's zone: its parts and islands, or everywhere without one. Zones have
-// rows of their own below the masks' in the parts and islands lookups.
+// The folder's zone, or everywhere without one.
 float zone(ivec2 t, vec4 pos) {
-  if (uZone < 0) return 1.0;
-  float p = texelFetch(uParts, ivec2(int(pos.w), uZone), 0).r;
-  float i = texelFetch(uIslands, ivec2(int(texelFetch(uNrm, t, 0).w), uZone), 0).r;
-  return max(p, i);
+  return uZone < 0 ? 1.0 : surfaces(uZone, t, pos);
 }
 
 void main() {

@@ -4,14 +4,13 @@
   import { store } from '../store.svelte'
   import { bridge } from '../bridge.svelte'
   import { setTileSize } from '../projects.svelte'
-  import type { Finish, GameTone } from '../types'
+  import type { Finish } from '../types'
   import ColorField from './ColorField.svelte'
   import Seg from './Seg.svelte'
   import Slider from './Slider.svelte'
   import HelpLink from './HelpLink.svelte'
 
   const p = $derived(store.project)
-  const tones: GameTone[] = ['standard', 'reinhard', 'filmic', 'aces', 'agx', 'substratum']
   const sh = $derived(store.project.shading)
 
   let stats = $state<main.UnwrapStats | null>(null)
@@ -97,11 +96,11 @@
     <Slider label="azimuth" bind:value={sh.azimuth} max={360} step={1} digits={0} def={60} />
     <Slider label="elevation" bind:value={sh.elevation} min={-30} max={90} step={1} digits={0} def={50} />
     <Slider label="key" bind:value={sh.key} def={0.45} />
-    <ColorField label="key" bind:value={sh.keyColor} />
+    <ColorField label="key color" bind:value={sh.keyColor} />
     <Slider label="form floor" bind:value={sh.formFloor} def={0.72} />
     <Slider label="ao floor" bind:value={sh.aoFloor} def={0.45} />
     <Slider label="under" bind:value={sh.under} def={0.12} />
-    <ColorField label="under" bind:value={sh.underColor} />
+    <ColorField label="under color" bind:value={sh.underColor} />
     <Slider label="rim" bind:value={sh.rim} def={0.3} />
     <div class="row">
       <span>both sides</span>
@@ -110,47 +109,7 @@
   {/if}
 </div>
 
-<div class="section">
-  <div class="caps">view light</div>
-  <Slider label="key" bind:value={p.light.key} max={5} def={2.2} />
-  <Slider label="ambient" bind:value={p.light.ambient} max={3} def={1} />
-  <Slider label="headlight" bind:value={p.light.headlight} max={3} def={0.6} />
-  <Slider label="angle" bind:value={p.light.angle} max={360} step={1} digits={0} def={35} />
-  <Slider label="bloom" bind:value={p.light.bloom} max={1.5} def={0.05} />
-</div>
-
-<div class="section">
-  <div class="caps">game light</div>
-  <label class="tone">
-    <span>tone</span>
-    <select bind:value={p.light.gameTone} title="Tone mapping of the game view (I), as Godot's; substratum adds its grade">
-      {#each tones as t}<option value={t}>{t}</option>{/each}
-    </select>
-  </label>
-  <ColorField label="ambient" bind:value={p.light.gameAmbient} />
-  <Slider label="energy" bind:value={p.light.gameEnergy} max={4} def={1} />
-  <Slider label="top light" bind:value={p.light.gameTop} max={3} def={0.6} />
-  <Slider label="torch" bind:value={p.light.torch} max={4} def={1} />
-</div>
-
 <style>
-  .tone {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 26px;
-    font-size: 12px;
-    color: var(--dim);
-  }
-  .tone select {
-    height: 24px;
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    background: var(--bg);
-    font: 11px var(--mono);
-    color: var(--fg);
-  }
-
   .section {
     display: flex;
     flex-direction: column;
