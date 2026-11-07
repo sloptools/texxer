@@ -62,7 +62,6 @@ func (c *modelCache) bake(path string, size, layout int, b bakeOptions) ([]byte,
 		DripLength:  0.25,
 		Padding:     max(4, size/64),
 		Detail:      b.detail,
-		Seamless:    isTile(path),
 	})
 
 	n := size * size

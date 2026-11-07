@@ -90,8 +90,6 @@ export class Stage {
   private root: THREE.Object3D | undefined
   private box = new THREE.Box3()
   private textured: THREE.Mesh[] = []
-  // A tile's neighbors, to see it repeat; they take its material but no clicks.
-  private neighbors: THREE.Group | undefined
   private lit: THREE.MeshLambertMaterial
   private unlit: THREE.MeshBasicMaterial
   private gameMat: THREE.MeshBasicMaterial
@@ -224,9 +222,8 @@ export class Stage {
     return m
   }
 
-  // Loads a model's files, each moved to its place beside the others. A tile (w, h
-  // in meters) shows with its eight neighbors.
-  async load(files: { url: string; images: string; offset: number[] }[], tile = [0, 0]) {
+  // Loads a model's files, each moved to its place beside the others.
+  async load(files: { url: string; images: string; offset: number[] }[]) {
     const scenes = await Promise.all(files.map((f) => new GLTFLoader().setResourcePath(f.images).loadAsync(f.url)))
     this.clear()
 
@@ -265,13 +262,10 @@ export class Stage {
     this.root = root
     this.scene.add(root)
     this.box.setFromObject(root)
-    if (tile[0] > 0) this.addNeighbors(tile[0], tile[1])
     this.radius = this.box.getBoundingSphere(new THREE.Sphere()).radius
     this.torch.uniforms.uMin.value.copy(this.box.min)
     this.torch.uniforms.uDiag.value = this.box.getSize(new THREE.Vector3()).length()
     this.controls.frame(this.box)
-    // A wall, seen from the front a little to the side.
-    if (tile[0] > 0) this.controls.view(0.3, 0.12)
     this.snap = true
 
     const size = this.box.getSize(new THREE.Vector3())
@@ -287,26 +281,7 @@ export class Stage {
     this.scene.add(this.grid)
   }
 
-  private addNeighbors(w: number, h: number) {
-    const group = new THREE.Group()
-    for (let y = -1; y <= 1; y++) {
-      for (let x = -1; x <= 1; x++) {
-        if (!x && !y) continue
-        for (const mesh of this.textured) {
-          const copy = new THREE.Mesh(mesh.geometry, mesh.material)
-          copy.applyMatrix4(mesh.matrixWorld)
-          copy.position.add(new THREE.Vector3(x * w, y * h, 0))
-          group.add(copy)
-        }
-      }
-    }
-    this.neighbors = group
-    this.scene.add(group)
-  }
-
   private clear() {
-    if (this.neighbors) this.scene.remove(this.neighbors)
-    this.neighbors = undefined
     if (this.root) this.scene.remove(this.root)
     if (this.grid) this.scene.remove(this.grid)
     this.root = undefined
@@ -323,9 +298,6 @@ export class Stage {
     }
     const material = view === 'lit' ? this.lit : view === 'game' ? this.gameMat : this.unlit
     for (const mesh of this.textured) mesh.material = material
-    this.neighbors?.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = material
-    })
     this.setGame(view === 'game')
   }
 

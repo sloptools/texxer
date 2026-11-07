@@ -189,8 +189,6 @@ export type ModelDoc = Project & {
   target?: string
   // Its UVs: Blender's own when unset, texxer's laid out on each sync, or texxer's kept.
   blendUV?: 'texxer' | 'locked'
-  // A tile texxer made itself, its width and height in meters; its file is texxer's too.
-  tile?: [number, number]
 }
 
 export type Workspace = {

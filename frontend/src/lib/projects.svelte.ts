@@ -1,6 +1,6 @@
 import * as api from '../../wailsjs/go/main/App'
 import { loading } from './assets'
-import { newProject, newTileProject, uid } from './project'
+import { newProject } from './project'
 import { load, persist, store, type History } from './store.svelte'
 import type { ModelDoc } from './types'
 import { baseName, docHash, link, modelKey, modelState, newModel, parseWorkspace, type ModelState } from './workspace'
@@ -79,41 +79,6 @@ export async function addModels(files?: string[]) {
   link(ws)
   await selectModel(added[0].id)
   refreshHashes()
-}
-
-const dirName = (path: string) => path.slice(0, path.lastIndexOf('/'))
-
-// Adds a tile, a wall texxer makes for a tileable texture; its PNGs go into textures/ beside the project.
-export async function addTile() {
-  const ws = store.workspace
-  if (!ws) return
-  const id = uid()
-  try {
-    const file = await api.MakeTile(store.path, id, 2, 2)
-    const n = ws.models.filter((m) => m.tile).length + 1
-    const m: ModelDoc = { ...newModel([file], newTileProject()), id, name: 'tile ' + n, tile: [2, 2], textures: dirName(store.path) + '/textures' }
-    ws.models.push(m)
-    link(ws)
-    await selectModel(m.id)
-    refreshHashes()
-  } catch (e) {
-    store.say(String(e))
-  }
-}
-
-// A new size rewrites the tile's file; its paint stays where it is in the texture.
-export async function setTileSize(w: number, h: number) {
-  const m = store.project
-  if (!m.tile) return
-  try {
-    await store.paint?.flush()
-    await api.MakeTile(store.path, m.id, w, h)
-    m.tile = [w, h]
-    store.model = await api.Open(modelKey(m))
-    refreshHashes()
-  } catch (e) {
-    store.say(String(e))
-  }
 }
 
 // Adds files to a model, so they share its texture. Their charts join the layout,
@@ -210,15 +175,10 @@ export async function exportModel(): Promise<boolean> {
       const s = store.snapshot!(v.id)
       return { name: v.name, color: s.color, emissive: s.emissive }
     })
-    let files: string
-    if (m.tile) {
-      files = await api.ExportTile(model.path, m.name, m.textures ?? dirName(store.path) + '/textures', shot.color, shot.emissive, variants)
-    } else {
-      // A Blender model's file is the add-on's copy; its export goes to a GLB of its own.
-      if (m.blend && !m.target) m.target = (await api.PickExportTarget(m.name)) || undefined
-      if (m.blend && !m.target) return false
-      files = await api.Export(model.path, m.unwrap, m.name, m.textures ?? '', m.target ?? '', shot.color, shot.emissive, variants, m.finish.glow)
-    }
+    // A Blender model's file is the add-on's copy; its export goes to a GLB of its own.
+    if (m.blend && !m.target) m.target = (await api.PickExportTarget(m.name)) || undefined
+    if (m.blend && !m.target) return false
+    const files = await api.Export(model.path, m.unwrap, m.name, m.textures ?? '', m.target ?? '', shot.color, shot.emissive, variants, m.finish.glow)
     m.exported = { doc: docHash(m), files }
     store.fileHashes = { ...store.fileHashes, [model.path]: files }
     store.say('exported ' + m.name)

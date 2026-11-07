@@ -22,8 +22,6 @@ export function DeleteSnippet(arg1:string,arg2:string,arg3:string):Promise<void>
 
 export function Export(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:Array<main.VariantTextures>,arg9:number):Promise<string>;
 
-export function ExportTile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:Array<main.VariantTextures>):Promise<string>;
-
 export function FileHashes(arg1:Array<string>):Promise<Record<string, string>>;
 
 export function GrungeMaps():Promise<Array<string>>;
@@ -33,8 +31,6 @@ export function ImportStamps():Promise<Array<string>>;
 export function KeepOriginals(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<string>;
 
 export function LoadProject(arg1:string):Promise<main.ProjectFile>;
-
-export function MakeTile(arg1:string,arg2:string,arg3:number,arg4:number):Promise<string>;
 
 export function Materials():Promise<Record<string, string>>;
 

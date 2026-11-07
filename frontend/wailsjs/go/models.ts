@@ -11,7 +11,6 @@ export namespace main {
 	    hash: string;
 	    details: boolean;
 	    texture: boolean;
-	    tile: number[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ModelInfo(source);
@@ -29,7 +28,6 @@ export namespace main {
 	        this.hash = source["hash"];
 	        this.details = source["details"];
 	        this.texture = source["texture"];
-	        this.tile = source["tile"];
 	    }
 	}
 	export class Photo {

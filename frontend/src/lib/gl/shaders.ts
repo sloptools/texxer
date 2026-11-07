@@ -43,37 +43,26 @@ float hash(vec3 p) {
   return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
 
-// Wraps every period cells along the axes where it isn't 0.
-float hashCell(vec3 i, vec3 period) {
-  return hash(mix(i, mod(i, max(period, 1.0)), step(0.5, period)));
-}
-
-float vnoise(vec3 x, vec3 period) {
+float vnoise(vec3 x) {
   vec3 i = floor(x);
   vec3 f = fract(x);
   f = f * f * (3.0 - 2.0 * f);
   return mix(
-    mix(mix(hashCell(i, period), hashCell(i + vec3(1, 0, 0), period), f.x), mix(hashCell(i + vec3(0, 1, 0), period), hashCell(i + vec3(1, 1, 0), period), f.x), f.y),
-    mix(mix(hashCell(i + vec3(0, 0, 1), period), hashCell(i + vec3(1, 0, 1), period), f.x), mix(hashCell(i + vec3(0, 1, 1), period), hashCell(i + vec3(1, 1, 1), period), f.x), f.y),
+    mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
+    mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y),
     f.z);
 }
 
-// Four octaves, spread back out to roughly 0..1. Wrapping ones double exactly.
-float fbm(vec3 p, vec3 period) {
+// Four octaves, spread back out to roughly 0..1.
+float fbm(vec3 p) {
   float s = 0.0;
   float a = 0.5;
-  float k = period == vec3(0.0) ? 2.03 : 2.0;
   for (int i = 0; i < 4; i++) {
-    s += a * vnoise(p, period);
-    p = p * k + 11.7;
-    period *= 2.0;
+    s += a * vnoise(p);
+    p = p * 2.03 + 11.7;
     a *= 0.5;
   }
   return clamp((s / 0.9375 - 0.5) * 2.2 + 0.5, 0.0, 1.0);
-}
-
-float fbm(vec3 p) {
-  return fbm(p, vec3(0.0));
 }
 `
 
@@ -92,8 +81,6 @@ uniform sampler2D uParts;
 uniform sampler2D uIslands;
 uniform int uZone;
 uniform vec3 uExtent;
-// A tile's size in bake positions, 0 along axes it doesn't repeat (all for models).
-uniform vec3 uPeriod;
 uniform vec2 uWidths;
 uniform float uFactor;
 uniform vec3 uColor;
@@ -145,20 +132,8 @@ uniform vec4 uSN[${maxStamps}];
 ${noise}
 ${shade}
 
-// On a tile, scales snap to whole repeats per tile, so patterns run on across its seams.
-vec3 snapScale(vec3 s) {
-  vec3 on = step(1e-9, uPeriod);
-  return mix(s, max(floor(uPeriod * s + 0.5), 1.0) / max(uPeriod, 1e-9), on);
-}
-
 float noiseAt(vec3 p, vec3 s, float offset) {
-  vec3 snapped = snapScale(s);
-  return fbm(p * snapped + offset, floor(uPeriod * snapped + 0.5) * step(1e-9, uPeriod));
-}
-
-// The nearest repeat of d on a tile.
-vec3 wrapped(vec3 d) {
-  return d - uPeriod * floor(d / max(uPeriod, 1e-9) + 0.5);
+  return fbm(p * s + offset);
 }
 
 // Sampler arrays can't take a loop index in GLSL ES 3.0.
@@ -188,10 +163,10 @@ float grunge(int i, vec3 p, vec3 n) {
   vec3 w = pow(abs(n), vec3(4.0));
   w /= w.x + w.y + w.z;
   vec2 o = vec2(uB[i].y * 0.137, uB[i].y * 0.291);
-  vec3 q = p * snapScale(vec3(uA[i].w));
-  return grungeAt(i, vec2(q.z, -q.y) + o) * w.x
-    + grungeAt(i, q.xz + o) * w.y
-    + grungeAt(i, vec2(q.x, -q.y) + o) * w.z;
+  float s = uA[i].w;
+  return grungeAt(i, vec2(p.z, -p.y) * s + o) * w.x
+    + grungeAt(i, p.xz * s + o) * w.y
+    + grungeAt(i, vec2(p.x, -p.y) * s + o) * w.z;
 }
 
 // The color under the strongest stamp, for layers that take their color from stamps.
@@ -234,7 +209,7 @@ float stamps(int i, vec3 p, vec3 n, float island) {
     int j = first + k;
     vec3 sn = uSN[j].xyz;
     vec3 st = uST[j].xyz;
-    vec3 d = wrapped(p - uSC[j].xyz);
+    vec3 d = p - uSC[j].xyz;
     float u = dot(d, st) / uSC[j].w;
     float w = dot(d, cross(sn, st)) / uST[j].w;
     float h = dot(d, sn) / uSC[j].w;
@@ -274,19 +249,9 @@ float inside(int i, vec3 p) {
   return 1.0 - max(a.x, max(a.y, a.z));
 }
 
-float volumeAt(int i, vec3 p) {
+float volume(int i, vec3 p) {
   float v = inside(i, p);
   if (uC[i].w > 0.5) v = max(v, inside(i, vec3(2.0 * uMirrorX - p.x, p.yz)));
-  return v;
-}
-
-// On a tile, the neighbors' volumes reach across the seams.
-float volume(int i, vec3 p) {
-  if (uPeriod == vec3(0.0)) return volumeAt(i, p);
-  float v = -1e9;
-  for (int y = -1; y <= 1; y++) {
-    for (int x = -1; x <= 1; x++) v = max(v, volumeAt(i, p + uPeriod * vec3(x, y, 0)));
-  }
   return v;
 }
 
@@ -518,12 +483,10 @@ out vec4 outColor;
 uniform sampler2D uSrc;
 uniform int uFactor;
 uniform float uSharpen;
-// A tile's texels: it repeats past them, so the rest of the texture holds copies.
-uniform ivec2 uWrap;
 
 vec3 block(ivec2 o) {
   ivec2 size = textureSize(uSrc, 0) / uFactor;
-  o = uWrap.x > 0 ? (o % uWrap + uWrap) % uWrap : clamp(o, ivec2(0), size - 1);
+  o = clamp(o, ivec2(0), size - 1);
   vec3 s = vec3(0.0);
   for (int y = 0; y < 4; y++) {
     for (int x = 0; x < 4; x++) {

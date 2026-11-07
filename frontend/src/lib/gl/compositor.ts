@@ -8,21 +8,8 @@ import { fetchBlob, imageURL, track } from '../assets'
 import { medianCut, refine, type RGB } from './mediancut'
 import { blendIndex, finishFragment, kindIndex, shapeIndex, layerFragment, lightFragment, lookupRows, maskRows, maxGroups, maxIslands, maxMasks, maxStamps, quadVertex, reduceFragment } from './shaders'
 
-// Where the model sits: bake positions are (p - min) / diag. A tile's size in meters,
-// zero for models.
-export type ModelFrame = { min: number[]; diag: number; extent: number[]; tile: number[] }
-
-// A tile's texels in a texture of this size: the longer side takes all of it.
-export function tileTexels(tile: number[], size: number): [number, number] {
-  const l = Math.max(tile[0], tile[1])
-  return [Math.round((size * tile[0]) / l), Math.round((size * tile[1]) / l)]
-}
-
-// A tile's size in bake positions, which repeat across it.
-export function tilePeriod(model: ModelFrame): THREE.Vector3 {
-  const [w, h] = model.tile
-  return w > 0 ? new THREE.Vector3(w / model.diag, h / model.diag, 0) : new THREE.Vector3()
-}
+// Where the model sits: bake positions are (p - min) / diag.
+export type ModelFrame = { min: number[]; diag: number; extent: number[] }
 
 export type Bake = {
   size: number
@@ -143,8 +130,7 @@ export class Compositor {
       uUnderColor: { value: new THREE.Color() },
       uRim: { value: 0.3 },
     })
-    const wrap = model.tile[0] > 0 ? tileTexels(model.tile, size / factor) : [0, 0]
-    this.reduceMat = shader(reduceFragment, { uSrc: { value: null }, uFactor: { value: factor }, uSharpen: { value: 0.2 }, uWrap: { value: new THREE.Vector2(...wrap) } })
+    this.reduceMat = shader(reduceFragment, { uSrc: { value: null }, uFactor: { value: factor }, uSharpen: { value: 0.2 } })
 
     this.layerMat = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
@@ -159,7 +145,6 @@ export class Compositor {
         uIslands: { value: this.islands },
         uZone: { value: -1 },
         uExtent: { value: new THREE.Vector3(...model.extent) },
-        uPeriod: { value: tilePeriod(model) },
         uWidths: { value: new THREE.Vector2(...bake.widths) },
         uFactor: { value: factor },
         uColor: { value: new THREE.Color() },

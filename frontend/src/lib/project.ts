@@ -99,14 +99,6 @@ export function normalize(p: Partial<Project>): Project {
   }
 }
 
-// A tile starts plain with some grime: its edges, cavities and gradients would repeat.
-export function newTileProject(): Project {
-  return {
-    ...newProject(),
-    layers: [newLayer('base', '#6b6a62'), newLayer('grime', '#4a4234', [newMask('grunge')], { opacity: 0.8 })],
-  }
-}
-
 // The project as a variant shows it; an unknown id is the base.
 export function withVariant(p: Project, id: string): Project {
   const v = p.variants.find((v) => v.id === id)
