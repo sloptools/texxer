@@ -1,13 +1,12 @@
 <script lang="ts">
   import { store } from '../store.svelte'
-  import type { GameTone } from '../types'
+  import { gameTones } from '../types'
   import ColorField from './ColorField.svelte'
   import Slider from './Slider.svelte'
 
   let { onclose }: { onclose: () => void } = $props()
 
   const light = $derived(store.project.light)
-  const tones: GameTone[] = ['standard', 'reinhard', 'filmic', 'aces', 'agx', 'substratum']
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onclose()} />
@@ -18,8 +17,8 @@
     <div class="caps">game light <span class="of">view only</span></div>
     <label class="tone">
       <span>tone</span>
-      <select bind:value={light.gameTone} title="Tone mapping of the game view (I), as Godot's; substratum adds its grade">
-        {#each tones as t}<option value={t}>{t}</option>{/each}
+      <select bind:value={light.gameTone} title="Tone mapping of the game view (I), as Godot's">
+        {#each gameTones as t}<option value={t}>{t}</option>{/each}
       </select>
     </label>
     <ColorField label="ambient" bind:value={light.gameAmbient} />

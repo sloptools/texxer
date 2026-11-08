@@ -1,4 +1,4 @@
-import type { Channel, Layer, Mask, MaskKind, Project } from './types'
+import { gameTones, type Channel, type Layer, type Mask, type MaskKind, type Project } from './types'
 
 let counter = 0
 export const uid = () => Date.now().toString(36) + (counter++).toString(36)
@@ -85,7 +85,8 @@ export function normalize(p: Partial<Project>): Project {
     bake: { ...base.bake, ...p.bake },
     finish: { ...base.finish, ...p.finish },
     shading: { ...base.shading, ...p.shading },
-    light: { ...base.light, ...p.light },
+    // Tone mappings that are gone become ACES.
+    light: { ...base.light, ...p.light, ...(p.light?.gameTone && !gameTones.includes(p.light.gameTone) && { gameTone: 'aces' as const }) },
     groups: (p.groups ?? []).map((g) => ({ ...g, zone: g.zone ?? { parts: [], islands: [] } })),
     layers: (p.layers ?? base.layers).map((l) => ({
       ...newLayer(l.name, l.color),

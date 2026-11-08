@@ -7,7 +7,6 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import type { GameTone, Light, View } from '../types'
 
 // Godot's tone mappings; Linear is no mapping, Filmic comes closest as Cineon.
@@ -17,10 +16,9 @@ const toneMappings: Record<GameTone, THREE.ToneMapping> = {
   filmic: THREE.CineonToneMapping,
   aces: THREE.ACESFilmicToneMapping,
   agx: THREE.AgXToneMapping,
-  substratum: THREE.ACESFilmicToneMapping,
 }
 import { TrackpadControls } from './controls'
-import { game, gameDeclarations, gamePatch, gameUniforms, gradePass } from './gamelook'
+import { gameDeclarations, gamePatch, gameUniforms } from './gamelook'
 import { Flat } from './flat'
 import { Torch, torchDeclarations } from './torch'
 import { VolumeGizmo } from './volume'
@@ -69,10 +67,8 @@ export class Stage {
   private camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
   private composer: EffectComposer
   private bloom: UnrealBloomPass
-  private grade: ShaderPass
   private game = false
   private tone: GameTone = 'standard'
-  private background = new THREE.Color()
   private grid: THREE.GridHelper | undefined
   private gridColor = new THREE.Color(0x555555)
   private showGrid = false
@@ -165,8 +161,6 @@ export class Stage {
     this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.4, 1)
     this.composer.addPass(this.bloom)
     this.composer.addPass(new OutputPass())
-    this.grade = gradePass()
-    this.composer.addPass(this.grade)
 
     this.controls = new TrackpadControls(this.camera, renderer.domElement, (x, y) => this.hit(x, y)?.point)
     this.flat = new Flat(renderer, renderer.domElement)
@@ -301,16 +295,11 @@ export class Stage {
     this.setGame(view === 'game')
   }
 
-  // The game view also takes a tone mapping like Godot's; Substratum's adds its grade
-  // and dark water background.
+  // The game view also takes a tone mapping like Godot's.
   private setGame(on: boolean) {
     this.game = on
     this.gameShared.uGame.value = on ? 1 : 0
-    const substratum = on && this.tone === 'substratum'
     this.renderer.toneMapping = on ? toneMappings[this.tone] : THREE.NoToneMapping
-    this.renderer.toneMappingExposure = substratum ? game.exposure : 1
-    this.grade.enabled = substratum
-    this.scene.background = substratum ? new THREE.Color(game.background) : this.background
   }
 
   setLight(l: Light) {
@@ -422,8 +411,7 @@ export class Stage {
 
   setBackground(css: string) {
     const bg = new THREE.Color(css)
-    this.background = bg
-    if (!this.game) this.scene.background = bg
+    this.scene.background = bg
     this.flat.setBackground(bg)
     this.gridColor = bg.clone().offsetHSL(0, 0, 0.3)
     if (this.grid) (this.grid.material as THREE.LineBasicMaterial).color.copy(this.gridColor)

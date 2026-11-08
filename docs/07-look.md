@@ -10,6 +10,6 @@ Settings in **crunch**, **baked light** and the lights are the project's, shared
 
 ## View lights
 
-**light** in the status bar sets the lights of the view; they don't change the texture. In the in-game view (**I**, flat ambient, AO, a light from above) it shows the game light: **tone** picks Godot's tone mapping: standard (linear, the default), reinhard, filmic, aces, agx; **substratum** is ACES with that game's grade and background.
+**light** in the status bar sets the lights of the view; they don't change the texture. In the in-game view (**I**, flat ambient, AO, a light from above) it shows the game light: **tone** picks Godot's tone mapping: standard (linear, the default), reinhard, filmic, aces, agx.
 
 **P** renders at game resolution (480, 360, 240 lines), with mipmaps like in the game. **T** holds a torch at the cursor. **H** headlight, **⇧B** bloom on and off; its strength is under **light**.

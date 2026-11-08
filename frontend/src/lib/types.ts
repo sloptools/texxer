@@ -137,7 +137,7 @@ export type Shading = {
   bothSides: boolean
 }
 
-export type GameTone = 'standard' | 'reinhard' | 'filmic' | 'aces' | 'agx' | 'substratum'
+export type GameTone = 'standard' | 'reinhard' | 'filmic' | 'aces' | 'agx'
 
 export type Light = {
   key: number
@@ -149,7 +149,7 @@ export type Light = {
   gameAmbient: string
   gameEnergy: number
   gameTop: number
-  // Tone mapping of the game view, as Godot's; substratum adds its grade.
+  // Tone mapping of the game view, as Godot's.
   gameTone: GameTone
   torch: number
   // How strongly glowing parts bloom in the views.
@@ -214,6 +214,7 @@ export type FlatMap = 'texture' | 'mask' | 'glow' | 'ao' | 'edges' | 'cavity' | 
 
 export type Tool = 'nav' | 'brush' | 'stamp' | 'volume'
 
+export const gameTones: GameTone[] = ['standard', 'reinhard', 'filmic', 'aces', 'agx']
 export const channels: Channel[] = ['color', 'ao', 'rough', 'glow']
 
 export const maskKinds: MaskKind[] = ['surfaces', 'paint', 'stamps', 'volume', 'grunge', 'ao', 'edges', 'cavity', 'gradient', 'facing', 'drips']
