@@ -93,6 +93,23 @@ func TestWithTexture(t *testing.T) {
 	if len(sliceArray(doc, "images")) < 2 {
 		t.Error("emissive image missing")
 	}
+
+	// Painted roughness takes the metallic-roughness slot, still not metallic.
+	rough, err := WithTexture(src, Textures{Color: buf.Bytes(), Roughness: buf.Bytes()}, "albedo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, _, _ = rawGLB(rough)
+	for _, m := range sliceArray(doc, "materials") {
+		mat := m.(map[string]any)
+		if mat["name"] != "albedo" {
+			continue
+		}
+		pbr := mat["pbrMetallicRoughness"].(map[string]any)
+		if pbr["metallicRoughnessTexture"] == nil || pbr["metallicFactor"] != 0.0 {
+			t.Errorf("albedo should take the roughness map: %v", pbr)
+		}
+	}
 }
 
 // baseColor decodes the base color texture of a material in a GLB.

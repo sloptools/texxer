@@ -38,6 +38,9 @@ type blendState struct {
 	Texture  int    `json:"texture"`
 	Color    string `json:"color"`
 	Emissive string `json:"emissive"`
+	// Painted roughness and AO kept apart from the color, empty without.
+	Roughness string `json:"roughness"`
+	AO        string `json:"ao"`
 	// Glow is the emission strength, as the export writes it.
 	Glow float64 `json:"glow"`
 	Sync int     `json:"sync"`
@@ -250,7 +253,7 @@ func (a *App) BridgeConnected() []string {
 
 // BridgeTexture writes a model's live texture where its export puts it, for the
 // .blend to show, and tells the add-on.
-func (a *App) BridgeTexture(blend, dir, name, color, emissive string, glow float64) error {
+func (a *App) BridgeTexture(blend, dir, name, color, emissive, rough, ao string, glow float64) error {
 	if a.bridge == nil {
 		return errors.New("no bridge")
 	}
@@ -258,7 +261,7 @@ func (a *App) BridgeTexture(blend, dir, name, color, emissive string, glow float
 		return err
 	}
 	base := filepath.Join(dir, fileName(name))
-	if err := writePNGs(base, color, emissive); err != nil {
+	if err := writePNGs(textureFiles(base, color, emissive, rough, ao)); err != nil {
 		return err
 	}
 	b := a.bridge
@@ -268,10 +271,15 @@ func (a *App) BridgeTexture(blend, dir, name, color, emissive string, glow float
 	s.Texture++
 	s.Color = base + ".png"
 	s.Glow = glow
-	s.Emissive = ""
-	if emissive != "" {
-		s.Emissive = base + "_emissive.png"
+	written := func(data, path string) string {
+		if data == "" {
+			return ""
+		}
+		return path
 	}
+	s.Emissive = written(emissive, base+"_emissive.png")
+	s.Roughness = written(rough, base+"_roughness.png")
+	s.AO = written(ao, base+"_ao.png")
 	return nil
 }
 

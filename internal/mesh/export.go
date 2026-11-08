@@ -19,10 +19,12 @@ const (
 
 // Textures to put on a model. Emissive is optional; its strength above 1
 // goes into KHR_materials_emissive_strength, so engines can make it bloom.
+// Roughness, optional too, is gray: glTF reads it from green.
 type Textures struct {
 	Color            []byte
 	Emissive         []byte
 	EmissiveStrength float64
+	Roughness        []byte
 	// Normal and Occlusion replace the material's detail maps when set, for a new UV layout.
 	Normal, Occlusion []byte
 	// Files, when set, links the images by these paths relative to the glTF instead of embedding them.
@@ -30,7 +32,7 @@ type Textures struct {
 }
 
 type TextureFiles struct {
-	Color, Emissive, Normal, Occlusion string
+	Color, Emissive, Roughness, Normal, Occlusion string
 }
 
 // WithTexture returns a copy of a binary glTF whose material uses the
@@ -80,6 +82,10 @@ func WithTexture(glb []byte, t Textures, material string) ([]byte, error) {
 	emit := -1.0
 	if t.Emissive != nil {
 		emit = add(t.Emissive, files.Emissive, "texxer_emissive")
+	}
+	rough := -1.0
+	if t.Roughness != nil {
+		rough = add(t.Roughness, files.Roughness, "texxer_roughness")
 	}
 	normal, occlusion := -1.0, -1.0
 	if t.Normal != nil {
@@ -138,9 +144,12 @@ func WithTexture(glb []byte, t Textures, material string) ([]byte, error) {
 		pbr["baseColorTexture"] = map[string]any{"index": tex}
 		// The baked texture is the full color; a tint would darken it.
 		delete(pbr, "baseColorFactor")
-		// Fully rough and not metallic: the look is in the texture, not in PBR highlights.
+		// Not metallic, and fully rough unless painted: the look is in the texture, not in PBR highlights.
 		pbr["metallicFactor"], pbr["roughnessFactor"] = 0.0, 1.0
 		delete(pbr, "metallicRoughnessTexture")
+		if rough >= 0 {
+			pbr["metallicRoughnessTexture"] = map[string]any{"index": rough}
+		}
 		if emit >= 0 {
 			setEmissive(doc, mat, emit, t.EmissiveStrength)
 		}

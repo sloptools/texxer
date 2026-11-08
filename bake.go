@@ -139,7 +139,8 @@ func (a *App) middleware(next http.Handler) http.Handler {
 			http.ServeFile(w, r, filepath.Join(filepath.Dir(paths[file]), filepath.FromSlash(uri)))
 
 		case "/grunge":
-			data, err := grunge.PNG(r.URL.Query().Get("name"))
+			dir, _ := grunge.Dir()
+			data, err := grunge.PNG(dir, r.URL.Query().Get("name"))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusNotFound)
 				return

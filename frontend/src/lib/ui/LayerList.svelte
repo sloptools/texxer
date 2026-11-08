@@ -3,7 +3,7 @@
   import { store } from '../store.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import { dragged as draggedIds, layerRows, markRow, place, selectRow, selectedKey, type Drop, type Row, type Where } from '../layerRows'
-  import type { Layer } from '../types'
+  import { channels, type Layer } from '../types'
 
   let renaming = $state('')
 
@@ -28,13 +28,14 @@
         { label: 'new layer in folder', key: 'N', run: () => store.addLayer() },
         { label: 'rename', run: () => (renaming = id) },
         { label: 'flatten to paint', run: () => store.flatten() },
+        ...copyItems(),
         'line',
         { label: 'dissolve folder', key: '⇧⌘G', run: () => store.ungroup(id) },
         { label: 'delete folder and its layers', danger: true, run: () => store.deleteGroup(id) },
       )
     } else if (row?.kind === 'layer' && draggedIds(row.key).length > 1) {
       const n = store.pickedLayers().length
-      items.push({ label: `delete ${n} layers`, key: '⌫', danger: true, run: () => store.deleteLayer() })
+      items.push(...copyItems().slice(1), 'line', { label: `delete ${n} layers`, key: '⌫', danger: true, run: () => store.deleteLayer() })
     } else if (row?.kind === 'layer') {
       selectRow(row)
       items.push(
@@ -43,6 +44,7 @@
         { label: 'rename', run: () => (renaming = row.key) },
         { label: 'into a new folder', key: '⌘G', run: () => store.groupLayer() },
         { label: 'flatten to paint', run: () => store.flatten() },
+        ...copyItems(),
         'line',
         { label: 'delete', key: '⌫', danger: true, run: () => store.deleteLayer() },
       )
@@ -51,6 +53,11 @@
     }
     menu = { x: e.clientX, y: e.clientY, items }
   }
+  // Copies into the other channels, which come into being for it.
+  function copyItems(): MenuItem[] {
+    return ['line', ...channels.filter((c) => c !== store.channel).map((c) => ({ label: 'copy to ' + c, run: () => store.copyToChannel(c) }))]
+  }
+
   let drag = $state<{ key: string; x: number; y: number; cx: number; cy: number; active: boolean } | null>(null)
   // out: below a folder's bottom layer but left of its indent, so below the folder.
   let drop = $state<Drop | null>(null)

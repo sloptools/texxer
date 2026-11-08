@@ -12,7 +12,7 @@ export function BridgeLayout(arg1:string,arg2:string,arg3:number):Promise<void>;
 
 export function BridgeRequestSync(arg1:string):Promise<void>;
 
-export function BridgeTexture(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:number):Promise<void>;
+export function BridgeTexture(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:number):Promise<void>;
 
 export function DeleteMaterial(arg1:string):Promise<void>;
 
@@ -20,7 +20,7 @@ export function DeletePhoto(arg1:string,arg2:string,arg3:string,arg4:string,arg5
 
 export function DeleteSnippet(arg1:string,arg2:string,arg3:string):Promise<void>;
 
-export function Export(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:Array<main.VariantTextures>,arg9:number):Promise<string>;
+export function Export(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:Array<main.VariantTextures>,arg11:number):Promise<string>;
 
 export function FileHashes(arg1:Array<string>):Promise<Record<string, string>>;
 
@@ -39,6 +39,8 @@ export function MovePaint(arg1:string,arg2:string,arg3:number,arg4:string,arg5:n
 export function NewProject():Promise<string>;
 
 export function Open(arg1:string):Promise<main.ModelInfo>;
+
+export function OpenGrungeFolder():Promise<void>;
 
 export function Palette(arg1:string):Promise<Array<any>>;
 

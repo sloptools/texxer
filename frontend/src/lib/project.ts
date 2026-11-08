@@ -1,4 +1,4 @@
-import type { Layer, Mask, MaskKind, Project } from './types'
+import type { Channel, Layer, Mask, MaskKind, Project } from './types'
 
 let counter = 0
 export const uid = () => Date.now().toString(36) + (counter++).toString(36)
@@ -8,7 +8,7 @@ const maskDefaults: Record<MaskKind, Partial<Mask>> = {
   paint: { amount: 0.5 },
   stamps: { amount: 0.5 },
   volume: { amount: 1, soft: 0.3 },
-  grunge: { amount: 0.4, scale: 3, map: 'grunge_1' },
+  grunge: { amount: 0.4, scale: 3, map: 'grime' },
   ao: { amount: 0.45, soft: 0.4 },
   edges: { amount: 0.3, rough: 0.25 },
   cavity: { amount: 0.5, rough: 0.3 },
@@ -57,6 +57,7 @@ export function newProject(): Project {
     ],
     groups: [],
     variants: [],
+    channels: [],
     finish: { supersample: 2, sharpen: 0.2, palette: 'auto', count: 48, colors: [], dither: 0, glow: 3 },
     shading: {
       on: true,
@@ -91,13 +92,15 @@ export function normalize(p: Partial<Project>): Project {
       ...l,
       masks: (l.masks ?? []).map((m) => {
         // Parts and islands masks became one; noise masks became soft grunge.
-        if ((m.kind as string) === 'noise') return { ...newMask('grunge'), ...m, kind: 'grunge' as const, map: 'blotches_1', scale: 3 }
+        if ((m.kind as string) === 'noise') return { ...newMask('grunge'), ...m, kind: 'grunge' as const, map: 'blotches', scale: 3 }
         const kind = ['parts', 'islands'].includes(m.kind) ? 'surfaces' : m.kind
         return { ...newMask(kind), ...m, kind }
       }),
     })),
   }
 }
+
+export const channelOf = (l: Layer): Channel => l.channel ?? 'color'
 
 // The project as a variant shows it; an unknown id is the base.
 export function withVariant(p: Project, id: string): Project {

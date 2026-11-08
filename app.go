@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -153,8 +155,25 @@ func (a *App) ImportStamps() ([]string, error) {
 	return a.Stamps()
 }
 
+// GrungeMaps lists the built-in grunge maps and the user's, served at /grunge?name=.
 func (a *App) GrungeMaps() []string {
-	return grunge.Names()
+	dir, _ := grunge.Dir()
+	return grunge.Names(dir)
+}
+
+// OpenGrungeFolder shows the user's grunge folder in the file manager.
+func (a *App) OpenGrungeFolder() error {
+	dir, err := grunge.Dir()
+	if err != nil {
+		return err
+	}
+	switch goruntime.GOOS {
+	case "darwin":
+		return exec.Command("open", dir).Start()
+	case "windows":
+		return exec.Command("explorer", dir).Start()
+	}
+	return exec.Command("xdg-open", dir).Start()
 }
 
 // Palette returns colors as 0..255 triplets: Quake's for "quake", otherwise
@@ -196,15 +215,23 @@ type VariantTextures struct {
 // file into target, and as PNGs into dir (beside the first file when empty), named
 // after the model; variants get PNGs of their own. The files link the PNGs instead
 // of embedding them, so engines import one texture, not a copy too. An empty
-// emissive leaves it out. It returns the files' new hash.
-func (a *App) Export(key string, layout int, name, dir, target, pngBase64, emissiveBase64 string, variants []VariantTextures, emissiveStrength float64) (string, error) {
+// emissive, roughness or ao leaves it out; a painted ao replaces the model's own.
+// It returns the files' new hash.
+func (a *App) Export(key string, layout int, name, dir, target, pngBase64, emissiveBase64, roughBase64, aoBase64 string, variants []VariantTextures, emissiveStrength float64) (string, error) {
 	t := mesh.Textures{EmissiveStrength: emissiveStrength}
 	var err error
 	if t.Color, err = base64.StdEncoding.DecodeString(pngBase64); err != nil {
 		return "", err
 	}
-	if emissiveBase64 != "" {
-		if t.Emissive, err = base64.StdEncoding.DecodeString(emissiveBase64); err != nil {
+	var ao []byte
+	for _, f := range []struct {
+		data string
+		to   *[]byte
+	}{{emissiveBase64, &t.Emissive}, {roughBase64, &t.Roughness}, {aoBase64, &ao}} {
+		if f.data == "" {
+			continue
+		}
+		if *f.to, err = base64.StdEncoding.DecodeString(f.data); err != nil {
 			return "", err
 		}
 	}
@@ -250,13 +277,17 @@ func (a *App) Export(key string, layout int, name, dir, target, pngBase64, emiss
 		ft.Files = &mesh.TextureFiles{
 			Color:     rel(base + ".png"),
 			Emissive:  rel(base + "_emissive.png"),
+			Roughness: rel(base + "_roughness.png"),
 			Normal:    rel(own + "_normal.png"),
 			Occlusion: rel(own + "_occlusion.png"),
 		}
 		if ft.Normal != nil {
 			details[own+"_normal.png"] = ft.Normal
 		}
-		if ft.Occlusion != nil {
+		if ao != nil {
+			ft.Occlusion = ao
+			ft.Files.Occlusion = rel(base + "_ao.png")
+		} else if ft.Occlusion != nil {
 			details[own+"_occlusion.png"] = ft.Occlusion
 		}
 		if outs[i], err = withTexture(glb, ft); err != nil {
@@ -264,11 +295,11 @@ func (a *App) Export(key string, layout int, name, dir, target, pngBase64, emiss
 		}
 	}
 
-	if err := writePNGs(base, pngBase64, emissiveBase64); err != nil {
+	if err := writePNGs(textureFiles(base, pngBase64, emissiveBase64, roughBase64, aoBase64)); err != nil {
 		return "", err
 	}
 	for _, v := range variants {
-		if err := writePNGs(base+"_"+fileName(v.Name), v.Color, v.Emissive); err != nil {
+		if err := writePNGs(textureFiles(base+"_"+fileName(v.Name), v.Color, v.Emissive, "", "")); err != nil {
 			return "", err
 		}
 	}
@@ -288,17 +319,22 @@ func (a *App) Export(key string, layout int, name, dir, target, pngBase64, emiss
 	return fileHash(key)
 }
 
-// writePNGs writes base.png and, if there is one, base_emissive.png.
-func writePNGs(base, color, emissive string) error {
-	for _, f := range []struct{ path, data string }{{base + ".png", color}, {base + "_emissive.png", emissive}} {
-		if f.data == "" {
+// textureFiles names a texture's PNGs after base.
+func textureFiles(base, color, emissive, rough, ao string) map[string]string {
+	return map[string]string{base + ".png": color, base + "_emissive.png": emissive, base + "_roughness.png": rough, base + "_ao.png": ao}
+}
+
+// writePNGs writes base64 PNGs to their paths, leaving out empty ones.
+func writePNGs(files map[string]string) error {
+	for path, data := range files {
+		if data == "" {
 			continue
 		}
-		png, err := base64.StdEncoding.DecodeString(f.data)
+		png, err := base64.StdEncoding.DecodeString(data)
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(f.path, png, 0o644); err != nil {
+		if err := os.WriteFile(path, png, 0o644); err != nil {
 			return err
 		}
 	}

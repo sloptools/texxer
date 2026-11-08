@@ -22,4 +22,8 @@ A mask decides where a layer shows. With several masks, the layer shows where al
 
 Use surfaces for zones, ao, edges and cavity for wear. Volume with grunge puts dirt exactly where you want it.
 
+## Grunge maps
+
+texxer brings a few maps made from noise: clouds, blotches, grime, specks, streaks, scratches, lines. Your own go into the grunge folder, the last tile of the map grid (on a Mac `~/Library/Application Support/texxer/grunge`): grays, white = dirt, best tileable, PNG or JPG, the file name is the map's name. They are evened out on loading, so **amount** is about the share they cover. A map a project uses but the folder lacks shows red and masks nothing.
+
 **Q** edits the layer's volume, adding one if needed: click the model to put it there, drag it over the surface, or use the gizmo. **W E R** (or the buttons on the mask) move, turn and size, **[ ]** size it all at once, **X** mirrors it across x. Prefer hard cuts: soft masks read as smears once crunched.

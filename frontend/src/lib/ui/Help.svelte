@@ -78,6 +78,8 @@
         ['⇧1 – ⇧7', 'add dirt: dust, grime, dirt below, rust edges, drips, chips with rust, grunge brush'],
         ['⇧M', 'add a material (a folder of layers)'],
         ['C', 'next variant (color, visibility, opacity per layer)'],
+        ['A', 'next channel (color, ao, rough, glow)'],
+        ['O', 'onion: another channel faintly over this one'],
         ['drag', 'reorder, drop on a folder to put it in, esc cancels'],
       ],
     ],

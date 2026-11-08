@@ -22,8 +22,8 @@ export function BridgeRequestSync(arg1) {
   return window['go']['main']['App']['BridgeRequestSync'](arg1);
 }
 
-export function BridgeTexture(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['BridgeTexture'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function BridgeTexture(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['BridgeTexture'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
 export function DeleteMaterial(arg1) {
@@ -38,8 +38,8 @@ export function DeleteSnippet(arg1, arg2, arg3) {
   return window['go']['main']['App']['DeleteSnippet'](arg1, arg2, arg3);
 }
 
-export function Export(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
-  return window['go']['main']['App']['Export'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+export function Export(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
+  return window['go']['main']['App']['Export'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 }
 
 export function FileHashes(arg1) {
@@ -76,6 +76,10 @@ export function NewProject() {
 
 export function Open(arg1) {
   return window['go']['main']['App']['Open'](arg1);
+}
+
+export function OpenGrungeFolder() {
+  return window['go']['main']['App']['OpenGrungeFolder']();
 }
 
 export function Palette(arg1) {

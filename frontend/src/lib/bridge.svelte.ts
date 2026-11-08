@@ -112,11 +112,11 @@ class Bridge {
     if (!m?.blend || !store.snapshot || !store.ready) return
     const shot = store.snapshot('')
     // Renders that change nothing don't write the files again.
-    const sig = hash(shot.color) + ':' + hash(shot.emissive) + ':' + m.finish.glow
+    const sig = [shot.color, shot.emissive, shot.rough, shot.ao].map(hash).join(':') + ':' + m.finish.glow
     if (sig === this.sent) return
     this.sent = sig
     try {
-      await api.BridgeTexture(m.blend, m.textures ?? dirName(m.blend) + '/textures', m.name, shot.color, shot.emissive, m.finish.glow)
+      await api.BridgeTexture(m.blend, m.textures ?? dirName(m.blend) + '/textures', m.name, shot.color, shot.emissive, shot.rough, shot.ao, m.finish.glow)
     } catch (e) {
       store.say(String(e))
     }

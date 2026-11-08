@@ -109,7 +109,8 @@ def socket(node, *names):
 
 
 def update_material(s):
-    """The texxer material with the latest texture: nearest pixels, no shine, glow from the emissive map."""
+    """The texxer material with the latest texture: nearest pixels, no shine, glow from the emissive map,
+    roughness and AO from theirs when texxer paints them apart."""
     name = material_name()
     mat = bpy.data.materials.get(name) or bpy.data.materials.new(name)
     mat.use_nodes = True
@@ -134,16 +135,48 @@ def update_material(s):
             tex.location = (-400, y)
         links.new(nodes["color"].outputs["Color"], socket(bsdf, "Base Color"))
         mat["texxer"] = 1
+    # Materials from before the data channels get their nodes now.
+    for key, y in (("roughness", -450), ("ao", 400)):
+        if key not in nodes:
+            tex = nodes.new("ShaderNodeTexImage")
+            tex.name = key
+            tex.interpolation = "Closest"
+            tex.location = (-400, y)
+            if "uv" in nodes:
+                links.new(nodes["uv"].outputs["UV"], tex.inputs["Vector"])
     if "uv" not in nodes:
         uvmap = nodes.new("ShaderNodeUVMap")
         uvmap.name = "uv"
         uvmap.location = (-650, 0)
-        for key in ("color", "emissive"):
+        for key in ("color", "emissive", "roughness", "ao"):
             links.new(uvmap.outputs["UV"], nodes[key].inputs["Vector"])
     nodes["uv"].uv_map = UV if s.get("uv") in ("texxer", "locked") else ""
 
     bsdf = nodes["bsdf"]
     nodes["color"].image = image(s["color"], nodes["color"].image)
+
+    rough = socket(bsdf, "Roughness")
+    for l in list(rough.links):
+        links.remove(l)
+    if s.get("roughness"):
+        nodes["roughness"].image = image(s["roughness"], nodes["roughness"].image)
+        nodes["roughness"].image.colorspace_settings.name = "Non-Color"
+        links.new(nodes["roughness"].outputs["Color"], rough)
+
+    # AO kept apart multiplies the color here, as engines do with their occlusion.
+    base = socket(bsdf, "Base Color")
+    if s.get("ao"):
+        nodes["ao"].image = image(s["ao"], nodes["ao"].image)
+        nodes["ao"].image.colorspace_settings.name = "Non-Color"
+        mul = nodes.get("ao_mul") or nodes.new("ShaderNodeVectorMath")
+        mul.name = "ao_mul"
+        mul.operation = "MULTIPLY"
+        mul.location = (-150, 250)
+        links.new(nodes["color"].outputs["Color"], mul.inputs[0])
+        links.new(nodes["ao"].outputs["Color"], mul.inputs[1])
+        links.new(mul.outputs["Vector"], base)
+    else:
+        links.new(nodes["color"].outputs["Color"], base)
     glow = socket(bsdf, "Emission Color", "Emission")
     if s.get("emissive"):
         nodes["emissive"].image = image(s["emissive"], nodes["emissive"].image)

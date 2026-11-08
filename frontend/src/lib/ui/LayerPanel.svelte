@@ -93,7 +93,9 @@
     {:else}
       <p class="hint">{sourceHints[source]}</p>
     {/if}
-    <label class="check"><input type="checkbox" bind:checked={layer.glow} /> glows (emissive)</label>
+    {#if !layer.channel}
+      <label class="check"><input type="checkbox" bind:checked={layer.glow} /> glows (emissive)</label>
+    {/if}
   </div>
 
   <div class="section">

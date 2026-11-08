@@ -219,6 +219,12 @@ export function handleKey(e: KeyboardEvent, openMaterials: () => void) {
       case 'c':
         store.cycleVariant()
         break
+      case 'a':
+        store.cycleChannel()
+        break
+      case 'o':
+        store.cycleOnion()
+        break
       case 'Tab':
         store.flat = !store.flat
         break

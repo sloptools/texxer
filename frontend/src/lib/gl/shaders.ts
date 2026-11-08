@@ -474,6 +474,7 @@ void main() {
 `
 
 // Box-filters uFactor² texels into one, then sharpens against the neighbors.
+// AO painted on its own can multiply in; data channels come out gray.
 export const reduceFragment = /* glsl */ `
 precision highp float;
 precision highp int;
@@ -481,17 +482,20 @@ precision highp int;
 out vec4 outColor;
 
 uniform sampler2D uSrc;
+uniform sampler2D uMul;
+uniform int uMulOn;
+uniform int uGray;
 uniform int uFactor;
 uniform float uSharpen;
 
-vec3 block(ivec2 o) {
-  ivec2 size = textureSize(uSrc, 0) / uFactor;
+vec3 block(sampler2D src, ivec2 o) {
+  ivec2 size = textureSize(src, 0) / uFactor;
   o = clamp(o, ivec2(0), size - 1);
   vec3 s = vec3(0.0);
   for (int y = 0; y < 4; y++) {
     for (int x = 0; x < 4; x++) {
       if (x >= uFactor || y >= uFactor) continue;
-      s += texelFetch(uSrc, o * uFactor + ivec2(x, y), 0).rgb;
+      s += texelFetch(src, o * uFactor + ivec2(x, y), 0).rgb;
     }
   }
   return s / float(uFactor * uFactor);
@@ -499,13 +503,33 @@ vec3 block(ivec2 o) {
 
 void main() {
   ivec2 t = ivec2(gl_FragCoord.xy);
-  vec3 c = block(t);
+  vec3 c = block(uSrc, t);
   vec3 soft = vec3(0.0);
   for (int y = -1; y <= 1; y++) {
-    for (int x = -1; x <= 1; x++) soft += block(t + ivec2(x, y));
+    for (int x = -1; x <= 1; x++) soft += block(uSrc, t + ivec2(x, y));
   }
   soft /= 9.0;
-  outColor = vec4(clamp(c + (c - soft) * uSharpen, 0.0, 1.0), 1.0);
+  c = clamp(c + (c - soft) * uSharpen, 0.0, 1.0);
+  const vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+  if (uMulOn == 1) c *= dot(block(uMul, t), luma);
+  if (uGray == 1) c = vec3(dot(c, luma));
+  outColor = vec4(c, 1.0);
+}
+`
+
+// The channel being painted, another one faintly over it.
+export const onionFragment = /* glsl */ `
+precision highp float;
+
+out vec4 outColor;
+
+uniform sampler2D uSrc;
+uniform sampler2D uOnion;
+uniform float uAmount;
+
+void main() {
+  ivec2 t = ivec2(gl_FragCoord.xy);
+  outColor = vec4(mix(texelFetch(uSrc, t, 0).rgb, texelFetch(uOnion, t, 0).rgb, uAmount), 1.0);
 }
 `
 

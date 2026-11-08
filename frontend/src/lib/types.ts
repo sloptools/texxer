@@ -68,9 +68,18 @@ export type Group = {
   zone: { parts: number[]; islands: number[] }
 }
 
+// The textures a model gets: its color, and the ones painted besides it when added.
+export type Channel = 'color' | 'ao' | 'rough' | 'glow'
+export type DataChannel = Exclude<Channel, 'color'>
+
+// A channel painted besides the color. AO goes into the color unless kept separate.
+export type ChannelDoc = { kind: DataChannel; separate?: boolean }
+
 export type Layer = {
   id: string
   name: string
+  // The channel it paints, the color when unset.
+  channel?: DataChannel
   // The folder, empty for none.
   group: string
   color: string
@@ -167,6 +176,7 @@ export type Project = {
   layers: Layer[]
   groups: Group[]
   variants: Variant[]
+  channels: ChannelDoc[]
   finish: Finish
   shading: Shading
   light: Light
@@ -203,6 +213,8 @@ export type View = 'lit' | 'unlit' | 'game' | 'mask'
 export type FlatMap = 'texture' | 'mask' | 'glow' | 'ao' | 'edges' | 'cavity' | 'parts'
 
 export type Tool = 'nav' | 'brush' | 'stamp' | 'volume'
+
+export const channels: Channel[] = ['color', 'ao', 'rough', 'glow']
 
 export const maskKinds: MaskKind[] = ['surfaces', 'paint', 'stamps', 'volume', 'grunge', 'ao', 'edges', 'cavity', 'gradient', 'facing', 'drips']
 export const blends: Blend[] = ['normal', 'multiply', 'add', 'overlay', 'relief']

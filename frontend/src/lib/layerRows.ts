@@ -1,3 +1,4 @@
+import { channelOf } from './project'
 import { store } from './store.svelte'
 import type { Group, Layer } from './types'
 
@@ -14,6 +15,7 @@ export function layerRows(): Row[] {
   const seen = new Set<string>()
   for (let i = layers.length - 1; i >= 0; i--) {
     const l = layers[i]
+    if (channelOf(l) !== store.channel) continue
     const g = l.group ? store.group(l.group) : undefined
     if (!g) {
       out.push({ kind: 'layer', key: l.id, l, i, nested: false })

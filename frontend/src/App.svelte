@@ -5,6 +5,7 @@
   import { store } from './lib/store.svelte'
   import Finish from './lib/ui/Finish.svelte'
   import FlatBar from './lib/ui/FlatBar.svelte'
+  import ChannelBar from './lib/ui/ChannelBar.svelte'
   import Help from './lib/ui/Help.svelte'
   import LayerList from './lib/ui/LayerList.svelte'
   import LayerPanel from './lib/ui/LayerPanel.svelte'
@@ -141,6 +142,9 @@
         {#if tools.tool === 'stamp'}
           <SnippetStrip />
         {/if}
+      {/if}
+      {#if mode === 'paint'}
+        <ChannelBar />
       {/if}
     {/if}
     {#if mode === 'photos'}

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import * as api from '../../../wailsjs/go/main/App'
+  import Icon from '../Icon.svelte'
   import { imageURL } from '../assets'
   import { store } from '../store.svelte'
 
@@ -8,13 +10,21 @@
   // Folded to the picked map; the grid opens on click and folds on a pick.
   let open = $state(false)
 
+  // Maps put into the grunge folder meanwhile show up on opening.
+  async function toggle() {
+    open = !open
+    if (open) store.grungeMaps = await api.GrungeMaps()
+  }
+
+  const missing = $derived(!!value && store.grungeMaps.length > 0 && !store.grungeMaps.includes(value))
+
   function pick(name: string) {
     onpick(name)
     open = false
   }
 </script>
 
-<button class="current" class:open title="Pick a grunge map" onclick={() => (open = !open)}>
+<button class="current" class:open title="Pick a grunge map" onclick={toggle}>
   <span class="thumb">
     {#if value}
       {#await imageURL(`/grunge?name=${encodeURIComponent(value)}`) then url}
@@ -22,7 +32,7 @@
       {/await}
     {/if}
   </span>
-  <span class="name">{value || 'no map'}</span>
+  <span class="name" class:missing title={missing ? 'Not in your grunge folder: the mask shows nothing' : undefined}>{value || 'no map'}{missing ? ' (missing)' : ''}</span>
   <span class="more">{open ? '▴' : '▾'}</span>
 </button>
 
@@ -38,6 +48,7 @@
         {/await}
       </button>
     {/each}
+    <button class="map none" title="Your own maps: PNG or JPG grays, white = dirt, best tileable; the file name is the map's name" onclick={() => api.OpenGrungeFolder()}><Icon name="dir" size={11} /></button>
   </div>
 {/if}
 
@@ -79,6 +90,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .missing {
+    color: var(--error);
+  }
   .more {
     color: var(--faint);
   }
@@ -99,8 +113,13 @@
     background: var(--bg);
   }
   .none {
+    display: grid;
+    place-items: center;
     font: 11px var(--mono);
     color: var(--faint);
+  }
+  .none:hover {
+    color: var(--strong);
   }
   .map.on {
     border-color: var(--accent);

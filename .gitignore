@@ -6,3 +6,14 @@ frontend/dist
 frontend/package.json.md5
 __pycache__/
 /texxer
+/dist
+
+# Local only: notes, examples and helpers that aren't part of texxer
+/CLAUDE.md
+/SHIFT.md
+/.claude
+/examples
+/internal/grunge/maps
+/frontend/scripts
+/tools/grunge/sources.txt
+/tools/unique_uvs.py

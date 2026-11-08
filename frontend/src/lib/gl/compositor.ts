@@ -1,12 +1,12 @@
 import * as THREE from 'three'
-import { newMask } from '../project'
+import { channelOf, newMask } from '../project'
 import { expand, frame } from '../stamps'
-import type { BakeSettings, Layer, Project, Stamp, Volume } from '../types'
+import type { BakeSettings, Channel, Layer, Project, Stamp, Volume } from '../types'
 import { StampAtlas, atlasGrid, atlasInset } from './atlas'
 import type { PaintStore } from './paint'
 import { fetchBlob, imageURL, track } from '../assets'
 import { medianCut, refine, type RGB } from './mediancut'
-import { blendIndex, finishFragment, kindIndex, shapeIndex, layerFragment, lightFragment, lookupRows, maskRows, maxGroups, maxIslands, maxMasks, maxStamps, quadVertex, reduceFragment } from './shaders'
+import { blendIndex, finishFragment, kindIndex, shapeIndex, layerFragment, lightFragment, lookupRows, onionFragment, maskRows, maxGroups, maxIslands, maxMasks, maxStamps, quadVertex, reduceFragment } from './shaders'
 
 // Where the model sits: bake positions are (p - min) / diag.
 export type ModelFrame = { min: number[]; diag: number; extent: number[] }
@@ -58,6 +58,13 @@ function target(size: number, mipmaps = false) {
   })
 }
 
+// What the view shows: a channel, another one faintly over it.
+export type Show = { channel: Channel; onion: Channel | ''; amount: number }
+const plain: Show = { channel: 'color', onion: '', amount: 0 }
+
+// A gray channel's stack and its finished map.
+type GrayChannel = { ping: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget]; src: number; out: THREE.WebGLRenderTarget }
+
 function lightDir(azimuth: number, elevation: number) {
   const az = THREE.MathUtils.degToRad(azimuth)
   const el = THREE.MathUtils.degToRad(elevation)
@@ -72,12 +79,18 @@ function shader(fragmentShader: string, uniforms: Record<string, THREE.IUniform>
 // per layer, bakes light into it, then crunches it down to the texture size.
 export class Compositor {
   readonly out: THREE.WebGLRenderTarget
+  // The channel being painted, as the view shows it.
+  readonly view: THREE.WebGLRenderTarget
   readonly mask: THREE.WebGLRenderTarget
   private ping: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget]
   private reduced: THREE.WebGLRenderTarget
   // The emissive map and its stack, made when a layer first glows.
   private emitPing: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] | undefined
   emission: THREE.WebGLRenderTarget | undefined
+  // AO and roughness, made when the project first has them.
+  private grays = new Map<'ao' | 'rough', GrayChannel>()
+  private show = plain
+  private onionMat: THREE.ShaderMaterial
   private lightMat: THREE.ShaderMaterial
   private reduceMat: THREE.ShaderMaterial
   // The auto palette, picked from the texture a moment after it changes.
@@ -111,6 +124,7 @@ export class Compositor {
     const vec4s = (n: number) => Array.from({ length: n }, () => new THREE.Vector4())
     const size = bake.size
     this.out = target(size / factor, true)
+    this.view = target(size / factor, true)
     this.reduced = target(size / factor)
     this.mask = target(size)
     this.ping = [target(size), target(size)]
@@ -130,7 +144,8 @@ export class Compositor {
       uUnderColor: { value: new THREE.Color() },
       uRim: { value: 0.3 },
     })
-    this.reduceMat = shader(reduceFragment, { uSrc: { value: null }, uFactor: { value: factor }, uSharpen: { value: 0.2 } })
+    this.reduceMat = shader(reduceFragment, { uSrc: { value: null }, uMul: { value: null }, uMulOn: { value: 0 }, uGray: { value: 0 }, uFactor: { value: factor }, uSharpen: { value: 0.2 } })
+    this.onionMat = shader(onionFragment, { uSrc: { value: null }, uOnion: { value: null }, uAmount: { value: 0 } })
 
     this.layerMat = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
@@ -214,8 +229,9 @@ export class Compositor {
   }
 
   // A ghost stamp previews where the stamp tool would place one, on the selected layer.
-  render(project: Project, selected: number, ghost?: Stamp | null) {
+  render(project: Project, selected: number, ghost?: Stamp | null, show: Show = plain) {
     if (ghost) project = withGhost(project, selected, ghost)
+    this.show = show
     const r = this.renderer
     const prevTarget = r.getRenderTarget()
     const u = this.layerMat.uniforms
@@ -227,13 +243,33 @@ export class Compositor {
     u.uL2.value.copy(lightDir(sh.azimuth + 80, 30))
     u.uBoth.value = sh.bothSides ? 1 : 0
 
+    const hidden = new Set(project.groups.filter((g) => !g.visible).map((g) => g.id))
+    const stack = (c: Channel) => project.layers.flatMap((layer, i) => (channelOf(layer) === c && layer.visible && !hidden.has(layer.group) ? [{ layer, i }] : []))
+    const has = (c: Channel) => project.channels.some((d) => d.kind === c)
+
+    const picked = project.layers[selected]
+    if (picked) {
+      this.setLayer(picked, selected)
+      u.uMaskOnly.value = 1
+      this.draw(this.layerMat, this.mask)
+      u.uMaskOnly.value = 0
+    }
+
+    // AO and roughness start white: no occlusion, fully rough, as without them.
+    for (const kind of ['ao', 'rough'] as const) {
+      if (!has(kind)) continue
+      const g = this.gray(kind)
+      g.src = this.composite(stack(kind), g.ping, 0xffffff)
+      this.reduce(g.ping[g.src].texture, g.out, 0, true)
+    }
+
     let src = 0
     r.setRenderTarget(this.ping[0])
     r.setClearColor(0x000000, 1)
     r.clear()
 
-    const hidden = new Set(project.groups.filter((g) => !g.visible).map((g) => g.id))
-    const glowing = project.layers.some((l) => l.glow && l.visible && !hidden.has(l.group))
+    const glowLayers = stack('glow')
+    const glowing = glowLayers.length > 0 || stack('color').some(({ layer }) => layer.glow)
     let esrc = 0
     if (glowing) {
       this.ensureEmission()
@@ -241,16 +277,8 @@ export class Compositor {
       r.clear()
     }
 
-    project.layers.forEach((layer, i) => {
+    for (const { layer, i } of stack('color')) {
       this.setLayer(layer, i)
-
-      if (i === selected) {
-        u.uMaskOnly.value = 1
-        this.draw(this.layerMat, this.mask)
-        u.uMaskOnly.value = 0
-      }
-      if (!layer.visible || hidden.has(layer.group)) return
-
       u.uPrev.value = this.ping[src].texture
       this.draw(this.layerMat, this.ping[1 - src])
       src = 1 - src
@@ -264,9 +292,12 @@ export class Compositor {
         u.uEmitPass.value = 0
         esrc = 1 - esrc
       }
-    })
+    }
+    // The glow channel's own layers paint over what the color's glowing layers left.
+    if (glowing) esrc = this.composite(glowLayers, this.emitPing!, null, esrc)
 
-    this.layered = src
+    this.layered = this.ping[src]
+    this.emitted = glowing ? this.emitPing![esrc] : undefined
     if (sh.on) {
       const lu = this.lightMat.uniforms
       lu.uSrc.value = this.ping[src].texture
@@ -283,19 +314,80 @@ export class Compositor {
       src = 1 - src
     }
 
-    this.reduceMat.uniforms.uSrc.value = this.ping[src].texture
-    this.reduceMat.uniforms.uSharpen.value = project.finish.sharpen
-    this.draw(this.reduceMat, this.reduced)
+    const ao = project.channels.find((d) => d.kind === 'ao' && !d.separate) && this.grays.get('ao')
+    this.reduce(this.ping[src].texture, this.reduced, project.finish.sharpen, false, ao ? ao.ping[ao.src].texture : null)
 
     this.hasEmission = glowing
-    if (glowing) {
-      this.reduceMat.uniforms.uSrc.value = this.emitPing![esrc].texture
-      this.reduceMat.uniforms.uSharpen.value = 0
-      this.draw(this.reduceMat, this.emission!)
-    }
+    if (glowing) this.reduce(this.emitPing![esrc].texture, this.emission!, 0)
     this.finish(project)
 
     r.setRenderTarget(prevTarget)
+  }
+
+  // Draws layers one over the other in a ping pair, from a cleared first target or
+  // from what target `from` holds; returns the target holding the result.
+  private composite(list: { layer: Layer; i: number }[], ping: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget], clear: number | null, from = 0): number {
+    const r = this.renderer
+    const u = this.layerMat.uniforms
+    if (clear !== null) {
+      r.setRenderTarget(ping[from])
+      r.setClearColor(clear, 1)
+      r.clear()
+    }
+    let src = from
+    for (const { layer, i } of list) {
+      this.setLayer(layer, i)
+      u.uPrev.value = ping[src].texture
+      this.draw(this.layerMat, ping[1 - src])
+      src = 1 - src
+    }
+    return src
+  }
+
+  private reduce(src: THREE.Texture, to: THREE.WebGLRenderTarget, sharpen: number, gray = false, mul: THREE.Texture | null = null) {
+    const ru = this.reduceMat.uniforms
+    ru.uSrc.value = src
+    ru.uSharpen.value = sharpen
+    ru.uGray.value = gray ? 1 : 0
+    ru.uMul.value = mul
+    ru.uMulOn.value = mul ? 1 : 0
+    this.draw(this.reduceMat, to)
+    ru.uMul.value = null
+    ru.uMulOn.value = 0
+  }
+
+  private gray(kind: 'ao' | 'rough'): GrayChannel {
+    let g = this.grays.get(kind)
+    if (!g) {
+      const size = this.bake.size
+      g = { ping: [target(size), target(size)], src: 0, out: target(size / this.factor, true) }
+      this.grays.set(kind, g)
+    }
+    return g
+  }
+
+  // A channel's finished map, undefined when the project has none.
+  map(c: Channel): THREE.WebGLRenderTarget | undefined {
+    if (c === 'color') return this.out
+    if (c === 'glow') return this.hasEmission ? this.emission : undefined
+    return this.grays.get(c)?.out
+  }
+
+  // The view's texture: the channel being painted, the onion faintly over it.
+  private present() {
+    const main = this.map(this.show.channel)
+    const onion = this.show.onion ? this.map(this.show.onion) : undefined
+    if (!main) {
+      this.renderer.setRenderTarget(this.view)
+      this.renderer.setClearColor(0x000000, 1)
+      this.renderer.clear()
+      return
+    }
+    const ou = this.onionMat.uniforms
+    ou.uSrc.value = main.texture
+    ou.uOnion.value = (onion ?? main).texture
+    ou.uAmount.value = onion ? this.show.amount : 0
+    this.draw(this.onionMat, this.view)
   }
 
   hasEmission = false
@@ -323,17 +415,21 @@ export class Compositor {
     r.setRenderTarget(prev)
     return data
   }
-  // The ping target holding the layers before baked light, for sampling colors.
-  private layered = 0
+  // The targets holding the color layers before baked light, and the emission, for sampling colors.
+  private layered: THREE.WebGLRenderTarget | undefined
+  private emitted: THREE.WebGLRenderTarget | undefined
 
-  // The layers' color around a texel of the bake, as a hex color.
-  colorAt(texel: [number, number]): string {
+  // A channel's layers' color around a texel of the bake, as a hex color.
+  colorAt(texel: [number, number], c: Channel = 'color'): string {
+    const g = c === 'ao' || c === 'rough' ? this.grays.get(c) : undefined
+    const from = c === 'glow' ? this.emitted : g ? g.ping[g.src] : this.layered
+    if (!from) return '#000000'
     const prev = this.renderer.getRenderTarget()
     const size = this.bake.size
     const x = Math.min(Math.max(texel[0] - 1, 0), size - 3)
     const y = Math.min(Math.max(texel[1] - 1, 0), size - 3)
     const px = new Uint8Array(9 * 4)
-    this.renderer.readRenderTargetPixels(this.ping[this.layered], x, y, 3, 3, px)
+    this.renderer.readRenderTargetPixels(from, x, y, 3, 3, px)
     this.renderer.setRenderTarget(prev)
     const sum = [0, 0, 0]
     for (let i = 0; i < 9; i++) for (let c = 0; c < 3; c++) sum[c] += px[i * 4 + c]
@@ -355,6 +451,7 @@ export class Compositor {
     f.uColors.value = this.fillPalette(project.finish.palette === 'auto' ? this.autoColors : project.finish.colors)
     f.uDither.value = project.finish.dither
     this.draw(this.finishMat, this.out)
+    this.present()
     this.renderer.setRenderTarget(prev)
   }
 
@@ -422,7 +519,7 @@ export class Compositor {
   }
 
   // The topmost shown layer covering a texel, for picking layers on the model.
-  layerAt(project: Project, texel: [number, number]): number {
+  layerAt(project: Project, texel: [number, number], channel: Channel = 'color'): number {
     const prev = this.renderer.getRenderTarget()
     const hidden = new Set(project.groups.filter((g) => !g.visible).map((g) => g.id))
     const px = new Uint8Array(4)
@@ -431,7 +528,7 @@ export class Compositor {
     let found = -1
     for (let i = project.layers.length - 1; i >= 0 && found < 0; i--) {
       const layer = project.layers[i]
-      if (!layer.visible || hidden.has(layer.group) || layer.opacity < 0.2) continue
+      if (channelOf(layer) !== channel || !layer.visible || hidden.has(layer.group) || layer.opacity < 0.2) continue
       this.setLayer(layer, i)
       u.uMaskOnly.value = 1
       this.draw(this.layerMat, this.mask)
@@ -575,7 +672,9 @@ export class Compositor {
   }
 
   dispose() {
-    for (const t of [this.out, this.reduced, this.mask, ...this.ping, ...(this.emitPing ?? []), this.emission]) t?.dispose()
+    const grays = [...this.grays.values()].flatMap((g) => [...g.ping, g.out])
+    for (const t of [this.out, this.view, this.reduced, this.mask, ...this.ping, ...(this.emitPing ?? []), this.emission, ...grays]) t?.dispose()
+    this.onionMat.dispose()
     this.layerMat.dispose()
     this.lightMat.dispose()
     this.reduceMat.dispose()

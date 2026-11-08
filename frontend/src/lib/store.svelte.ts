@@ -2,8 +2,8 @@ import * as THREE from 'three'
 import * as api from '../../wailsjs/go/main/App'
 import type { main } from '../../wailsjs/go/models'
 import type { PaintStore } from './gl/paint'
-import { newLayer, newMask, newProject, uid } from './project'
-import type { ColorSource, Finish, FlatMap, Group, Layer, LayerLook, Mask, MaskKind, ModelDoc, Variant, Vec3, View, Workspace } from './types'
+import { channelOf, newLayer, newMask, newProject, uid } from './project'
+import { channels, type Channel, type ColorSource, type DataChannel, type Finish, type FlatMap, type Group, type Layer, type LayerLook, type Mask, type MaskKind, type ModelDoc, type Variant, type Vec3, type View, type Workspace } from './types'
 import { serializeWorkspace } from './workspace'
 
 export function load<T>(key: string, fallback: T): T {
@@ -49,6 +49,11 @@ class Store {
   selectedGroup = $state('')
   // Clicks on the model add to the picked folder's zone only while this is on.
   pickingZone = $state(false)
+  // The channel being painted, and another one shown faintly over it for reference.
+  channel = $state<Channel>('color')
+  onion = $state<Channel | ''>('')
+  onionAmount = 0.3
+  private picks: Partial<Record<Channel, string>> = {}
   // The variant being looked at and edited, '' for the base.
   variant = $state('')
   view = $state<View>('lit')
@@ -72,8 +77,9 @@ class Store {
   grungeMaps = $state<string[]>([])
   stampImages = $state<string[]>([])
 
-  // Set by the viewport: renders a variant's ('' for the base) finished textures as base64 PNGs; emissive is empty when nothing glows.
-  snapshot: ((variant: string) => { color: string; emissive: string }) | null = null
+  // Set by the viewport: renders a variant's ('' for the base) finished textures as base64 PNGs;
+  // emissive, rough and ao are empty when nothing glows or the channel goes nowhere of its own.
+  snapshot: ((variant: string) => Snapshot) | null = null
   // Set by the viewport: layers rendered alone, premultiplied, at the bake's size.
   flattened: ((indices: number[]) => Uint8Array) | null = null
   paint: PaintStore | null = null
@@ -85,14 +91,20 @@ class Store {
   private saveTimer = 0
   private messageTimer = 0
 
+  // Only a layer of the channel being painted.
   get layer(): Layer | undefined {
-    return this.project.layers[this.selected]
+    const l = this.project.layers[this.selected]
+    return l && channelOf(l) === this.channel ? l : undefined
   }
 
   init() {
     api.GrungeMaps().then((m) => (this.grungeMaps = m))
     api.Stamps().then((s) => (this.stampImages = s))
     $effect.root(() => {
+      // Another model may not have the channel being painted.
+      $effect(() => {
+        if (!this.hasChannel(this.channel)) this.setChannel('color')
+      })
       $effect(() => {
         const json = JSON.stringify(this.project)
         clearTimeout(this.commitTimer)
@@ -181,7 +193,8 @@ class Store {
     Object.assign(m.finish, p.finish)
     Object.assign(m.shading, p.shading)
     Object.assign(m.light, p.light)
-    Object.assign(m, { size: p.size, layers: p.layers, groups: p.groups, variants: p.variants })
+    Object.assign(m, { size: p.size, layers: p.layers, groups: p.groups, variants: p.variants, channels: p.channels })
+    if (!this.hasChannel(this.channel)) this.channel = 'color'
     this.last = JSON.stringify(m)
     this.selected = Math.min(this.selected, this.project.layers.length - 1)
     this.marked = []
@@ -274,6 +287,83 @@ class Store {
     }
   }
 
+  // Channels
+
+  hasChannel(c: Channel) {
+    return c === 'color' || this.project.channels.some((d) => d.kind === c)
+  }
+
+  // Switches to a channel, adding it the first time; the selection goes back to the
+  // layer picked there last, else to its top layer.
+  setChannel(c: Channel) {
+    if (!this.hasChannel(c)) this.project.channels.push({ kind: c as DataChannel })
+    if (this.layer) this.picks[this.channel] = this.layer.id
+    this.channel = c
+    if (this.onion === c) this.onion = ''
+    const layers = this.project.layers
+    let top = layers.findIndex((l) => l.id === this.picks[c] && channelOf(l) === c)
+    if (top < 0) {
+      top = layers.length - 1
+      while (top >= 0 && channelOf(layers[top]) !== c) top--
+    }
+    this.selected = top
+    this.selectedGroup = ''
+    this.marked = []
+    this.pickingZone = false
+  }
+
+  // The channels there are, round and round.
+  cycleChannel() {
+    const list = channels.filter((c) => this.hasChannel(c))
+    this.setChannel(list[(list.indexOf(this.channel) + 1) % list.length])
+  }
+
+  // Off, then each other channel as the onion.
+  cycleOnion() {
+    const list: (Channel | '')[] = ['', ...channels.filter((c) => c !== this.channel && this.hasChannel(c))]
+    this.onion = list[(list.indexOf(this.onion) + 1) % list.length]
+  }
+
+  // Removes a channel and its layers.
+  deleteChannel(c: DataChannel) {
+    this.project.layers = this.project.layers.filter((l) => l.channel !== c)
+    this.project.channels = this.project.channels.filter((d) => d.kind !== c)
+    if (this.onion === c) this.onion = ''
+    this.dropEmptyGroups()
+    if (this.channel === c) this.setChannel('color')
+  }
+
+  // Copies the picked layers, or the picked folder with its layers, to the top of
+  // another channel, painted masks and all.
+  copyToChannel(c: Channel) {
+    const group = this.selectedGroup ? this.group(this.selectedGroup) : undefined
+    const from = group ? this.project.layers.filter((l) => l.group === group.id) : this.pickedLayers()
+    if (!from.length) return
+    if (!this.hasChannel(c)) this.project.channels.push({ kind: c as DataChannel })
+    const copyGroup = group && { ...$state.snapshot(group), id: uid() }
+    if (copyGroup) this.project.groups.push(copyGroup)
+    const copies = from.map((l) => {
+      const copy = { ...this.copy(l), group: copyGroup?.id ?? '' }
+      if (c === 'color') delete copy.channel
+      else copy.channel = c as DataChannel
+      return copy
+    })
+    this.project.layers.push(...copies)
+    this.say(`copied ${copies.length === 1 ? copies[0].name : copies.length + ' layers'} to ${c}`)
+  }
+
+  // A layer as a new one, with its own copies of its painted masks.
+  private copy(l: Layer): Layer {
+    const copy = { ...$state.snapshot(l), id: uid() }
+    for (const m of copy.masks) {
+      if (m.kind !== 'paint') continue
+      const id = uid()
+      this.paint?.clone(m.paint, id)
+      m.paint = id
+    }
+    return copy
+  }
+
   // Layers
 
   // Above the selected layer, or at the top of the picked folder. A new one starts
@@ -286,9 +376,11 @@ class Store {
       group = this.selectedGroup
       at = Math.max(...layers.map((l, i) => (l.group === group ? i : -1))) + 1
     }
+    if (!this.layer && !this.selectedGroup) at = layers.length
     at = Math.min(at, layers.length)
-    const l = layer ?? newLayer('layer ' + (layers.length + 1), '#8a8578', [newMask('paint')])
-    layers.splice(at, 0, { ...l, group })
+    const l = layer ?? newLayer('layer ' + (layers.length + 1), layerColors[this.channel], [newMask('paint')])
+    const channel = this.channel === 'color' ? undefined : this.channel
+    layers.splice(at, 0, { ...l, group, channel })
     this.selected = at
     this.selectedGroup = ''
     this.marked = []
@@ -307,7 +399,7 @@ class Store {
     const top = indices[indices.length - 1]
     const name = group ? (this.group(group)?.name ?? 'folder') : layers[top].name
     const mask = newMask('paint')
-    const flat = newLayer(name + ' flat', '#808080', [mask], { paintColors: true, tone: 0, grain: 0, group: group ? '' : layers[top].group })
+    const flat = newLayer(name + ' flat', '#808080', [mask], { paintColors: true, tone: 0, grain: 0, group: group ? '' : layers[top].group, channel: layers[top].channel })
     for (const i of indices) layers[i].visible = false
     // Out of the folder, which would hide it again by its zone, right above it.
     const at = group ? Math.max(...layers.map((l, i) => (l.group === group ? i : -1))) + 1 : top + 1
@@ -367,13 +459,7 @@ class Store {
   duplicateLayer() {
     const l = this.layer
     if (!l) return
-    const copy = { ...$state.snapshot(l), id: uid(), name: l.name + ' copy' }
-    for (const m of copy.masks) {
-      if (m.kind !== 'paint') continue
-      const id = uid()
-      this.paint?.clone(m.paint, id)
-      m.paint = id
-    }
+    const copy = { ...this.copy(l), name: l.name + ' copy' }
     this.project.layers.splice(this.selected + 1, 0, copy)
     this.selected++
   }
@@ -391,7 +477,12 @@ class Store {
     const first = this.project.layers.findIndex((l) => ids.includes(l.id))
     this.project.layers = this.project.layers.filter((l) => !ids.includes(l.id))
     this.marked = []
-    this.selected = Math.max(0, Math.min(first, this.project.layers.length - 1))
+    // The next layer down in the same channel, else the next up.
+    const layers = this.project.layers
+    let at = Math.min(first, layers.length) - 1
+    while (at >= 0 && channelOf(layers[at]) !== this.channel) at--
+    if (at < 0) at = layers.findIndex((l) => channelOf(l) === this.channel)
+    this.selected = at
     this.dropEmptyGroups()
   }
 
@@ -541,5 +632,10 @@ class Store {
     }
   }
 }
+
+export type Snapshot = { color: string; emissive: string; rough: string; ao: string }
+
+// What a new layer paints with in each channel.
+const layerColors: Record<Channel, string> = { color: '#8a8578', ao: '#404040', rough: '#808080', glow: '#ffa040' }
 
 export const store = new Store()

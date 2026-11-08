@@ -5,7 +5,7 @@
   import { Compositor, loadBake } from './gl/compositor'
   import { PaintStore } from './gl/paint'
   import { Stage, type Hit } from './gl/stage'
-  import { withVariant } from './project'
+  import { channelOf, withVariant } from './project'
   import { stateOf } from './projects.svelte'
   import { corners, handles } from './stamps'
   import { store } from './store.svelte'
@@ -85,7 +85,8 @@
       frame = requestAnimationFrame(loop)
       if (compositor && dirty) {
         const project = withVariant($state.snapshot(store.project), store.variant)
-        compositor.render(project, store.hoverLayer >= 0 ? store.hoverLayer : store.selected, tools.ghost && $state.snapshot(tools.ghost))
+        const show = { channel: store.channel, onion: store.onion, amount: store.onionAmount }
+        compositor.render(project, store.hoverLayer >= 0 ? store.hoverLayer : store.selected, tools.ghost && $state.snapshot(tools.ghost), show)
         if (project.finish.palette === 'auto') schedulePalette(compositor)
         dirty = false
         bridge.changed()
@@ -94,7 +95,7 @@
         const t = (performance.now() - flashed) / 500
         const tint = store.hoverLayer >= 0 ? 0.6 : t < 1 ? 0.6 * (1 - t * t) : 0
         s.setMaskTint(tint > 0 && store.view !== 'mask' ? compositor.mask.texture : null, tint)
-        const glow = compositor.hasEmission && store.view !== 'mask' ? compositor.emission!.texture : null
+        const glow = compositor.hasEmission && store.view !== 'mask' && store.channel === 'color' ? compositor.emission!.texture : null
         s.setEmission(glow, store.project.finish.glow)
       }
       if (hoverPoint && !store.flat) {
@@ -134,7 +135,7 @@
     const l = store.layer
     if (!c || !l || !hit?.uv) return
     const size = c.mask.width
-    const color = c.colorAt([Math.min(size - 1, Math.floor(hit.uv.x * size)), Math.min(size - 1, Math.floor(hit.uv.y * size))])
+    const color = c.colorAt([Math.min(size - 1, Math.floor(hit.uv.x * size)), Math.min(size - 1, Math.floor(hit.uv.y * size))], store.channel)
     // Layers that paint colors take it as the brush color.
     if (l.paintColors && tools.tool === 'brush') {
       tools.brush.color = color
@@ -152,7 +153,7 @@
     const l = store.layer
     if (!c || !l || !hit?.uv) return
     const size = c.mask.width
-    const target = c.colorAt([Math.min(size - 1, Math.floor(hit.uv.x * size)), Math.min(size - 1, Math.floor(hit.uv.y * size))])
+    const target = c.colorAt([Math.min(size - 1, Math.floor(hit.uv.x * size)), Math.min(size - 1, Math.floor(hit.uv.y * size))], store.channel)
     const from = c.layerColor(withVariant($state.snapshot(store.project), store.variant), store.selected)
     if (!from) {
       store.say(`${l.name} shows nowhere`)
@@ -168,7 +169,7 @@
     if (!c || !hit?.uv) return
     const size = c.mask.width
     const texel: [number, number] = [Math.min(size - 1, Math.floor(hit.uv.x * size)), Math.min(size - 1, Math.floor(hit.uv.y * size))]
-    const i = c.layerAt(withVariant($state.snapshot(store.project), store.variant), texel)
+    const i = c.layerAt(withVariant($state.snapshot(store.project), store.variant), texel, store.channel)
     c.renderMask(withVariant($state.snapshot(store.project), store.variant), i >= 0 ? i : store.selected)
     if (i < 0) return
     store.selected = i
@@ -192,7 +193,7 @@
 
   // Colors painted on shown layers, which the auto palette keeps.
   function painted(project: Project): RGB[] {
-    const hex = project.layers.filter((l) => l.paintColors && l.visible).flatMap((l) => l.brushColors ?? [])
+    const hex = project.layers.filter((l) => channelOf(l) === 'color' && l.paintColors && l.visible).flatMap((l) => l.brushColors ?? [])
     return [...new Set(hex)].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as RGB)
   }
 
@@ -259,7 +260,9 @@
             c.finish(project)
           }
           dirty = true
-          return { color: c.png(), emissive: c.hasEmission && c.emission ? c.png(c.emission) : '' }
+          const rough = c.map('rough')
+          const ao = project.channels.some((d) => d.kind === 'ao' && d.separate) && c.map('ao')
+          return { color: c.png(), emissive: c.hasEmission && c.emission ? c.png(c.emission) : '', rough: rough ? c.png(rough) : '', ao: ao ? c.png(ao) : '' }
         }
         store.ready = true
         dirty = true
@@ -279,6 +282,9 @@
     JSON.stringify(store.project.shading)
     JSON.stringify(store.project.groups)
     JSON.stringify(store.project.variants)
+    JSON.stringify(store.project.channels)
+    store.channel
+    store.onion
     store.variant
     store.selected
     dirty = true
@@ -286,7 +292,7 @@
 
   $effect(() => {
     if (!stage || !compositor) return
-    const texture = store.view === 'mask' ? compositor.mask.texture : compositor.out.texture
+    const texture = store.view === 'mask' ? compositor.mask.texture : compositor.view.texture
     stage.setTexture(texture, compositor.bake, store.view)
   })
 
@@ -294,7 +300,7 @@
     if (!stage || !compositor) return
     const c = compositor
     stage.flat.setSources(
-      { color: c.out.texture, mask: c.mask.texture, glow: () => (c.hasEmission && c.emission ? c.emission.texture : null), geo: c.bake.geo, pos: c.bake.pos, size: store.project.size },
+      { color: c.view.texture, mask: c.mask.texture, glow: () => (c.hasEmission && c.emission ? c.emission.texture : null), geo: c.bake.geo, pos: c.bake.pos, size: store.project.size },
       c.bake.posData,
     )
   })

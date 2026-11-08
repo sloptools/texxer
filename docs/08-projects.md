@@ -11,6 +11,6 @@ A project is a `.texxer` file anywhere. It lists models; each has its own textur
 
 ## Export
 
-**⌘E** writes PNGs beside the model's GLB files or into its folder: `<model>.png`, emissive, variants, and on texxer's layout normal and occlusion maps. The GLBs are updated in place and link those PNGs instead of carrying a copy, so Godot and Blender use them directly.
+**⌘E** writes PNGs beside the model's GLB files or into its folder: `<model>.png`, emissive, `_roughness` and `_ao` for those channels (ao only when kept out of the color), variants, and on texxer's layout normal and occlusion maps. The GLBs are updated in place and link those PNGs instead of carrying a copy, so Godot and Blender use them directly.
 
 The dot beside each model shows what it needs: dim when exported, teal when edited, not exported yet or its file changed (when Blender wrote it again), red when the file is missing. **⇧⌘E** exports all models that need it.
