@@ -1,5 +1,6 @@
 <script lang="ts">
   import { store } from '../store.svelte'
+  import { tools } from '../tools.svelte'
 
   // A surfaces mask or a folder's zone: whole parts and single islands.
   let { picked }: { picked: { parts: number[]; islands: number[] } } = $props()
@@ -27,6 +28,7 @@
 {/if}
 <div class="row">
   <span class="hint">
+    {#if tools.tool !== 'nav'}with the view tool (esc):{/if}
     {#if store.onePart}click islands in the view{:else}click parts in the view, ⇧ single islands{/if}
     {#if picked.islands.length}· {picked.islands.length} {picked.islands.length === 1 ? 'island' : 'islands'}{/if}
   </span>

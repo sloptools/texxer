@@ -42,6 +42,8 @@ class Store {
   // Hashes of each model's files, by model key, to tell which ones changed.
   fileHashes = $state<Record<string, string>>({})
   quickOpen = $state(false)
+  // Where the keys go: the view on hover, the layer list on a click. Layer keys act only in the list.
+  focus = $state<'view' | 'layers'>('view')
   selected = $state(0)
   // Layers marked besides the selected one (⌘ and ⇧ click), by id, to delete or move together.
   marked = $state<string[]>([])
@@ -59,6 +61,10 @@ class Store {
   view = $state<View>('lit')
   bloom = $state(true)
   grid = $state(false)
+  // What shows around the view: layers (⌘B), the panel on the right (⇧⌘B), the view bar (N).
+  left = $state(load('left', true))
+  right = $state(load('right', true))
+  viewBar = $state(load('viewBar', true))
   torch = $state(false)
   // Vertical resolution of the view, 0 for full; lets you judge the texture at game size.
   lines = $state(0)

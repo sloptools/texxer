@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { Compositor } from './gl/compositor'
 import type { Dab } from './gl/paint'
 import type { Hit, Stage } from './gl/stage'
+import { cmd } from './input.svelte'
 import { store } from './store.svelte'
 import { tools } from './tools.svelte'
 
@@ -17,7 +18,7 @@ function lineTo(a: THREE.Vector3, b: THREE.Vector3, free: boolean): { end: THREE
   return { end: a.clone().addScaledVector(axes[axis], d.getComponent(axis)), axis }
 }
 
-export type Keys = { shiftKey: boolean; metaKey: boolean; altKey: boolean }
+export type Keys = { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean; altKey: boolean }
 
 // Brush strokes on the 3D view: soft or pixel dabs, and straight lines.
 export class BrushInput {
@@ -43,7 +44,7 @@ export class BrushInput {
     this.stage.setRing(brush && hit ? { point: brush.point, normal: hit.normal, radius: brush.radius } : null)
 
     if (brush && keys?.shiftKey && this.lastDab && !this.stroke) {
-      const line = lineTo(this.lastDab, brush.point, keys.metaKey)
+      const line = lineTo(this.lastDab, brush.point, cmd(keys))
       this.stage.setLine([this.lastDab, line.end], axisColors[line.axis])
     } else this.stage.setLine(null)
   }
@@ -63,7 +64,7 @@ export class BrushInput {
     this.stroke = { id, before: paint.read(id), last: hit.point.clone() }
 
     // ⌘click fills the surface under the cursor, bounded by hard edges.
-    if (e.metaKey && !e.shiftKey) {
+    if (cmd(e) && !e.shiftKey) {
       if (hit.island < 0) return
       this.stroke.fill = true
       paint.fill(id, hit.island, l.paintColors ? new THREE.Color(tools.brush.color).convertLinearToSRGB() : undefined, tools.brush.erase !== e.altKey)
@@ -74,7 +75,7 @@ export class BrushInput {
     // Shift-click draws a straight line from the last stroke, along an axis unless ⌘.
     if (e.shiftKey && this.lastDab) {
       this.stroke.last = this.lastDab.clone()
-      const line = lineTo(this.lastDab, this.at(hit).point, e.metaKey)
+      const line = lineTo(this.lastDab, this.at(hit).point, cmd(e))
       this.stage.setLine(null)
       this.to({ ...hit, point: line.end }, e.altKey, line.axis >= 0 ? hit.normal : undefined)
     } else this.dab(hit.point, e.altKey)

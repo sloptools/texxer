@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { BrushInput, type Keys } from './brushInput'
 import type { Compositor } from './gl/compositor'
 import type { Hit, Stage } from './gl/stage'
+import { cmd, input } from './input.svelte'
 import { contains, corners, expand, fitted, handles, rotationTowards } from './stamps'
 import { snipTiles, tiled } from './snippets.svelte'
 import { store } from './store.svelte'
@@ -18,6 +19,8 @@ export class ToolInput {
   private dragging = false
   // A grip of the picked stamp being dragged.
   private grip: 'rotate' | number | undefined
+  // ⌥ right drag (or ⌃⌥ drag) sizes the brush sideways, its hardness up and down.
+  private sizing: { x: number; y: number; size: number; pixels: number; hard: number; hit: Hit } | undefined
   private cleanup: () => void
 
   constructor(
@@ -31,7 +34,12 @@ export class ToolInput {
     const move = (e: PointerEvent) => this.move(e)
     const up = () => this.up()
     const leave = () => this.hover(undefined)
-    const keys = (e: KeyboardEvent) => (e.key === 'Shift' || e.key === 'Meta' || e.key === 'Alt') && this.hover(this.lastHit, e)
+    const keys = (e: KeyboardEvent) => ['Shift', 'Meta', 'Control', 'Alt'].includes(e.key) && this.hover(this.lastHit, e)
+    // Ahead of the camera, which would pan on the right button.
+    const size = (e: PointerEvent) => this.startSizing(e)
+    const menu = (e: Event) => e.preventDefault()
+    el.addEventListener('pointerdown', size, { capture: true })
+    el.addEventListener('contextmenu', menu)
     el.addEventListener('pointerdown', down)
     el.addEventListener('pointermove', move)
     el.addEventListener('pointerup', up)
@@ -41,6 +49,8 @@ export class ToolInput {
     this.cleanup = () => {
       window.removeEventListener('keydown', keys)
       window.removeEventListener('keyup', keys)
+      el.removeEventListener('pointerdown', size, { capture: true })
+      el.removeEventListener('contextmenu', menu)
       el.removeEventListener('pointerdown', down)
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', up)
@@ -48,8 +58,36 @@ export class ToolInput {
     }
   }
 
+  private startSizing(e: PointerEvent) {
+    if (tools.tool !== 'brush' || !e.altKey || (e.button !== 2 && !e.ctrlKey)) return
+    const hit = this.lastHit ?? this.stage.hit(e.clientX, e.clientY)
+    if (!hit) return
+    e.stopImmediatePropagation()
+    e.preventDefault()
+    this.stage.renderer.domElement.setPointerCapture(e.pointerId)
+    const b = tools.brush
+    this.sizing = { x: e.clientX, y: e.clientY, size: b.size, pixels: b.pixels, hard: b.hard, hit }
+  }
+
+  private size(e: PointerEvent) {
+    const s = this.sizing!
+    const b = tools.brush
+    const dx = e.clientX - s.x
+    const dy = e.clientY - s.y
+    if (b.pixel) {
+      b.pixels = Math.min(Math.max(Math.round(s.pixels + dx / 12), 1), 16)
+      store.say(`brush ${b.pixels} px`)
+    } else {
+      b.size = Math.min(Math.max(s.size * Math.exp(dx * 0.01), 0.002), 0.3)
+      b.hard = Math.min(Math.max(s.hard - dy * 0.005, 0), 1)
+      store.say(`brush size ${b.size.toFixed(3)} · hardness ${b.hard.toFixed(2)}`)
+    }
+    this.brush.hover(s.hit)
+    this.changed()
+  }
+
   private down(e: PointerEvent) {
-    if (e.button !== 0 || tools.tool === 'nav') return
+    if (e.button !== 0 || tools.tool === 'nav' || input.space) return
     if (tools.tool === 'volume') {
       this.pressVolume(e)
       return
@@ -64,11 +102,15 @@ export class ToolInput {
 
     if (tools.tool === 'brush') this.brush.start(hit, e)
     else if (e.shiftKey && tools.pickedStamp) tools.row(hit.point, hit.normal)
-    else if (e.metaKey) this.fitStamp(hit)
+    else if (cmd(e)) this.fitStamp(hit)
     else this.pressStamp(hit, e.altKey)
   }
 
   private move(e: PointerEvent) {
+    if (this.sizing) {
+      this.size(e)
+      return
+    }
     if (tools.tool === 'nav') return
     if (this.grip !== undefined) {
       this.dragGrip(e)
@@ -97,6 +139,7 @@ export class ToolInput {
   }
 
   private up() {
+    this.sizing = undefined
     this.brush.end()
     this.dragging = false
     this.grip = undefined

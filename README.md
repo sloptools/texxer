@@ -48,7 +48,7 @@ texxer ships maps made from noise: clouds, blotches, grime, specks, streaks, scr
 
 ## License
 
-MIT, see [LICENSE](LICENSE). IBM Plex Mono is under the SIL Open Font License.
+MIT, see [LICENSE](LICENSE). IBM Plex Mono and the fonts for text stamps are under the SIL Open Font License (`frontend/public/fonts/licenses`).
 
 ## Help
 

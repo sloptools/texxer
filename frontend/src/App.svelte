@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import { OnFileDrop, WindowShow } from '../wailsjs/runtime/runtime'
   import Icon from './lib/Icon.svelte'
-  import { store } from './lib/store.svelte'
+  import { persist, store } from './lib/store.svelte'
   import Finish from './lib/ui/Finish.svelte'
   import FlatBar from './lib/ui/FlatBar.svelte'
   import ChannelBar from './lib/ui/ChannelBar.svelte'
@@ -10,13 +10,15 @@
   import LayerList from './lib/ui/LayerList.svelte'
   import LayerPanel from './lib/ui/LayerPanel.svelte'
   import StatusBar from './lib/ui/StatusBar.svelte'
-  import Toolbar from './lib/ui/Toolbar.svelte'
+  import ToolStrip from './lib/ui/ToolStrip.svelte'
+  import Tips from './lib/ui/Tips.svelte'
   import ToolPanel from './lib/ui/ToolPanel.svelte'
   import { tools } from './lib/tools.svelte'
   import { handleKey } from './lib/keys'
   import Viewport from './lib/Viewport.svelte'
   import VariantBar from './lib/ui/VariantBar.svelte'
   import ModelList from './lib/ui/ModelList.svelte'
+  import ModelTexture from './lib/ui/ModelTexture.svelte'
   import QuickOpen from './lib/ui/QuickOpen.svelte'
   import MaterialMenu from './lib/ui/MaterialMenu.svelte'
   import { snippets } from './lib/snippets.svelte'
@@ -38,6 +40,10 @@
   $effect(() => localStorage.setItem('mode', mode))
   let side = $state<Side>(sides.find((s) => s === localStorage.getItem('side')) ?? 'layers')
   $effect(() => localStorage.setItem('side', side))
+  $effect(() => persist('left', store.left))
+  $effect(() => persist('right', store.right))
+  $effect(() => persist('viewBar', store.viewBar))
+  const columns = $derived([store.left && '248px', 'minmax(0, 1fr)', '36px', store.right && '300px'].filter(Boolean).join(' '))
 
   onMount(() => {
     store.init()
@@ -71,6 +77,7 @@
 
   function onkeydown(e: KeyboardEvent) {
     handleKey(e, () => {
+      store.left = true
       side = 'layers'
       materials = true
     })
@@ -79,7 +86,7 @@
 
 <svelte:window {onkeydown} onfocus={refreshHashes} />
 
-<div class="app">
+<div class="app" style:grid-template-columns={columns}>
   <header class="top">
     <span class="title">texxer{#if store.path}<span class="project">{projectName()}</span>{/if}</span>
     {#if store.workspace}
@@ -95,52 +102,63 @@
     </span>
   </header>
 
-  <aside class="left">
-    {#if store.workspace && mode === 'photos'}
-      <div class="scroll">
-        <PhotoList />
-      </div>
-    {:else if store.workspace}
-      <div class="tabs">
-        {#each sides as s}
-          <button class="caps" class:on={side === s} onclick={() => (side = s)}>{s}</button>
-        {/each}
-        {#if side === 'models'}
-          <span class="icons">
-            <button class="icon" title="Add models (each file its own model)" onclick={() => addModels()}><Icon name="plus" size={11} /></button>
-          </span>
+  {#if store.left}
+    <aside class="left" class:focus={store.focus === 'layers'} onpointerdown={() => (store.focus = 'layers')}>
+      {#if store.workspace && mode === 'photos'}
+        <div class="scroll">
+          <PhotoList />
+        </div>
+      {:else if store.workspace}
+        <div class="tabs">
+          {#each sides as s}
+            <button class="caps" class:on={side === s} onclick={() => (side = s)}>{s}</button>
+          {/each}
+          {#if side === 'models'}
+            <span class="icons">
+              <button class="icon" title="Add models (each file its own model)" onclick={() => addModels()}><Icon name="plus" size={11} /></button>
+            </span>
+          {/if}
+        </div>
+        {#if materials && side === 'layers'}
+          <MaterialMenu onclose={() => (materials = false)} />
         {/if}
-      </div>
-      {#if materials && side === 'layers'}
-        <MaterialMenu onclose={() => (materials = false)} />
+        <div class="scroll">
+          {#if side === 'models'}
+            <ModelList />
+            {#if store.model}
+              <ModelTexture />
+            {/if}
+          {:else if !store.model}
+            <p class="note">pick a model first</p>
+          {:else if side === 'layers'}
+            <VariantBar />
+            <div class="adds">
+              <button title="New layer (⇧N)" onclick={() => store.addLayer()}><Icon name="plus" size={11} />layer</button>
+              <button title="Add a material or dirt (⇧M)" onclick={() => (materials = !materials)}><Icon name="ball" size={11} />material</button>
+              <span class="icons">
+                <button class="icon" title="Put the layer in a new folder (⌘G)" onclick={() => store.groupLayer()}><Icon name="dir" size={11} /></button>
+                <button class="icon" title="Duplicate the layer (D)" disabled={!store.layer} onclick={() => store.duplicateLayer()}><Icon name="duplicate" size={11} /></button>
+                <button class="icon" title="Delete the layer (⌫)" disabled={!store.layer} onclick={() => store.deleteLayer()}><Icon name="trash" size={11} /></button>
+              </span>
+            </div>
+            <LayerList />
+            {#if store.project.layers.length === 1 && !store.project.layers[0].masks.length}
+              <p class="note">next: a material or dirt (⇧M), or masks for this layer on the right</p>
+            {/if}
+          {:else}
+            <Finish />
+          {/if}
+        </div>
       {/if}
-      <div class="scroll">
-        {#if side === 'models'}
-          <ModelList />
-        {:else if !store.model}
-          <p class="note">pick a model first</p>
-        {:else if side === 'layers'}
-          <VariantBar />
-          <div class="adds">
-            <button title="New layer (N)" onclick={() => store.addLayer()}><Icon name="plus" size={11} />layer</button>
-            <button title="Put the layer in a new folder (⌘G)" onclick={() => store.groupLayer()}><Icon name="dir" size={11} />folder</button>
-            <button title="Add a material or dirt (⇧M)" onclick={() => (materials = !materials)}><Icon name="ball" size={11} />material</button>
-          </div>
-          <LayerList />
-        {:else}
-          <Finish />
-        {/if}
-      </div>
-    {/if}
-  </aside>
+    </aside>
+  {/if}
 
-  <main>
+  <main onpointerenter={() => (store.focus = 'view')}>
     <Viewport />
     {#if store.model}
       {#if store.flat}
         <FlatBar />
       {:else}
-        <Toolbar />
         {#if tools.tool === 'stamp'}
           <SnippetStrip />
         {/if}
@@ -180,19 +198,25 @@
     {/if}
   </main>
 
-  <aside class="right">
-    {#if mode === 'photos'}
-      <CutPanel />
-    {:else if store.model}
-      <ToolPanel />
-      <LayerPanel />
-    {/if}
-  </aside>
+  <ToolStrip active={mode === 'paint'} />
+
+  {#if store.right}
+    <aside class="right">
+      {#if mode === 'photos'}
+        <CutPanel />
+      {:else if store.model}
+        <ToolPanel />
+        <LayerPanel />
+      {/if}
+    </aside>
+  {/if}
 
   <div class="bottom">
     <StatusBar />
   </div>
 </div>
+
+<Tips />
 
 {#if store.help}
   <Help />
@@ -204,7 +228,6 @@
 <style>
   .app {
     display: grid;
-    grid-template-columns: 248px minmax(0, 1fr) 300px;
     grid-template-rows: 44px minmax(0, 1fr) 30px;
     height: 100%;
   }
@@ -339,6 +362,9 @@
     background: var(--active);
     color: var(--fg);
   }
+  .left.focus .tabs .caps.on {
+    color: var(--accent);
+  }
   .adds {
     display: flex;
     gap: 4px;
@@ -379,6 +405,14 @@
   .icon:hover {
     background: var(--hover);
     color: var(--strong);
+  }
+  .adds .icon {
+    padding: 0;
+    border: 0;
+  }
+  .icon:disabled {
+    background: none;
+    color: var(--faint);
   }
   .right {
     border-left: 1px solid var(--line);

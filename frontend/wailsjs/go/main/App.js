@@ -14,6 +14,10 @@ export function BridgeConnected() {
   return window['go']['main']['App']['BridgeConnected']();
 }
 
+export function BridgeStale() {
+  return window['go']['main']['App']['BridgeStale']();
+}
+
 export function BridgeLayout(arg1, arg2, arg3) {
   return window['go']['main']['App']['BridgeLayout'](arg1, arg2, arg3);
 }
@@ -46,6 +50,10 @@ export function FileHashes(arg1) {
   return window['go']['main']['App']['FileHashes'](arg1);
 }
 
+export function Fonts() {
+  return window['go']['main']['App']['Fonts']();
+}
+
 export function GrungeMaps() {
   return window['go']['main']['App']['GrungeMaps']();
 }
@@ -76,6 +84,10 @@ export function NewProject() {
 
 export function Open(arg1) {
   return window['go']['main']['App']['Open'](arg1);
+}
+
+export function OpenFontsFolder() {
+  return window['go']['main']['App']['OpenFontsFolder']();
 }
 
 export function OpenGrungeFolder() {

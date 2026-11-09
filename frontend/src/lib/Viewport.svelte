@@ -1,6 +1,9 @@
 <script lang="ts">
   import ViewGizmo from './ui/ViewGizmo.svelte'
+  import ViewBar from './ui/ViewBar.svelte'
+  import Icon from './Icon.svelte'
   import { onMount, untrack } from 'svelte'
+  import { cmd } from './input.svelte'
   import * as api from '../../wailsjs/go/main/App'
   import { Compositor, loadBake } from './gl/compositor'
   import { PaintStore } from './gl/paint'
@@ -20,6 +23,8 @@
   let stage = $state<Stage>()
   let compositor = $state<Compositor>()
   let dirty = true
+  // The view only renders again after a snapshot, nothing changed for Blender.
+  let quiet = false
   let hoverPoint: { x: number; y: number } | undefined
   // When the selected layer last changed, to flash where it shows.
   let flashed = -Infinity
@@ -89,7 +94,8 @@
         compositor.render(project, store.hoverLayer >= 0 ? store.hoverLayer : store.selected, tools.ghost && $state.snapshot(tools.ghost), show)
         if (project.finish.palette === 'auto') schedulePalette(compositor)
         dirty = false
-        bridge.changed()
+        if (!quiet) bridge.changed()
+        quiet = false
       }
       if (compositor) {
         const t = (performance.now() - flashed) / 500
@@ -125,7 +131,7 @@
   // Plain clicks pick surfaces while a folder's zone is picked or the layer has a
   // surfaces mask; ⌘ adds one.
   function picksSurfaces(e: MouseEvent) {
-    if (e.metaKey || (store.pickingZone && store.selectedGroup)) return true
+    if (cmd(e) || (store.pickingZone && store.selectedGroup)) return true
     return !!store.layer?.masks.some((m) => m.kind === 'surfaces')
   }
 
@@ -260,6 +266,7 @@
             c.finish(project)
           }
           dirty = true
+          quiet = true
           const rough = c.map('rough')
           const ao = project.channels.some((d) => d.kind === 'ao' && d.separate) && c.map('ao')
           return { color: c.png(), emissive: c.hasEmission && c.emission ? c.png(c.emission) : '', rough: rough ? c.png(rough) : '', ao: ao ? c.png(ao) : '' }
@@ -288,6 +295,7 @@
     store.variant
     store.selected
     dirty = true
+    quiet = false
   })
 
   $effect(() => {
@@ -407,6 +415,16 @@
       case '5':
         c.setOrtho(!c.ortho)
         break
+      case 'ArrowLeft':
+      case 'ArrowRight':
+      case 'ArrowUp':
+      case 'ArrowDown': {
+        if (store.focus !== 'view' || tools.pickedStamp) return
+        const step = Math.PI / 12
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') c.orbit(e.key === 'ArrowLeft' ? -step : step, 0)
+        else c.orbit(0, e.key === 'ArrowUp' ? -step : step)
+        break
+      }
       case 'f': {
         const hit = hoverPoint && stage.hit(hoverPoint.x, hoverPoint.y)
         if (hit) c.focus(hit.point)
@@ -423,11 +441,48 @@
 <svelte:window {onkeydown} />
 
 <div class="viewport" class:brush={tools.tool === 'brush'} class:sampling={store.sampling || store.matching} bind:this={container}></div>
-{#if stage && !store.flat && store.model}
-  <ViewGizmo {stage} />
+{#if stage && store.model}
+  <div class="side">
+    {#if !store.flat}
+      <ViewGizmo {stage} />
+    {/if}
+    {#if store.viewBar}
+      <ViewBar />
+    {:else}
+      <button class="show" title="Show the view bar (N)" onclick={() => (store.viewBar = true)}><Icon name="caret" size={11} /></button>
+    {/if}
+  </div>
 {/if}
 
 <style>
+  .side {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .show {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--panel);
+    align-self: flex-end;
+    margin-right: -7px;
+    color: var(--dim);
+    transform: scaleX(-1);
+  }
+  .show:hover {
+    color: var(--strong);
+  }
+
   .viewport {
     position: absolute;
     inset: 0;

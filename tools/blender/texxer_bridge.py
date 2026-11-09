@@ -4,7 +4,7 @@
 bl_info = {
     "name": "texxer bridge",
     "author": "texxer",
-    "version": (0, 1, 0),
+    "version": (0, 2, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > texxer",
     "description": "Paint the objects in texxer, live",
@@ -19,8 +19,11 @@ import urllib.request
 
 import bpy
 
+# Goes up with texxer's bridgeProtocol when the two change how they talk.
+PROTOCOL = 2
+
 # What the last poll saw, so only changes act.
-state = {"connected": False, "texture": -1, "sync": None, "blend": ""}
+state = {"connected": False, "texture": -1, "sync": None, "blend": "", "protocol": PROTOCOL}
 
 
 def config_dir():
@@ -39,7 +42,7 @@ def call(path, body=None, timeout=0.3):
     except (OSError, ValueError):
         return None
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(f"http://127.0.0.1:{info['port']}{path}", data=data, headers={"X-Texxer-Token": info["token"]})
+    req = urllib.request.Request(f"http://127.0.0.1:{info['port']}{path}", data=data, headers={"X-Texxer-Token": info["token"], "X-Texxer-Protocol": str(PROTOCOL)})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as res:
             text = res.read()
@@ -323,11 +326,15 @@ def send(context, blend):
     s = call("/state?blend=" + urllib.parse.quote(blend))
     if s is None:
         return "texxer is not running"
-    uv = s.get("uv") or "blender"
+    # Before texxer knows the model (just started), the layout of the last sync.
+    if s.get("uv"):
+        scene["texxer_uv"], scene["texxer_size"] = s["uv"], s.get("size") or 512
+    uv = scene.get("texxer_uv", "blender")
+    size = scene.get("texxer_size", 512)
     base = os.path.join(os.path.dirname(blend), ".texxer", blend_name())
     os.makedirs(os.path.dirname(base), exist_ok=True)
     if uv == "texxer":
-        err = unwrap(context, objects, base + ".corners.glb", s.get("size") or 512)
+        err = unwrap(context, objects, base + ".corners.glb", size)
         if err:
             return err
     set_material_uv(UV if uv in ("texxer", "locked") else "")
@@ -357,12 +364,16 @@ def poll():
         state.update(blend=blend, texture=-1, sync=None)
     s = call("/state?blend=" + urllib.parse.quote(blend)) if blend else None
     connected = s is not None
-    if connected != state["connected"]:
+    protocol = s.get("protocol", 0) if s else PROTOCOL
+    if connected != state["connected"] or protocol != state["protocol"]:
         state["connected"] = connected
+        state["protocol"] = protocol
         for win in bpy.context.window_manager.windows:
             for area in win.screen.areas:
                 area.tag_redraw()
     if not s:
+        # A restarted texxer counts syncs from 0 again, which is no request.
+        state["sync"] = None
         return 0.5
 
     if s["texture"] != state["texture"] and s.get("color") and os.path.exists(s["color"]):
@@ -420,6 +431,9 @@ class TEXXER_PT_panel(bpy.types.Panel):
         col = self.layout.column()
         if not bpy.data.filepath:
             col.label(text="save the .blend first")
+        elif state["connected"] and state["protocol"] != PROTOCOL:
+            fix = "update the add-on" if state["protocol"] > PROTOCOL else "update texxer"
+            col.label(text=f"texxer doesn't match: {fix}", icon="ERROR")
         elif state["connected"]:
             col.label(text="texxer: live", icon="LINKED")
         else:

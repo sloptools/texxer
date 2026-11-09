@@ -109,7 +109,7 @@ func withTexture(glb []byte, t mesh.Textures) ([]byte, error) {
 	return mesh.WithTexture(glb, t, "")
 }
 
-// middleware serves model files and bakes, which are too large for bindings.
+// middleware serves model files, bakes and fonts, which are too large for bindings.
 func (a *App) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Query().Get("path")
@@ -147,6 +147,9 @@ func (a *App) middleware(next http.Handler) http.Handler {
 			}
 			w.Header().Set("Content-Type", "image/png")
 			w.Write(data)
+
+		case "/font":
+			serveFont(w, r)
 
 		case "/stamp":
 			dir, err := stampDir()

@@ -23,7 +23,7 @@
   const pending = $derived(models.filter((m) => ['edited', 'changed', 'new'].includes(stateOf(m))).length)
 
   function where(m: ModelDoc) {
-    if (m.blend) return `blender · ${m.blend.split('/').pop()} · ${bridge.isConnected(m) ? 'live' : 'not connected'}`
+    if (m.blend) return `blender · ${m.blend.split('/').pop()} · ${bridge.stale[m.blend] ?? (bridge.isConnected(m) ? 'live' : 'not connected')}`
     const parts = m.files[0]?.split('/') ?? []
     return parts.slice(-3, -1).join('/') + (m.files.length > 1 ? ` · ${m.files.length} files` : '')
   }
@@ -69,7 +69,7 @@
         {:else}
           <span class="name">{m.name}</span>
         {/if}
-        <span class="where">{where(m)}</span>
+        <span class="where" class:stale={m.blend && bridge.stale[m.blend]}>{where(m)}</span>
       </span>
       <span class="actions">
         <button class="icon" class:set={m.textures} title={m.textures ? `PNGs go to ${m.textures} (cancel to put them beside the files)` : 'Folder for the texture PNGs (beside the files)'} onclick={(e) => (e.stopPropagation(), pickTextureFolder(m.id))}><Icon name="dir" size={11} /></button>
@@ -174,6 +174,9 @@
   .where {
     font: 11px var(--mono);
     color: var(--faint);
+  }
+  .where.stale {
+    color: var(--error);
   }
   input {
     width: 100%;

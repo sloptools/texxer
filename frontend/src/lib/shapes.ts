@@ -1,8 +1,9 @@
 import { drawPixelText, pixelColumns } from './pixelfont'
 
 // Stamp shapes, drawn white on transparent into a square canvas cell.
-// Text stamps are "text:…" (condensed font) or "pixel:…" (bitmap font), stretched
-// to fill the cell; their stamps get the text's aspect back. Images are "img:…".
+// Text stamps are "text:…" (condensed font), "pixel:…" (bitmap font) or
+// "font:<name>:…", stretched to fill the cell; their stamps get the text's aspect
+// back. Images are "img:…".
 
 export const shapes = [
   'circle',
@@ -23,7 +24,18 @@ export const shapes = [
   'splat',
 ] as const
 
-const font = '"DIN Condensed", "Arial Narrow", "Helvetica Neue", sans-serif'
+const condensed = '700 80px "DIN Condensed", "Arial Narrow", "Helvetica Neue", sans-serif'
+
+export const fontShape = (name: string, value: string) => `font:${name}:${value}`
+
+export function parseFont(shape: string): { name: string; value: string } {
+  const rest = shape.slice(5)
+  const i = rest.indexOf(':')
+  return { name: rest.slice(0, i), value: rest.slice(i + 1) }
+}
+
+const fontOf = (shape: string) => (shape.startsWith('font:') ? `80px "${parseFont(shape).name}", sans-serif` : condensed)
+const textOf = (shape: string) => (shape.startsWith('font:') ? parseFont(shape).value : shape.slice(5))
 
 export function drawShape(ctx: CanvasRenderingContext2D, shape: string, x: number, y: number, size: number) {
   ctx.save()
@@ -32,8 +44,8 @@ export function drawShape(ctx: CanvasRenderingContext2D, shape: string, x: numbe
   ctx.fillStyle = '#fff'
   ctx.strokeStyle = '#fff'
 
-  if (shape.startsWith('text:')) {
-    text(ctx, shape.slice(5))
+  if (shape.startsWith('text:') || shape.startsWith('font:')) {
+    text(ctx, shape)
     ctx.restore()
     return
   }
@@ -153,25 +165,30 @@ export function drawShape(ctx: CanvasRenderingContext2D, shape: string, x: numbe
   ctx.restore()
 }
 
-function measure(ctx: CanvasRenderingContext2D, value: string) {
-  ctx.font = `700 80px ${font}`
-  const m = ctx.measureText(value)
-  return { w: Math.max(m.width, 1), up: m.actualBoundingBoxAscent, h: Math.max(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent, 1) }
+// Fonts measure by their inked box, as some reach past their advance; condensed
+// text keeps the advance it always had, so older stamps stay as they were.
+function measure(ctx: CanvasRenderingContext2D, shape: string) {
+  ctx.font = fontOf(shape)
+  const m = ctx.measureText(textOf(shape))
+  const inked = shape.startsWith('font:')
+  const left = inked ? m.actualBoundingBoxLeft : 0
+  const w = inked ? left + m.actualBoundingBoxRight : m.width
+  return { left, w: Math.max(w, 1), up: m.actualBoundingBoxAscent, h: Math.max(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent, 1) }
 }
 
-// Condensed stencil-ish text, stretched to fill the cell.
-function text(ctx: CanvasRenderingContext2D, value: string) {
-  const m = measure(ctx, value)
+// Text stretched to fill the cell.
+function text(ctx: CanvasRenderingContext2D, shape: string) {
+  const m = measure(ctx, shape)
   ctx.scale(100 / m.w, 100 / m.h)
   ctx.textBaseline = 'alphabetic'
-  ctx.fillText(value, 0, m.up)
+  ctx.fillText(textOf(shape), m.left, m.up)
 }
 
 // Height over width of a shape's artwork; images report theirs when loaded.
 export function shapeAspect(shape: string): number | undefined {
   if (shape.startsWith('pixel:')) return 7 / pixelColumns(shape.slice(6))
-  if (shape.startsWith('text:')) {
-    const m = measure(document.createElement('canvas').getContext('2d')!, shape.slice(5))
+  if (shape.startsWith('text:') || shape.startsWith('font:')) {
+    const m = measure(document.createElement('canvas').getContext('2d')!, shape)
     return m.h / m.w
   }
 }

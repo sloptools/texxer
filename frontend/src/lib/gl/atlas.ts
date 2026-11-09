@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import { drawDecal, isDecal } from '../decals'
 import { fetchBlob, track } from '../assets'
-import { drawShape } from '../shapes'
+import { fontLoaded, ready } from '../fonts.svelte'
+import { drawShape, parseFont } from '../shapes'
 import { libraryURL, snipTiles, snippetChanged } from '../snippets.svelte'
 
 const grid = 8
@@ -18,6 +19,11 @@ export class StampAtlas {
     const id = (e as CustomEvent<string>).detail
     for (const shape of this.cells.keys()) if (shape.startsWith('snip:') && snipTiles(shape).id === id) this.draw(shape)
   }
+  private redrawFont = (e: Event) => {
+    const name = (e as CustomEvent<string>).detail
+    for (const shape of this.cells.keys()) if (shape.startsWith('font:') && parseFont(shape).name === name) this.draw(shape)
+    this.onLoad()
+  }
 
   constructor() {
     const canvas = document.createElement('canvas')
@@ -28,6 +34,7 @@ export class StampAtlas {
     this.texture.generateMipmaps = false
     this.texture.minFilter = this.texture.magFilter = THREE.LinearFilter
     snippetChanged.addEventListener('change', this.redraw)
+    fontLoaded.addEventListener('load', this.redrawFont)
   }
 
   cell(shape: string): number {
@@ -59,7 +66,11 @@ export class StampAtlas {
       track(this.drawImage(libraryURL('snippet', t.id, '', Date.now()), x, y, size, false, t.cols, t.rows))
     }
     else if (isDecal(shape)) drawDecal(this.ctx, shape, x, y, size)
-    else drawShape(this.ctx, shape, x, y, size)
+    else {
+      // Drawn now in what is there; a font still loading draws it again.
+      if (shape.startsWith('font:')) track(ready(parseFont(shape).name))
+      drawShape(this.ctx, shape, x, y, size)
+    }
     this.texture.needsUpdate = true
   }
 
@@ -96,6 +107,7 @@ export class StampAtlas {
 
   dispose() {
     snippetChanged.removeEventListener('change', this.redraw)
+    fontLoaded.removeEventListener('load', this.redrawFont)
     this.texture.dispose()
   }
 }

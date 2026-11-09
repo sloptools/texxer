@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { FlatMap } from '../types'
-import { isMouseWheel } from './wheel'
+import { isMouseWheel } from '../input.svelte'
 
 type GestureEvent = UIEvent & { scale: number; clientX: number; clientY: number }
 

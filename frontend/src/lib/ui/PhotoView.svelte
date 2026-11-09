@@ -1,6 +1,6 @@
 <script lang="ts">
   import { orderCorners, type Corner, type Cut } from '../cut'
-  import { isMouseWheel } from '../gl/wheel'
+  import { isMouseWheel } from '../input.svelte'
   import { libraryURL, snippets, type PhotoEntry } from '../snippets.svelte'
 
   let { photo }: { photo: PhotoEntry } = $props()

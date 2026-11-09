@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { isMouseWheel } from './wheel'
+import { input, isMouseWheel } from '../input.svelte'
 
 type Pick = (x: number, y: number) => THREE.Vector3 | undefined
 
@@ -17,8 +17,9 @@ const onAxis = (yaw: number, pitch: number) =>
   Math.abs(Math.abs(pitch) - 1.55) < 0.01 || (Math.abs(pitch) < 0.01 && Math.abs(yaw - Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2)) < 0.01)
 
 // Trackpad first: two fingers orbit, shift pans, pinch zooms towards the cursor,
-// option turns the key light. A mouse drags to orbit (middle while a tool has the
-// left), right or ⇧ drags pan, the wheel zooms.
+// option turns the key light. A mouse drags to orbit (middle, or with space held,
+// while a tool has the left), right or ⇧ drags pan, ⇧ right drag turns the light,
+// the wheel zooms.
 export class TrackpadControls {
   target = new THREE.Vector3()
   yaw = 0.8
@@ -88,9 +89,9 @@ export class TrackpadControls {
   }
 
   private down(e: PointerEvent) {
-    if (e.button > 2 || (e.button === 0 && !this.leftDrag)) return
+    if (e.button > 2 || (e.button === 0 && !this.leftDrag && !input.space)) return
     this.el.setPointerCapture(e.pointerId)
-    const mode = e.altKey ? 'light' : e.shiftKey || e.button === 2 ? 'pan' : 'orbit'
+    const mode = e.button === 2 && e.shiftKey ? 'light' : e.shiftKey || e.button === 2 ? 'pan' : 'orbit'
     this.drag = { x: e.clientX, y: e.clientY, moved: false, mode }
   }
 
@@ -125,14 +126,26 @@ export class TrackpadControls {
     const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0)
     const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1)
     this.goal.target.addScaledVector(right, dx * perPixel).addScaledVector(up, -dy * perPixel)
+    this.keepNear()
   }
 
-  // Zooms so the point under the cursor stays put.
+  // Zooming in heads for the point under the cursor; zooming out drifts back to
+  // the model's center, so the pivot never wanders off the model.
   zoomAt(x: number, y: number, factor: number) {
     const dist = THREE.MathUtils.clamp(this.goal.dist * factor, this.radius * 0.05, this.radius * 30)
-    const hit = this.pick(x, y)
-    if (hit) this.goal.target.lerp(hit, 1 - dist / this.goal.dist)
+    const step = 1 - dist / this.goal.dist
+    if (step > 0) {
+      const hit = this.pick(x, y)
+      if (hit) this.goal.target.lerp(hit, step)
+    } else this.goal.target.lerp(this.center, Math.min(1, -step))
     this.goal.dist = dist
+    this.keepNear()
+  }
+
+  // The pivot stays within the model's sphere, so orbiting always turns round the model.
+  private keepNear() {
+    const off = this.goal.target.clone().sub(this.center)
+    if (off.length() > this.radius) this.goal.target.copy(this.center).add(off.setLength(this.radius))
   }
 
   frame(box: THREE.Box3) {
@@ -186,8 +199,7 @@ export class TrackpadControls {
     this.camera.position.set(Math.sin(this.yaw) * c, Math.sin(this.pitch), Math.cos(this.yaw) * c).multiplyScalar(far).add(this.target)
     this.camera.lookAt(this.target)
 
-    // Zooming out past the cursor moves the target behind the model, so the planes
-    // go by the model's sphere, with room for a pan.
+    // The planes go by the model's sphere, with room for a pan.
     const toModel = this.camera.position.distanceTo(this.center)
     const near = Math.max(this.radius / 200, toModel - this.radius * 3)
     if (this.camera.fov !== this.fov || this.camera.near !== near) {

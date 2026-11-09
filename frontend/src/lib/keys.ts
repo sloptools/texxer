@@ -1,4 +1,3 @@
-import { addDirt, dirt } from './dirt'
 import type { GizmoMode } from './gl/volume'
 import { nudgeSelection, stepSelection } from './layerRows'
 import { createProject, cycleModel, exportChanged, exportModel, pickProject } from './projects.svelte'
@@ -78,7 +77,8 @@ function toolKey(e: KeyboardEvent): boolean {
       return true
   }
 
-  // Without a picked stamp these do nothing, rather than reach the layers.
+  // Over the view these act on the picked stamp, without one they do nothing.
+  if (store.focus !== 'view') return false
   const picked = !!tools.pickedStamp
   if (!picked) return ['d', 'Backspace', 'Delete'].includes(e.key)
 
@@ -102,6 +102,26 @@ function toolKey(e: KeyboardEvent): boolean {
       return true
     case 'd':
       tools.duplicate()
+      return true
+  }
+  return false
+}
+
+// Keys that change the layers, only while the list has the focus, so they never
+// hit a layer while painting; true when handled.
+function listKey(e: KeyboardEvent): boolean {
+  switch (e.key) {
+    case 'd':
+      store.duplicateLayer()
+      return true
+    case 'Backspace':
+    case 'Delete':
+      store.deleteLayer()
+      return true
+    case 'ArrowUp':
+    case 'ArrowDown':
+      if (e.altKey) nudgeSelection(e.key === 'ArrowUp')
+      else stepSelection(e.key === 'ArrowUp' ? 1 : -1)
       return true
   }
   return false
@@ -144,6 +164,10 @@ export function handleKey(e: KeyboardEvent, openMaterials: () => void) {
         if (e.shiftKey) store.redo()
         else store.undo()
         break
+      case 'b':
+        if (e.shiftKey) store.right = !store.right
+        else store.left = !store.left
+        break
       case 'g':
         if (e.shiftKey) store.ungroup()
         else store.groupLayer()
@@ -151,28 +175,13 @@ export function handleKey(e: KeyboardEvent, openMaterials: () => void) {
       default:
         handled = false
     }
-  } else if (e.shiftKey && /^Digit[1-7]$/.test(e.code)) {
-    // ⇧ digits, as the plain ones are camera views.
-    addDirt(dirt[Number(e.code.slice(5)) - 1])
-  } else {
+  } else if (!(store.focus === 'layers' && listKey(e))) {
     switch (e.key) {
-      case 'n':
+      case 'N':
         store.addLayer()
         break
-      case 'd':
-        store.duplicateLayer()
-        break
-      case 'Backspace':
-      case 'Delete':
-        store.deleteLayer()
-        break
-      case 'ArrowUp':
-        if (e.altKey) nudgeSelection(true)
-        else stepSelection(1)
-        break
-      case 'ArrowDown':
-        if (e.altKey) nudgeSelection(false)
-        else stepSelection(-1)
+      case 'n':
+        store.viewBar = !store.viewBar
         break
       case 'v':
         if (l) {

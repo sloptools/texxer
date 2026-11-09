@@ -1,18 +1,6 @@
 <script lang="ts">
   import { store } from '../store.svelte'
   import { tools } from '../tools.svelte'
-  import type { View } from '../types'
-  import Seg from './Seg.svelte'
-  import ViewLight from './ViewLight.svelte'
-
-  let lightOpen = $state(false)
-
-  const views: [View, string][] = [
-    ['lit', 'lit'],
-    ['unlit', 'unlit'],
-    ['game', 'game'],
-    ['mask', 'mask'],
-  ]
 
   const hover = $derived(
     store.onePart && store.hoverIsland >= 0 && !store.flat
@@ -47,20 +35,10 @@
   </span>
 
   <span class="tools">
-    <button class:on={store.flat} title="Flat texture and UVs (tab)" onclick={() => (store.flat = !store.flat)}>2d</button>
-    <Seg value={store.view} options={views} onchange={(v) => (store.view = v)} />
-    <button title="Render at game resolution (P)" class:on={store.lines > 0} onclick={() => store.cycleLines()}>{store.lines ? store.lines + 'p' : 'full res'}</button>
-    <button class:on={lightOpen} title="Lights of the view (not the texture)" onclick={() => (lightOpen = !lightOpen)}>light</button>
-    <button class:on={store.torch} title="Flashlight at the cursor (T)" onclick={() => (store.torch = !store.torch)}>torch</button>
-    <button class:on={store.grid} title="Grid (⇧G)" onclick={() => (store.grid = !store.grid)}>grid</button>
-    <button class:on={store.bloom} title="Bloom (⇧B)" onclick={() => (store.bloom = !store.bloom)}>bloom</button>
-    <button title="Shortcuts (?)" onclick={() => (store.help = true)}>?</button>
+    <button title="Shortcuts and docs (?)" onclick={() => (store.help = true)}>? help</button>
   </span>
 </footer>
 
-{#if lightOpen}
-  <ViewLight onclose={() => (lightOpen = false)} />
-{/if}
 
 <style>
   footer {
@@ -100,13 +78,6 @@
   .tools {
     gap: 4px;
   }
-  .tools :global(.seg) {
-    margin-right: 6px;
-  }
-  .tools :global(.seg button) {
-    height: 18px;
-    font-size: 11px;
-  }
   button {
     height: 22px;
     padding: 0 7px;
@@ -119,8 +90,5 @@
   button:hover {
     background: var(--hover);
     color: var(--strong);
-  }
-  button.on {
-    color: var(--accent);
   }
 </style>

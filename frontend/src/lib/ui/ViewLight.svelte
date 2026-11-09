@@ -43,9 +43,9 @@
     z-index: 30;
   }
   .pop {
-    position: fixed;
-    right: 8px;
-    bottom: 36px;
+    position: absolute;
+    top: 0;
+    right: calc(100% + 8px);
     z-index: 31;
     display: flex;
     flex-direction: column;

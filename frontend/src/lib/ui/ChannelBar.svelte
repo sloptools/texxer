@@ -20,7 +20,7 @@
   }
 </script>
 
-<div class="bar">
+<div class="bar" class:below={store.flat}>
   <div class="group" title="Channels: each a texture with its own layers (A cycles)">
     {#each channels as c}
       <button class:on={store.channel === c} class:missing={!store.hasChannel(c)} title={store.hasChannel(c) ? titles[c] : `Add ${c}: ${titles[c]}`} onclick={() => store.setChannel(c)} oncontextmenu={(e) => context(e, c)}>
@@ -49,11 +49,14 @@
 <style>
   .bar {
     position: absolute;
-    top: 44px;
+    top: 10px;
     left: 10px;
     display: flex;
     gap: 6px;
     pointer-events: none;
+  }
+  .bar.below {
+    top: 44px;
   }
 
   .group {

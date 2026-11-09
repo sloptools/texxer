@@ -122,9 +122,6 @@
 
 <style>
   .gizmo {
-    position: absolute;
-    top: 10px;
-    right: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -153,15 +150,19 @@
   }
   .lens {
     display: flex;
-    gap: 5px;
+    justify-content: space-between;
     align-items: center;
-    height: 20px;
+    width: 72px;
+    height: 22px;
     padding: 0 7px;
     border: 1px solid var(--line);
     border-radius: 5px;
     background: var(--panel);
-    font: 10px var(--mono);
+    font: 11px var(--mono);
     color: var(--dim);
+  }
+  .lens:hover {
+    color: var(--strong);
   }
   .lens.on {
     color: var(--accent);

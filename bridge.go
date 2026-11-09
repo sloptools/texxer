@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,7 +35,12 @@ type bridge struct {
 
 // blendState is what texxer has for one .blend: the texture's files and a count
 // that goes up with each new one, and a count of syncs texxer asked for.
+// bridgeProtocol goes up when texxer and the add-on change how they talk; both
+// warn when the other's differs.
+const bridgeProtocol = 2
+
 type blendState struct {
+	Protocol int    `json:"protocol"`
 	Texture  int    `json:"texture"`
 	Color    string `json:"color"`
 	Emissive string `json:"emissive"`
@@ -49,6 +55,10 @@ type blendState struct {
 	UV   string `json:"uv"`
 	Size int    `json:"size"`
 	seen time.Time
+	// The UV the add-on was last told, "" before texxer knew the model.
+	told string
+	// The add-on's protocol, 0 for add-ons from before there was one.
+	addon int
 }
 
 // BridgeSync is what the add-on sends after writing a .blend's objects into a GLB
@@ -61,6 +71,8 @@ type BridgeSync struct {
 	Written string         `json:"written"`
 	UVSets  map[string]int `json:"uvSets"`
 	Prev    string         `json:"prev"`
+	// Blind: the add-on synced before texxer told it where the UVs come from.
+	Blind bool `json:"blind"`
 }
 
 // The new GLB takes the place of the old, which stays as prev.glb beside it.
@@ -168,7 +180,7 @@ func (b *bridge) state(blend string) *blendState {
 	blend = filepath.ToSlash(blend)
 	s, ok := b.blends[blend]
 	if !ok {
-		s = &blendState{}
+		s = &blendState{Protocol: bridgeProtocol}
 		b.blends[blend] = s
 	}
 	return s
@@ -187,6 +199,8 @@ func (a *App) bridgeHandler() http.Handler {
 			b.mu.Lock()
 			s := b.state(blend)
 			s.seen = time.Now()
+			s.told = s.UV
+			s.addon, _ = strconv.Atoi(r.Header.Get("X-Texxer-Protocol"))
 			out, _ := json.Marshal(s)
 			b.mu.Unlock()
 			w.Header().Set("Content-Type", "application/json")
@@ -202,6 +216,9 @@ func (a *App) bridgeHandler() http.Handler {
 				http.Error(w, "bad sync", http.StatusBadRequest)
 				return
 			}
+			b.mu.Lock()
+			s.Blind = b.state(s.Blend).told == ""
+			b.mu.Unlock()
 			if err := s.apply(); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -248,6 +265,28 @@ func (a *App) BridgeConnected() []string {
 	for blend, s := range b.blends {
 		if time.Since(s.seen) < 3*time.Second {
 			out = append(out, blend)
+		}
+	}
+	return out
+}
+
+// BridgeStale tells, per connected .blend whose add-on speaks another protocol,
+// which side wants an update.
+func (a *App) BridgeStale() map[string]string {
+	out := map[string]string{}
+	if a.bridge == nil {
+		return out
+	}
+	b := a.bridge
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for blend, s := range b.blends {
+		switch {
+		case time.Since(s.seen) >= 3*time.Second:
+		case s.addon < bridgeProtocol:
+			out[blend] = "update the add-on"
+		case s.addon > bridgeProtocol:
+			out[blend] = "update texxer"
 		}
 	}
 	return out

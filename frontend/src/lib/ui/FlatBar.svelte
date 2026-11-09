@@ -1,6 +1,7 @@
 <script lang="ts">
   import { store } from '../store.svelte'
   import type { FlatMap } from '../types'
+  import { uvOptions } from '../uvSource'
 
   const maps: [FlatMap, string][] = [
     ['texture', 'texture'],
@@ -21,6 +22,11 @@
   </div>
   <div class="group">
     <button class:on={store.flatUV} title="UV layout: cuts, unused space, overlaps in red (W)" onclick={() => (store.flatUV = !store.flatUV)}>uv<kbd>W</kbd></button>
+  </div>
+  <div class="group">
+    {#each uvOptions() as o}
+      <button class:on={o.on} title={o.title} onclick={o.pick}>{o.label}</button>
+    {/each}
   </div>
 </div>
 

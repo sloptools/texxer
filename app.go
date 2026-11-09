@@ -167,6 +167,10 @@ func (a *App) OpenGrungeFolder() error {
 	if err != nil {
 		return err
 	}
+	return openFolder(dir)
+}
+
+func openFolder(dir string) error {
 	switch goruntime.GOOS {
 	case "darwin":
 		return exec.Command("open", dir).Start()

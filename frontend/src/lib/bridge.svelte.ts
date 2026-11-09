@@ -6,7 +6,7 @@ import type { ModelDoc } from './types'
 import { link, modelKey, newModel } from './workspace'
 import { newProject } from './project'
 
-type Sync = { blend: string; glb: string; name: string; prev: string }
+type Sync = { blend: string; glb: string; name: string; prev: string; blind: boolean }
 
 const dirName = (path: string) => path.slice(0, path.lastIndexOf('/'))
 
@@ -21,9 +21,11 @@ function hash(s: string): string {
 class Bridge {
   // The .blend files whose add-on is listening.
   connected = $state<string[]>([])
+  // Connected .blend files whose add-on speaks another protocol, with what to update.
+  stale = $state<Record<string, string>>({})
   private timer = 0
   private sent = ''
-  private layout = ''
+  private layouts = new Map<string, string>()
 
   start() {
     EventsOn('bridge:sync', (s: Sync) => this.synced(s))
@@ -41,8 +43,11 @@ class Bridge {
   private async poll() {
     const before = this.connected
     this.connected = await api.BridgeConnected()
+    const stale = await api.BridgeStale()
+    for (const [blend, fix] of Object.entries(stale)) if (!this.stale[blend]) store.say(`blender add-on doesn't match: ${fix}`, true)
+    this.stale = stale
+    for (const b of store.workspace?.models ?? []) if (b.blend) await this.tellLayout(b)
     const m = this.model
-    if (m) await this.tellLayout(m)
     // A .blend that just started listening gets the texture as it is.
     if (m && this.isConnected(m) && !before.includes(m.blend!)) this.changed(true)
   }
@@ -73,13 +78,15 @@ class Bridge {
     store.model = await api.Open(modelKey(m))
     refreshHashes()
     store.say('synced from blender')
+    // Sent with Blender's UVs before texxer could say it lays them out: once more.
+    if (s.blind && m.blendUV) await this.requestSync()
   }
 
   // The add-on reads where the UVs come from on its next sync.
   private async tellLayout(m: ModelDoc) {
-    const layout = `${m.blend}|${m.blendUV ?? 'blender'}|${m.size}`
-    if (layout === this.layout) return
-    this.layout = layout
+    const layout = `${m.blendUV ?? 'blender'}|${m.size}`
+    if (this.layouts.get(m.blend!) === layout) return
+    this.layouts.set(m.blend!, layout)
     await api.BridgeLayout(m.blend!, m.blendUV ?? 'blender', m.size)
   }
 

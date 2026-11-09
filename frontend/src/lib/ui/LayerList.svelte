@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '../Icon.svelte'
   import { store } from '../store.svelte'
+  import { cmd } from '../input.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import { dragged as draggedIds, layerRows, markRow, place, selectRow, selectedKey, type Drop, type Row, type Where } from '../layerRows'
   import { channels, type Layer } from '../types'
@@ -25,7 +26,7 @@
       const id = row.g.id
       store.selectedGroup = id
       items.push(
-        { label: 'new layer in folder', key: 'N', run: () => store.addLayer() },
+        { label: 'new layer in folder', key: '⇧N', run: () => store.addLayer() },
         { label: 'rename', run: () => (renaming = id) },
         { label: 'flatten to paint', run: () => store.flatten() },
         ...copyItems(),
@@ -39,7 +40,7 @@
     } else if (row?.kind === 'layer') {
       selectRow(row)
       items.push(
-        { label: 'new layer', key: 'N', run: () => store.addLayer() },
+        { label: 'new layer', key: '⇧N', run: () => store.addLayer() },
         { label: 'duplicate', key: 'D', run: () => store.duplicateLayer() },
         { label: 'rename', run: () => (renaming = row.key) },
         { label: 'into a new folder', key: '⌘G', run: () => store.groupLayer() },
@@ -49,7 +50,7 @@
         { label: 'delete', key: '⌫', danger: true, run: () => store.deleteLayer() },
       )
     } else {
-      items.push({ label: 'new layer', key: 'N', run: () => store.addLayer() })
+      items.push({ label: 'new layer', key: '⇧N', run: () => store.addLayer() })
     }
     menu = { x: e.clientX, y: e.clientY, items }
   }
@@ -249,7 +250,7 @@
         onpointerleave={() => (overRow = -1)}
         onpointerdown={(e) => down(e, row)}
         oncontextmenu={(e) => context(e, row)}
-        onclick={(e) => (e.metaKey || e.shiftKey ? markRow(rows, row, e.shiftKey) : selectRow(row))}
+        onclick={(e) => (cmd(e) || e.shiftKey ? markRow(rows, row, e.shiftKey) : selectRow(row))}
         ondblclick={() => (renaming = row.key)}
         onkeydown={() => {}}
       >

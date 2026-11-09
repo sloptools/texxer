@@ -15,7 +15,7 @@ Layers stack bottom to top. A new layer starts with an empty paint mask and show
 - **blend**: normal, multiply, add, overlay, relief. Relief takes gray stamps as bumps: mid gray keeps the surface.
 - **opacity**
 
-**N** new (in the picked folder, if one is), **D** duplicate, **⌫** delete, **V** show or hide, **↩** rename, **↑ ↓** select, **⌥↑ ⌥↓** move, into and out of folders on the way. **⌘click** marks more layers, **⇧click** the ones in between: **⌫**, **V** and dragging then take them all, **Esc** drops the marks. Right-click a layer or folder for the same and more: **flatten to paint** bakes the layer or the folder's shown layers into one layer that paints colors, above them, to touch up with the brush; the originals stay, hidden.
+Keys that change layers act after a click in the list, so they never hit a layer while you paint: **D** duplicate, **⌫** delete, **↑ ↓** select, **⌥↑ ⌥↓** move. **⇧N** new (in the picked folder, if one is), **V** show or hide, **↩** rename; moving with **⌥↑ ⌥↓** goes into and out of folders on the way. **⌘click** marks more layers, **⇧click** the ones in between: **⌫**, **V** and dragging then take them all, **Esc** drops the marks. Right-click a layer or folder for the same and more: **flatten to paint** bakes the layer or the folder's shown layers into one layer that paints colors, above them, to touch up with the brush; the originals stay, hidden.
 
 A newly selected layer flashes where it shows on the model; the target beside the eye, or **⌥** over the layer, holds it. **⌥click** the model picks the topmost layer there. Drag over the eyes to show or hide several, **⌥click** an eye to show only that layer, again for all.
 
@@ -40,7 +40,7 @@ Right-click a layer or folder, **copy to** another channel: the base colors as a
 
 ## Dirt
 
-**⇧1** to **⇧7** add dirt above the selected layer: dust on top, grime in cavities, dirt from below, rust on edges, drips below edges, chips with rust (two layers sharing one map), and a grunge brush that paints dirt with the brush (B). They are also at the top of the material menu (**⇧M**).
+Dirt from the material menu (**⇧M**) goes above the selected layer: dust on top, grime in cavities, dirt from below, rust on edges, drips below edges, chips with rust (two layers sharing one map), and a grunge brush that paints dirt with the brush (B).
 
 ## Materials
 
