@@ -1,0 +1,62 @@
+# A pushed tag v* builds texxer for macOS, Windows and Linux, each packed with
+# the Blender add-on, and puts the archives on a release.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            targets: dist-mac dist-windows
+          - os: ubuntu-24.04
+            targets: dist-linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
+
+      - if: runner.os == 'macOS'
+        run: make test
+
+      - run: make ${{ matrix.targets }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ runner.os }}
+          path: dist/texxer-*
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - run: gh release create "${{ github.ref_name }}" dist/* --repo "${{ github.repository }}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

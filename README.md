@@ -30,8 +30,13 @@ make dev       # app window, plus http://localhost:34115 in a browser
 make build     # bin/texxer.app
 make install   # into /Applications
 make dist      # dist/: macOS (universal) and Windows zips, each with the Blender add-on
+make dist-linux  # on Linux, needs libgtk-3-dev and libwebkit2gtk-4.1-dev
 make test
 ```
+
+## Download
+
+The latest release, each with the Blender add-on: [macOS](https://github.com/sloptools/texxer/releases/latest/download/texxer-mac.zip), [Windows](https://github.com/sloptools/texxer/releases/latest/download/texxer-windows.zip), [Linux](https://github.com/sloptools/texxer/releases/latest/download/texxer-linux.tar.gz). The Mac app isn't signed: open it the first time with right click › Open.
 
 ## Blender
 
