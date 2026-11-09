@@ -5,13 +5,15 @@
 
   const groups: [string, [string, string][]][] = [
     [
-      'trackpad',
+      'trackpad and mouse',
       [
         ['two fingers', 'orbit'],
         ['⇧ two fingers', 'pan'],
         ['pinch', 'zoom to cursor'],
         ['⌥ two fingers', 'turn key light'],
         ['drag / ⇧ drag', 'orbit / pan'],
+        ['middle / right drag', 'orbit / pan, also while painting'],
+        ['mouse wheel', 'zoom to cursor'],
         ['⌘ click', 'add part to the surfaces mask'],
         ['⌥ click', 'pick the topmost layer there'],
         ['⇧⌘ click', 'add island (surface up to hard edges)'],
@@ -39,7 +41,7 @@
         ['1 – 7', 'texture, mask, glow, ao, edges, cavity, parts'],
         ['W', 'UV layout: cuts, unused space, overlaps in red'],
         ['two fingers / drag', 'pan'],
-        ['pinch', 'zoom to cursor'],
+        ['pinch / mouse wheel', 'zoom to cursor'],
         ['0 F', 'fit'],
       ],
     ],

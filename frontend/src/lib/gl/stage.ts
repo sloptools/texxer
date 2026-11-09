@@ -455,6 +455,12 @@ export class Stage {
     if (!this.box.isEmpty()) this.controls.frame(this.box)
   }
 
+  // Back to the first view of the model.
+  resetView() {
+    this.controls.view(0.8, 0.35)
+    this.frame()
+  }
+
   render() {
     this.timer.update()
     const dt = Math.min(this.timer.getDelta(), 0.1)

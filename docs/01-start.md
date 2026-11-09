@@ -13,6 +13,6 @@ Everything saves on its own. **?** shows all shortcuts. Sliders: drag sideways (
 
 ## View
 
-Two fingers orbit, **⇧** two fingers pan, pinch zooms to the cursor, **⌥** two fingers turn the key light. **1 3 7** front, side, top, **0** reset, **F** focus the point under the cursor.
+Two fingers orbit, **⇧** two fingers pan, pinch zooms to the cursor, **⌥** two fingers turn the key light. With a mouse: drag or middle drag orbits, right drag pans, the wheel zooms. **1 3 7** front, side, top, **0** or **reset** under the gizmo resets, **F** focus the point under the cursor.
 
 The gizmo top right does the same: click an axis to look along it, again for the other side, drag it to orbit. Axis views are ortho until you orbit; **5** switches ortho and perspective.

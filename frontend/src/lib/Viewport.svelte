@@ -402,8 +402,7 @@
         c.view(Math.round(c.yaw / (Math.PI / 2)) * (Math.PI / 2), e.ctrlKey ? -1.55 : 1.55)
         break
       case '0':
-        c.view(0.8, 0.35)
-        stage.frame()
+        stage.resetView()
         break
       case '5':
         c.setOrtho(!c.ortho)

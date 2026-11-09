@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { FlatMap } from '../types'
+import { isMouseWheel } from './wheel'
 
 type GestureEvent = UIEvent & { scale: number; clientX: number; clientY: number }
 
@@ -234,6 +235,7 @@ export class Flat {
     e.preventDefault()
     const scale = e.deltaMode === 1 ? 16 : 1
     if (e.ctrlKey) this.zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * scale * 0.01))
+    else if (isMouseWheel(e)) this.zoomAt(e.clientX, e.clientY, Math.exp(-Math.sign(e.deltaY) * 0.15))
     else this.center.add(new THREE.Vector2(e.deltaX, e.deltaY).multiplyScalar(scale / this.scale))
   }
 

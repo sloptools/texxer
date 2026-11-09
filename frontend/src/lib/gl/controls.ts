@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { isMouseWheel } from './wheel'
 
 type Pick = (x: number, y: number) => THREE.Vector3 | undefined
 
@@ -16,7 +17,8 @@ const onAxis = (yaw: number, pitch: number) =>
   Math.abs(Math.abs(pitch) - 1.55) < 0.01 || (Math.abs(pitch) < 0.01 && Math.abs(yaw - Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2)) < 0.01)
 
 // Trackpad first: two fingers orbit, shift pans, pinch zooms towards the cursor,
-// option turns the key light. Dragging orbits too, for a mouse.
+// option turns the key light. A mouse drags to orbit (middle while a tool has the
+// left), right or ⇧ drags pan, the wheel zooms.
 export class TrackpadControls {
   target = new THREE.Vector3()
   yaw = 0.8
@@ -79,6 +81,7 @@ export class TrackpadControls {
     const dy = e.deltaY * scale
 
     if (e.ctrlKey) this.zoomAt(e.clientX, e.clientY, Math.exp(dy * 0.01))
+    else if (isMouseWheel(e) && !e.altKey) this.zoomAt(e.clientX, e.clientY, Math.exp(Math.sign(dy) * 0.15))
     else if (e.altKey) this.onLight(dx + dy)
     else if (e.shiftKey) this.pan(dx, dy)
     else this.orbit(dx * orbitSpeed, dy * orbitSpeed)
@@ -87,7 +90,7 @@ export class TrackpadControls {
   private down(e: PointerEvent) {
     if (e.button > 2 || (e.button === 0 && !this.leftDrag)) return
     this.el.setPointerCapture(e.pointerId)
-    const mode = e.altKey ? 'light' : e.shiftKey || e.button === 1 || e.button === 2 ? 'pan' : 'orbit'
+    const mode = e.altKey ? 'light' : e.shiftKey || e.button === 2 ? 'pan' : 'orbit'
     this.drag = { x: e.clientX, y: e.clientY, moved: false, mode }
   }
 

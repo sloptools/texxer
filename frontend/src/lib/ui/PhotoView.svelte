@@ -1,5 +1,6 @@
 <script lang="ts">
   import { orderCorners, type Corner, type Cut } from '../cut'
+  import { isMouseWheel } from '../gl/wheel'
   import { libraryURL, snippets, type PhotoEntry } from '../snippets.svelte'
 
   let { photo }: { photo: PhotoEntry } = $props()
@@ -50,6 +51,7 @@
   function wheel(e: WheelEvent) {
     e.preventDefault()
     if (e.ctrlKey || e.metaKey) zoomAt(e, Math.exp(-e.deltaY * 0.01))
+    else if (isMouseWheel(e)) zoomAt(e, Math.exp(-Math.sign(e.deltaY) * 0.15))
     else offset = [offset[0] - e.deltaX, offset[1] - e.deltaY]
   }
 

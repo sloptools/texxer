@@ -115,6 +115,9 @@
   <button class="lens" class:on={ortho} title="Ortho or perspective (5); axis views turn ortho, orbiting turns it off" onclick={() => stage.controls.setOrtho(!ortho)}>
     {ortho ? 'ortho' : 'persp'}<kbd>5</kbd>
   </button>
+  <button class="lens" title="Reset the view (0)" onclick={() => stage.resetView()}>
+    reset<kbd>0</kbd>
+  </button>
 </div>
 
 <style>

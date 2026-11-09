@@ -8,7 +8,7 @@ Switch to **photos** at the top. Drop photos onto the window or use **add photos
 
 - **drag** a rectangle for a straight cut,
 - **click four corners** for a skewed one, like a wall seen at an angle; it gets deskewed,
-- drag corners to fit, drag inside to move, **⌫** deletes, **F** fits the photo. Two fingers pan, pinch zooms.
+- drag corners to fit, drag inside to move, **⌫** deletes, **F** fits the photo. Two fingers pan, pinch or the mouse wheel zooms.
 
 ## Look
 
