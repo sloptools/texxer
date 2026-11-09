@@ -42,19 +42,14 @@ export function newLayer(name: string, color: string, masks: Mask[] = [], extra:
   return { id: uid(), name, group: '', color, tone: 0.08, toneScale: 12, grain: 0.02, shine: 0, hue: 0, saturation: 1, brightness: 0, stampColors: false, glow: false, opacity: 1, blend: 'normal', visible: true, masks, ...extra }
 }
 
-// A starter stack that already reads as worn metal, so a fresh model looks like something.
-// Shading comes from the baked light.
+// A plain base to build on; dirt and wear come from materials.
 export function newProject(): Project {
   return {
     version: 1,
     size: 512,
     unwrap: 0,
     bake: { edges: 0.03, cavity: 0.03, detail: 1 },
-    layers: [
-      newLayer('base', '#6b6a62'),
-      newLayer('dirt', '#4a4234', [newMask('gradient')], { opacity: 0.8 }),
-      newLayer('wear', '#a8a59a', [newMask('edges')]),
-    ],
+    layers: [newLayer('base', '#6b6a62')],
     groups: [],
     variants: [],
     channels: [],
