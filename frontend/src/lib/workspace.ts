@@ -3,25 +3,35 @@ import type { ModelDoc, Project, Workspace } from './types'
 
 const shared = ['finish', 'shading', 'light'] as const
 
-export const baseName = (path: string) => path.split('/').pop()!.replace(/\.[^.]+$/, '')
+export const baseName = (path: string) => slash(path).split('/').pop()!.replace(/\.[^.]+$/, '')
 const dirName = (path: string) => path.slice(0, path.lastIndexOf('/'))
 
+// Windows paths too, as C:/dir/file.
+export const slash = (path: string) => path.replace(/\\/g, '/')
+
+// Projects saved by an older texxer on Windows hold "../C:\dir\file".
+const drive = (path: string) => path.match(/(?:^|\/)([A-Za-z]:\/.*)/)?.[1]
+
 export function relative(fromDir: string, to: string): string {
-  const a = fromDir.split('/').filter(Boolean)
-  const b = to.split('/').filter(Boolean)
+  const a = slash(fromDir).split('/').filter(Boolean)
+  const b = slash(to).split('/').filter(Boolean)
+  if (a[0] !== b[0] && (drive(slash(fromDir)) || drive(slash(to)))) return slash(to)
   let i = 0
   while (i < a.length && i < b.length && a[i] === b[i]) i++
   return [...a.slice(i).map(() => '..'), ...b.slice(i)].join('/') || '.'
 }
 
 export function resolve(dir: string, path: string): string {
+  path = slash(path)
+  const abs = drive(path)
+  if (abs) return abs
   if (path.startsWith('/')) return path
-  const out = dir.split('/').filter(Boolean)
+  const out = slash(dir).split('/').filter(Boolean)
   for (const part of path.split('/')) {
     if (part === '..') out.pop()
     else if (part && part !== '.') out.push(part)
   }
-  return '/' + out.join('/')
+  return (drive(slash(dir)) ? '' : '/') + out.join('/')
 }
 
 // The key the backend knows a model by: its files joined by "|".
@@ -47,7 +57,7 @@ export function parseWorkspace(path: string, json: string, model: string): Works
   const models = data.models.map((m: ModelDoc) => ({
     ...normalize({ ...m, finish: base.finish, shading: base.shading, light: base.light }),
     id: m.id,
-    name: m.name,
+    name: m.name.includes('\\') ? baseName(m.name) : m.name,
     files: m.files.map((f) => resolve(dir, f)),
     textures: m.textures && resolve(dir, m.textures),
     blend: m.blend && resolve(dir, m.blend),

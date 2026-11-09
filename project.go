@@ -28,6 +28,7 @@ type ProjectFile struct {
 
 // LoadProject opens a project, or for a GLB the project beside it, new if there is none.
 func (a *App) LoadProject(path string) (*ProjectFile, error) {
+	path = filepath.ToSlash(path)
 	f := &ProjectFile{Path: path}
 	if strings.EqualFold(filepath.Ext(path), ".glb") {
 		f.Model = path
@@ -54,32 +55,41 @@ func (a *App) SaveProject(path, json string) error {
 }
 
 func (a *App) PickProject() (string, error) {
-	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+	return slash(runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:   "Open project or model",
 		Filters: []runtime.FileFilter{{DisplayName: "texxer project or glTF binary", Pattern: "*.texxer;*.glb"}},
-	})
+	}))
 }
 
 func (a *App) NewProject() (string, error) {
-	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+	return slash(runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "New project",
 		DefaultFilename: "project.texxer",
 		Filters:         []runtime.FileFilter{{DisplayName: "texxer project", Pattern: "*.texxer"}},
-	})
+	}))
 }
 
 func (a *App) PickModels() ([]string, error) {
-	return runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
+	paths, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:   "Add models",
 		Filters: []runtime.FileFilter{{DisplayName: "glTF binary (*.glb)", Pattern: "*.glb"}},
 	})
+	for i, p := range paths {
+		paths[i] = filepath.ToSlash(p)
+	}
+	return paths, err
 }
 
 func (a *App) PickFolder() (string, error) {
-	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+	return slash(runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:                "Folder for the texture PNGs",
 		CanCreateDirectories: true,
-	})
+	}))
+}
+
+// The frontend works with "/" paths only; Go takes them on Windows too.
+func slash(path string, err error) (string, error) {
+	return filepath.ToSlash(path), err
 }
 
 // FileHashes tells for each model key whether its files changed, empty when one is missing.
@@ -185,7 +195,7 @@ func (a *App) KeepOriginals(project, id, key string, refresh bool) (string, erro
 				return "", err
 			}
 		}
-		kept = append(kept, dst)
+		kept = append(kept, filepath.ToSlash(dst))
 	}
 	return strings.Join(kept, "|"), nil
 }

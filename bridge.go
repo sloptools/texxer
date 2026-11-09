@@ -165,6 +165,7 @@ func (a *App) stopBridge() {
 }
 
 func (b *bridge) state(blend string) *blendState {
+	blend = filepath.ToSlash(blend)
 	s, ok := b.blends[blend]
 	if !ok {
 		s = &blendState{}
@@ -205,6 +206,7 @@ func (a *App) bridgeHandler() http.Handler {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			s.Blend, s.GLB, s.Prev = filepath.ToSlash(s.Blend), filepath.ToSlash(s.GLB), filepath.ToSlash(s.Prev)
 			runtime.EventsEmit(a.ctx, "bridge:sync", s)
 			runtime.WindowShow(a.ctx)
 
@@ -306,9 +308,9 @@ func (a *App) BridgeRequestSync(blend string) {
 
 // PickExportTarget asks where a bridge model's export goes.
 func (a *App) PickExportTarget(name string) (string, error) {
-	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+	return slash(runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Export to",
 		DefaultFilename: fileName(name) + ".glb",
 		Filters:         []runtime.FileFilter{{DisplayName: "glTF binary", Pattern: "*.glb"}},
-	})
+	}))
 }

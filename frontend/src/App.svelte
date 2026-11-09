@@ -26,6 +26,7 @@
   import CutPanel from './lib/ui/CutPanel.svelte'
   import SnippetStrip from './lib/ui/SnippetStrip.svelte'
   import { addModels, createProject, exportModel, openProject, pickProject, projectName, recent, refreshHashes } from './lib/projects.svelte'
+  import { slash } from './lib/workspace'
 
   let materials = $state(false)
   type Side = 'models' | 'layers' | 'settings'
@@ -41,7 +42,8 @@
   onMount(() => {
     store.init()
     bridge.start()
-    OnFileDrop((_x, _y, paths) => {
+    OnFileDrop((_x, _y, dropped) => {
+      const paths = dropped.map(slash)
       const project = paths.find((p) => p.toLowerCase().endsWith('.texxer'))
       const glbs = paths.filter((p) => p.toLowerCase().endsWith('.glb'))
       const photos = paths.filter((p) => /\.(png|jpe?g|webp)$/i.test(p))
