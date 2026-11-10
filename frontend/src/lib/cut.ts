@@ -8,8 +8,9 @@ export type Corner = [number, number]
 // widens what the photo foreshortened.
 export type CutLook = { px: number; calm: number; sat: number; bright: number; mono: boolean; width?: number }
 
-// Corners in photo pixels: top left, top right, bottom right, bottom left.
-export type Cut = { id: string; name: string; corners: [Corner, Corner, Corner, Corner]; look: CutLook; aspect: number }
+// Corners in photo pixels: top left, top right, bottom right, bottom left. A round
+// cut keeps the ellipse inside them, so a skewed one follows the perspective.
+export type Cut = { id: string; name: string; corners: [Corner, Corner, Corner, Corner]; look: CutLook; aspect: number; round?: boolean }
 
 export const defaultLook: CutLook = { px: 256, calm: 0.3, sat: 0.85, bright: 0, mono: false, width: 1 }
 
@@ -65,6 +66,15 @@ function squareToQuad(q: Corner[]) {
   }
 }
 
+// The ellipse inside the quad, as points around it.
+export function ellipse(q: Corner[], steps = 64): Corner[] {
+  const map = squareToQuad(q)
+  return Array.from({ length: steps }, (_, i) => {
+    const a = (i / steps) * Math.PI * 2
+    return map(0.5 + Math.cos(a) * 0.5, 0.5 + Math.sin(a) * 0.5)
+  })
+}
+
 const dist = (p: Corner, q: Corner) => Math.hypot(p[0] - q[0], p[1] - q[1])
 
 // Height over width of the cut, from its edges.
@@ -77,6 +87,48 @@ export function cutAspect(c: Cut['corners']): number {
 // The snippet's height over width, as the photo shows it, widened.
 export function aspectOf(cut: Cut): number {
   return cutAspect(cut.corners) / (cut.look.width ?? 1)
+}
+
+// Corner i dragged to p, the opposite one fixed: the quad stretches along its own
+// edges, so a skewed one stays skewed.
+export function stretchCorner(q: Cut['corners'], i: number, p: Corner): Cut['corners'] {
+  const o = q[(i + 2) % 4]
+  const a = q[(i + 1) % 4]
+  const b = q[(i + 3) % 4]
+  const ea = [a[0] - o[0], a[1] - o[1]]
+  const eb = [b[0] - o[0], b[1] - o[1]]
+  const det = ea[0] * eb[1] - ea[1] * eb[0]
+  if (Math.abs(det) < 1e-6) return q
+
+  const local = (c: Corner) => {
+    const dx = c[0] - o[0]
+    const dy = c[1] - o[1]
+    return [(dx * eb[1] - dy * eb[0]) / det, (ea[0] * dy - ea[1] * dx) / det]
+  }
+  const [u0, v0] = local(q[i])
+  const [u1, v1] = local(p)
+  const su = Math.max(u1 / u0, 0.02)
+  const sv = Math.max(v1 / v0, 0.02)
+  return q.map((c) => {
+    const [u, v] = local(c)
+    return [o[0] + u * su * ea[0] + v * sv * eb[0], o[1] + u * su * ea[1] + v * sv * eb[1]]
+  }) as Cut['corners']
+}
+
+// The edge from corner i to i + 1 pushed towards p, the opposite edge fixed.
+export function stretchEdge(q: Cut['corners'], i: number, p: Corner): Cut['corners'] {
+  const [a, b, c, d] = [0, 1, 2, 3].map((k) => q[(i + k) % 4])
+  const near = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+  const far = [(c[0] + d[0]) / 2, (c[1] + d[1]) / 2]
+  const dir = [near[0] - far[0], near[1] - far[1]]
+  const len = dir[0] * dir[0] + dir[1] * dir[1]
+  if (len < 1e-6) return q
+
+  const t = Math.max(((p[0] - far[0]) * dir[0] + (p[1] - far[1]) * dir[1]) / len, 0.02)
+  const out = [...q] as Cut['corners']
+  out[i] = [d[0] + (a[0] - d[0]) * t, d[1] + (a[1] - d[1]) * t]
+  out[(i + 1) % 4] = [c[0] + (b[0] - c[0]) * t, c[1] + (b[1] - c[1]) * t]
+  return out
 }
 
 // Orders four clicked points as top left, top right, bottom right, bottom left.
@@ -124,29 +176,40 @@ export function render(photo: Levels, cut: Cut): ImageData {
   const map = squareToQuad(cut.corners.map(([x, y]) => [x * scale, y * scale]))
 
   const rgb = new Float32Array(ow * oh * 3)
+  const alpha = new Float32Array(ow * oh).fill(1)
   const acc = [0, 0, 0]
   for (let y = 0; y < oh; y++) {
     for (let x = 0; x < ow; x++) {
       acc[0] = acc[1] = acc[2] = 0
+      let n = 0
       for (let j = 0; j < sub; j++) {
         for (let i = 0; i < sub; i++) {
-          const [sx, sy] = map((x + (i + 0.5) / sub) / ow, (y + (j + 0.5) / sub) / oh)
+          const u = (x + (i + 0.5) / sub) / ow
+          const v = (y + (j + 0.5) / sub) / oh
+          if (cut.round && (u - 0.5) ** 2 + (v - 0.5) ** 2 > 0.25) continue
+          const [sx, sy] = map(u, v)
           sample(img, sx, sy, acc)
+          n++
         }
       }
-      const k = (y * ow + x) * 3
-      for (let c = 0; c < 3; c++) rgb[k + c] = acc[c] / (sub * sub * 255)
+      const p = y * ow + x
+      if (cut.round) alpha[p] = n / (sub * sub)
+      for (let c = 0; c < 3; c++) rgb[p * 3 + c] = n ? acc[c] / (n * 255) : 0
     }
   }
-  return style(rgb, ow, oh, cut.look)
+  return style(rgb, alpha, ow, oh, cut.look)
 }
 
 const luma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b
 
-function style(rgb: Float32Array, w: number, h: number, look: CutLook): ImageData {
+function style(rgb: Float32Array, alpha: Float32Array, w: number, h: number, look: CutLook): ImageData {
   let mean = 0
-  for (let i = 0; i < rgb.length; i += 3) mean += luma(rgb[i], rgb[i + 1], rgb[i + 2])
-  mean /= w * h
+  let covered = 0
+  for (let p = 0; p < w * h; p++) {
+    mean += luma(rgb[p * 3], rgb[p * 3 + 1], rgb[p * 3 + 2]) * alpha[p]
+    covered += alpha[p]
+  }
+  mean /= covered || 1
 
   const out = new ImageData(w, h)
   for (let p = 0; p < w * h; p++) {
@@ -166,7 +229,7 @@ function style(rgb: Float32Array, w: number, h: number, look: CutLook): ImageDat
     out.data[p * 4] = Math.round(Math.min(Math.max(r, 0), 1) * 255)
     out.data[p * 4 + 1] = Math.round(Math.min(Math.max(g, 0), 1) * 255)
     out.data[p * 4 + 2] = Math.round(Math.min(Math.max(b, 0), 1) * 255)
-    out.data[p * 4 + 3] = 255
+    out.data[p * 4 + 3] = Math.round(alpha[p] * 255)
   }
   return out
 }

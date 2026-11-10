@@ -61,10 +61,9 @@ class Store {
   view = $state<View>('lit')
   bloom = $state(true)
   grid = $state(false)
-  // What shows around the view: layers (⌘B), the panel on the right (⇧⌘B), the view bar (N).
+  // What shows around the view: layers (⌘B), the panel on the right (⌘N).
   left = $state(load('left', true))
   right = $state(load('right', true))
-  viewBar = $state(load('viewBar', true))
   torch = $state(false)
   // Vertical resolution of the view, 0 for full; lets you judge the texture at game size.
   lines = $state(0)

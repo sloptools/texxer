@@ -151,7 +151,8 @@ export function handleKey(e: KeyboardEvent, openMaterials: () => void) {
         pickProject()
         break
       case 'n':
-        createProject()
+        if (e.shiftKey) createProject()
+        else store.right = !store.right
         break
       case 'p':
         if (store.workspace) store.quickOpen = true
@@ -165,8 +166,7 @@ export function handleKey(e: KeyboardEvent, openMaterials: () => void) {
         else store.undo()
         break
       case 'b':
-        if (e.shiftKey) store.right = !store.right
-        else store.left = !store.left
+        store.left = !store.left
         break
       case 'g':
         if (e.shiftKey) store.ungroup()
@@ -179,9 +179,6 @@ export function handleKey(e: KeyboardEvent, openMaterials: () => void) {
     switch (e.key) {
       case 'N':
         store.addLayer()
-        break
-      case 'n':
-        store.viewBar = !store.viewBar
         break
       case 'v':
         if (l) {

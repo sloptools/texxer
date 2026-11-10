@@ -1,5 +1,5 @@
 import * as api from '../../wailsjs/go/main/App'
-import { aspectOf, cutAspect, defaultLook, levels, pngBase64, render, type Corner, type Cut, type Levels } from './cut'
+import { aspectOf, cutAspect, defaultLook, levels, pngBase64, render, type Cut, type Levels } from './cut'
 import { newLayer, newMask, uid } from './project'
 import { store } from './store.svelte'
 import { tools } from './tools.svelte'
@@ -38,6 +38,10 @@ class Snippets {
   photos = $state<PhotoEntry[]>([])
   photo = $state('')
   cut = $state('')
+  // New cuts are ellipses.
+  round = $state(false)
+  // Handles move corners freely instead of stretching the cut.
+  skew = $state(false)
   // Bumped per snippet when its PNG is written, so images load anew.
   versions = $state<Record<string, number>>({})
 
@@ -118,6 +122,7 @@ class Snippets {
 
   addCut(photo: PhotoEntry, corners: Cut['corners']) {
     const cut: Cut = { id: uid(), name: 'snippet ' + (photo.cuts.length + 1), corners, look: { ...defaultLook }, aspect: cutAspect(corners) }
+    if (this.round) cut.round = true
     photo.cuts.push(cut)
     this.cut = cut.id
     this.changed(photo, cut)
@@ -128,11 +133,6 @@ class Snippets {
     if (this.cut === cut.id) this.cut = ''
     api.DeleteSnippet(store.path, this.category, cut.id).catch(() => {})
     this.saveCuts(photo)
-  }
-
-  moveCorner(photo: PhotoEntry, cut: Cut, i: number, to: Corner) {
-    cut.corners[i] = to
-    this.changed(photo, cut)
   }
 
   // Writes the snippet and the photo's cuts once edits pause.

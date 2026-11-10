@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { orderCorners, type Corner, type Cut } from '../cut'
+  import { ellipse, orderCorners, stretchCorner, stretchEdge, type Corner, type Cut } from '../cut'
   import { isMouseWheel } from '../input.svelte'
   import { libraryURL, snippets, type PhotoEntry } from '../snippets.svelte'
+  import Seg from './Seg.svelte'
 
   let { photo }: { photo: PhotoEntry } = $props()
 
@@ -80,12 +81,18 @@
   })
 
   // Dragging: a corner of the picked cut, the whole cut, or a new rectangle.
-  type Drag = { kind: 'corner'; cut: Cut; i: number } | { kind: 'move'; cut: Cut; from: Corner; start: Cut['corners'] } | { kind: 'rect'; from: Corner; to: Corner; moved: boolean }
+  type Handle = { kind: 'corner' | 'edge'; cut: Cut; i: number; from: Corner; start: Cut['corners'] }
+  type Drag = Handle | { kind: 'move'; cut: Cut; from: Corner; start: Cut['corners'] } | { kind: 'rect'; from: Corner; to: Corner; moved: boolean; square: boolean }
   let drag = $state<Drag>()
+
+  const outline = (cut: Cut) => (cut.round ? ellipse(cut.corners) : cut.corners)
+
+  // Midpoints of the edges, edge i from corner i to i + 1.
+  const mids = (q: Corner[]): Corner[] => q.map((c, i) => [(c[0] + q[(i + 1) % 4][0]) / 2, (c[1] + q[(i + 1) % 4][1]) / 2])
 
   const inside = (p: Corner, q: Corner[]) => {
     let hit = false
-    for (let i = 0, j = 3; i < 4; j = i++) {
+    for (let i = 0, j = q.length - 1; i < q.length; j = i++) {
       if (q[i][1] > p[1] !== q[j][1] > p[1] && p[0] < ((q[j][0] - q[i][0]) * (p[1] - q[i][1])) / (q[j][1] - q[i][1]) + q[i][0]) hit = !hit
     }
     return hit
@@ -98,18 +105,22 @@
     const grab = 8 / zoom
     const picked = snippets.selectedCut
 
-    const corner = picked?.corners.findIndex((c) => Math.hypot(c[0] - p[0], c[1] - p[1]) < grab) ?? -1
-    if (picked && corner >= 0) {
-      drag = { kind: 'corner', cut: picked, i: corner }
-      return
+    const near = (q: Corner[]) => q.findIndex((c) => Math.hypot(c[0] - p[0], c[1] - p[1]) < grab)
+    if (picked) {
+      const start = picked.corners.map((c) => [...c]) as Cut['corners']
+      const corner = near(picked.corners)
+      const edge = near(mids(picked.corners))
+      if (corner >= 0) drag = { kind: 'corner', cut: picked, i: corner, from: p, start }
+      else if (edge >= 0) drag = { kind: 'edge', cut: picked, i: edge, from: p, start }
+      if (drag) return
     }
-    const over = pending.length ? undefined : [...photo.cuts].reverse().find((c) => inside(p, c.corners))
+    const over = pending.length ? undefined : [...photo.cuts].reverse().find((c) => inside(p, outline(c)))
     if (over) {
       snippets.cut = over.id
       drag = { kind: 'move', cut: over, from: p, start: over.corners.map((c) => [...c]) as Cut['corners'] }
       return
     }
-    drag = { kind: 'rect', from: p, to: p, moved: false }
+    drag = { kind: 'rect', from: p, to: p, moved: false, square: e.shiftKey }
   }
 
   function move(e: PointerEvent) {
@@ -117,13 +128,16 @@
     const d = drag
     if (!d) return
     const p = toPhoto(e)
-    if (d.kind === 'corner') snippets.moveCorner(photo, d.cut, d.i, clamp(p))
-    else if (d.kind === 'move') {
+    if (d.kind === 'corner' || d.kind === 'edge') {
+      d.cut.corners = handle(d, p).map(clamp) as Cut['corners']
+      snippets.changed(photo, d.cut)
+    } else if (d.kind === 'move') {
       const dx = p[0] - d.from[0]
       const dy = p[1] - d.from[1]
       d.start.forEach((c, i) => (d.cut.corners[i] = clamp([c[0] + dx, c[1] + dy])))
       snippets.changed(photo, d.cut)
-    } else {
+    } else if (d.kind === 'rect') {
+      d.square = e.shiftKey
       d.to = p
       if (Math.hypot(p[0] - d.from[0], p[1] - d.from[1]) * zoom > 4) d.moved = true
     }
@@ -135,12 +149,8 @@
     if (d?.kind !== 'rect') return
 
     if (d.moved && !pending.length) {
-      const [a, b] = [clamp(d.from), clamp(d.to)]
-      const x0 = Math.min(a[0], b[0])
-      const x1 = Math.max(a[0], b[0])
-      const y0 = Math.min(a[1], b[1])
-      const y1 = Math.max(a[1], b[1])
-      if (x1 - x0 > 2 && y1 - y0 > 2) snippets.addCut(photo, [[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
+      const r = box(d)
+      if (r.w > 2 && r.h > 2) snippets.addCut(photo, [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]])
       return
     }
     // A click without a drag adds a corner; the fourth makes the cut.
@@ -149,6 +159,32 @@
       snippets.addCut(photo, orderCorners(pending))
       pending = []
     } else snippets.cut = ''
+  }
+
+  // Skew moves the corner or edge freely, size stretches the cut along its edges.
+  function handle(d: Handle, p: Corner) {
+    if (!snippets.skew) return d.kind === 'corner' ? stretchCorner(d.start, d.i, p) : stretchEdge(d.start, d.i, p)
+    const out = d.start.map((c) => [...c]) as Cut['corners']
+    if (d.kind === 'corner') out[d.i] = p
+    else {
+      for (const k of [d.i, (d.i + 1) % 4]) out[k] = [out[k][0] + p[0] - d.from[0], out[k][1] + p[1] - d.from[1]]
+    }
+    return out
+  }
+
+  // The dragged box in the photo, square with ⇧.
+  function box(d: { from: Corner; to: Corner; square: boolean }) {
+    let dx = d.to[0] - d.from[0]
+    let dy = d.to[1] - d.from[1]
+    if (d.square) {
+      const s = Math.max(Math.abs(dx), Math.abs(dy))
+      dx = Math.sign(dx) * s
+      dy = Math.sign(dy) * s
+    }
+    const [a, b] = [clamp(d.from), clamp([d.from[0] + dx, d.from[1] + dy])]
+    const x = Math.min(a[0], b[0])
+    const y = Math.min(a[1], b[1])
+    return { x, y, w: Math.max(a[0], b[0]) - x, h: Math.max(a[1], b[1]) - y }
   }
 
   const clamp = (p: Corner): Corner => [Math.min(Math.max(p[0], 0), size[0]), Math.min(Math.max(p[1], 0), size[1])]
@@ -161,6 +197,10 @@
       else snippets.cut = ''
     } else if ((e.key === 'Backspace' || e.key === 'Delete') && cut) snippets.deleteCut(photo, cut)
     else if (e.key === 'f' || e.key === '0') fit()
+    else if (e.metaKey || e.ctrlKey) return
+    else if (e.key === 'r') snippets.round = false
+    else if (e.key === 'e') snippets.round = true
+    else if (e.key === 's') snippets.skew = !snippets.skew
     else return
     e.preventDefault()
     e.stopPropagation()
@@ -185,9 +225,15 @@
     <img src={url} alt={photo.file} onload={loaded} draggable="false" />
     <svg viewBox="0 0 {size[0]} {size[1]}" width={size[0]} height={size[1]}>
       {#each photo.cuts as cut (cut.id)}
-        <polygon class="halo" points={points(cut.corners)} />
-        <polygon class="cut" class:on={cut.id === snippets.cut} points={points(cut.corners)} />
+        <polygon class="halo" points={points(outline(cut))} />
+        <polygon class="cut" class:on={cut.id === snippets.cut} points={points(outline(cut))} />
         {#if cut.id === snippets.cut}
+          {#if cut.round}
+            <polygon class="frame" points={points(cut.corners)} />
+          {/if}
+          {#each mids(cut.corners) as c}
+            <rect class="corner" x={c[0] - 3.5 / zoom} y={c[1] - 3.5 / zoom} width={7 / zoom} height={7 / zoom} />
+          {/each}
           {#each cut.corners as c}
             <circle class="corner" cx={c[0]} cy={c[1]} r={5 / zoom} />
           {/each}
@@ -196,8 +242,14 @@
         {/if}
       {/each}
       {#if drag?.kind === 'rect' && drag.moved && !pending.length}
-        <rect class="halo" x={Math.min(drag.from[0], drag.to[0])} y={Math.min(drag.from[1], drag.to[1])} width={Math.abs(drag.to[0] - drag.from[0])} height={Math.abs(drag.to[1] - drag.from[1])} />
-        <rect class="cut on" x={Math.min(drag.from[0], drag.to[0])} y={Math.min(drag.from[1], drag.to[1])} width={Math.abs(drag.to[0] - drag.from[0])} height={Math.abs(drag.to[1] - drag.from[1])} />
+        {@const r = box(drag)}
+        {#if snippets.round}
+          <ellipse class="halo" cx={r.x + r.w / 2} cy={r.y + r.h / 2} rx={r.w / 2} ry={r.h / 2} />
+          <ellipse class="cut on" cx={r.x + r.w / 2} cy={r.y + r.h / 2} rx={r.w / 2} ry={r.h / 2} />
+        {:else}
+          <rect class="halo" x={r.x} y={r.y} width={r.w} height={r.h} />
+          <rect class="cut on" x={r.x} y={r.y} width={r.w} height={r.h} />
+        {/if}
       {/if}
       {#if pending.length}
         <polyline class="halo" points={points(cursor ? [...pending, cursor] : pending)} />
@@ -208,7 +260,11 @@
       {/if}
     </svg>
   </div>
-  <p class="hint">drag a rectangle or click four corners · drag corners to fit · ⌫ deletes · two fingers pan, pinch zooms · F fits</p>
+  <div class="shape" role="toolbar" tabindex="-1" onpointerdown={(e) => e.stopPropagation()}>
+    <Seg value={snippets.round} options={[[false, 'rect R'], [true, 'ellipse E']]} onchange={(v) => (snippets.round = v)} />
+    <Seg value={snippets.skew} options={[[false, 'size'], [true, 'skew']]} onchange={(v) => (snippets.skew = v)} />
+  </div>
+  <p class="hint">drag a box (⇧ square) or click four corners · corners and edges size or skew (S) · ⌫ deletes · two fingers pan, pinch zooms · F fits</p>
 </div>
 
 <style>
@@ -261,6 +317,23 @@
     stroke-width: 1.5;
     stroke-dasharray: 4 3;
     vector-effect: non-scaling-stroke;
+  }
+  .frame {
+    fill: none;
+    stroke: var(--mark);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    opacity: 0.6;
+    vector-effect: non-scaling-stroke;
+  }
+  .shape {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    cursor: default;
   }
   .corner {
     fill: var(--mark);

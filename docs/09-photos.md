@@ -6,9 +6,10 @@ Paint from real photos: cut snippets from them, calm them to the texture's look,
 
 Switch to **photos** at the top. Drop photos onto the window or use **add photos**; they are copied into the project (`<project>.snippets/`). Pick one, then on the photo:
 
-- **drag** a rectangle for a straight cut,
+- **drag** a rectangle for a straight cut, **⇧** keeps it square,
 - **click four corners** for a skewed one, like a wall seen at an angle; it gets deskewed,
-- drag corners to fit, drag inside to move, **⌫** deletes, **F** fits the photo. Two fingers pan, pinch or the mouse wheel zooms.
+- **rect** or **ellipse** at the top (**R**, **E**): an ellipse cuts the round shape inside the corners, transparent around it, skewed ones in perspective. **ellipse** in the panel switches a cut.
+- drag corners or edges to fit: **size** stretches the cut with the opposite side fixed, **skew** moves them freely (**S** switches). Drag inside to move, **⌫** deletes, **F** fits the photo. Two fingers pan, pinch or the mouse wheel zooms.
 
 ## Look
 

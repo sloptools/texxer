@@ -4,7 +4,7 @@
 
 texxer paints textures for GLB models: a stack of layers, each a color limited by masks, crunched down to a few colors and baked light.
 
-1. **⌘N** new project, then add models with **+** in the models tab. Or **⌘O** to open a single GLB.
+1. **⇧⌘N** new project, then add models with **+** in the models tab. Or **⌘O** to open a single GLB.
 2. Add layers (**⇧N**), give them a color and masks.
 3. Judge the look in the views: **L** lit, **U** unlit, **I** in game, **Tab** flat texture.
 4. **⌘E** writes the texture into the model's file.
@@ -17,4 +17,4 @@ Two fingers orbit, **⇧** two fingers pan, pinch zooms to the cursor, **⌥** t
 
 The gizmo top right does the same: click an axis to look along it, again for the other side, drag it to orbit. Axis views are ortho until you orbit; **5** switches ortho and perspective. Below it: 2D, the view modes, game resolution, torch, grid, bloom and the view's lights.
 
-The tools are in the strip right of the view: view and pick surfaces, brush, stamp, volume, and the pipette. Their settings show at the top of the panel beside it. **⌘B** hides and shows the layers on the left, **⇧⌘B** that panel, **N** the view bar under the gizmo.
+The tools are in the strip right of the view: view and pick surfaces, brush, stamp, volume, and the pipette. Their settings show at the top of the panel beside it. **⌘B** hides and shows the layers on the left, **⌘N** that panel.

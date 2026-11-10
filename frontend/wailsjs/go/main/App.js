@@ -14,16 +14,16 @@ export function BridgeConnected() {
   return window['go']['main']['App']['BridgeConnected']();
 }
 
-export function BridgeStale() {
-  return window['go']['main']['App']['BridgeStale']();
-}
-
 export function BridgeLayout(arg1, arg2, arg3) {
   return window['go']['main']['App']['BridgeLayout'](arg1, arg2, arg3);
 }
 
 export function BridgeRequestSync(arg1) {
   return window['go']['main']['App']['BridgeRequestSync'](arg1);
+}
+
+export function BridgeStale() {
+  return window['go']['main']['App']['BridgeStale']();
 }
 
 export function BridgeTexture(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {

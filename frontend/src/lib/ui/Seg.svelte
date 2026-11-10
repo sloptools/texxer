@@ -20,6 +20,7 @@
     flex: 1;
     height: 22px;
     padding: 0 8px;
+    white-space: nowrap;
     border: 0;
     border-radius: 5px;
     background: none;

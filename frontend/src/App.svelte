@@ -36,14 +36,15 @@
 
   // Painting the model, or cutting snippets from photos.
   type Mode = 'paint' | 'photos'
-  let mode = $state<Mode>(localStorage.getItem('mode') === 'photos' ? 'photos' : 'paint')
-  $effect(() => localStorage.setItem('mode', mode))
+  let mode = $state<Mode>('paint')
   let side = $state<Side>(sides.find((s) => s === localStorage.getItem('side')) ?? 'layers')
   $effect(() => localStorage.setItem('side', side))
   $effect(() => persist('left', store.left))
   $effect(() => persist('right', store.right))
-  $effect(() => persist('viewBar', store.viewBar))
-  const columns = $derived([store.left && '248px', 'minmax(0, 1fr)', '36px', store.right && '300px'].filter(Boolean).join(' '))
+  // Photos need both sides.
+  const left = $derived(store.left || mode === 'photos')
+  const right = $derived(store.right || mode === 'photos')
+  const columns = $derived([left && '248px', 'minmax(0, 1fr)', '36px', right && '300px'].filter(Boolean).join(' '))
 
   onMount(() => {
     store.init()
@@ -96,13 +97,13 @@
       </div>
     {/if}
     <span class="actions">
-      <button title="New project (⌘N)" onclick={createProject}><Icon name="plus" size={11} />new</button>
+      <button title="New project (⇧⌘N)" onclick={createProject}><Icon name="plus" size={11} />new</button>
       <button title="Open a project or a model (⌘O)" onclick={pickProject}><Icon name="dir" size={11} />open</button>
       <button title="Export the model into its files, PNGs beside them (⌘E; ⇧⌘E all changed)" disabled={!store.model} onclick={exportModel}><Icon name="export" size={11} />export</button>
     </span>
   </header>
 
-  {#if store.left}
+  {#if left}
     <aside class="left" class:focus={store.focus === 'layers'} onpointerdown={() => (store.focus = 'layers')}>
       {#if store.workspace && mode === 'photos'}
         <div class="scroll">
@@ -179,7 +180,7 @@
         <p>Open a project, or a model to paint it right away. Drop files here or</p>
         <div class="buttons">
           <button class="primary" onclick={pickProject}>open <kbd>⌘O</kbd></button>
-          <button class="primary" onclick={createProject}>new project <kbd>⌘N</kbd></button>
+          <button class="primary" onclick={createProject}>new project <kbd>⇧⌘N</kbd></button>
         </div>
         {#if recent.list.length}
           <div class="recent">
@@ -200,7 +201,7 @@
 
   <ToolStrip active={mode === 'paint'} />
 
-  {#if store.right}
+  {#if right}
     <aside class="right">
       {#if mode === 'photos'}
         <CutPanel />

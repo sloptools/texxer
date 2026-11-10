@@ -28,7 +28,7 @@
   // Every edit writes the snippet once it rests.
   $effect(() => {
     if (!cut || !photo) return
-    JSON.stringify(cut.look) + cut.name
+    JSON.stringify(cut.look) + cut.name + cut.round
     snippets.changed(photo, cut)
   })
 </script>
@@ -38,6 +38,7 @@
     <div class="caps">snippet</div>
     <div class="preview"><canvas bind:this={canvas}></canvas></div>
     <input class="name" bind:value={cut.name} />
+    <label class="check"><input type="checkbox" bind:checked={() => !!cut.round, (v) => (cut.round = v || undefined)} /> ellipse inside the corners</label>
   </div>
   <div class="section">
     <div class="caps">look</div>
@@ -53,7 +54,7 @@
     <button class="text danger" onclick={() => snippets.deleteCut(photo, cut)}>delete snippet</button>
   </div>
 {:else if photo}
-  <p class="hint pad">drag a rectangle on the photo, or click four corners for a skewed one</p>
+  <p class="hint pad">drag a box on the photo, rect or ellipse (R, E), or click four corners for a skewed one</p>
 {:else}
   <p class="hint pad">add photos on the left, then cut snippets from them</p>
 {/if}

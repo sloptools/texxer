@@ -35,8 +35,7 @@
         ['⇧B ⇧G', 'bloom, grid'],
         ['P', 'game resolution: full, 480, 360, 240'],
         ['T', 'flashlight at the cursor'],
-        ['N', 'show / hide the view bar'],
-        ['⌘B ⇧⌘B', 'show / hide layers, the panel on the right'],
+        ['⌘B ⌘N', 'show / hide layers, the panel on the right'],
       ],
     ],
     [
@@ -92,7 +91,7 @@
     [
       'file',
       [
-        ['⌘O ⌘N', 'open a project or model, new project'],
+        ['⌘O ⇧⌘N', 'open a project or model, new project'],
         ['⌘P', 'switch model'],
         ['PgUp PgDn', 'previous, next model'],
         ['⌘E', 'export the model into its files'],

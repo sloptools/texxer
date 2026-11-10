@@ -1,7 +1,6 @@
 <script lang="ts">
   import ViewGizmo from './ui/ViewGizmo.svelte'
   import ViewBar from './ui/ViewBar.svelte'
-  import Icon from './Icon.svelte'
   import { onMount, untrack } from 'svelte'
   import { cmd } from './input.svelte'
   import * as api from '../../wailsjs/go/main/App'
@@ -446,11 +445,7 @@
     {#if !store.flat}
       <ViewGizmo {stage} />
     {/if}
-    {#if store.viewBar}
-      <ViewBar />
-    {:else}
-      <button class="show" title="Show the view bar (N)" onclick={() => (store.viewBar = true)}><Icon name="caret" size={11} /></button>
-    {/if}
+    <ViewBar />
   </div>
 {/if}
 
@@ -463,24 +458,6 @@
     flex-direction: column;
     align-items: center;
     gap: 8px;
-  }
-
-  .show {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 22px;
-    padding: 0;
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    background: var(--panel);
-    align-self: flex-end;
-    margin-right: -7px;
-    color: var(--dim);
-    transform: scaleX(-1);
-  }
-  .show:hover {
-    color: var(--strong);
   }
 
   .viewport {
